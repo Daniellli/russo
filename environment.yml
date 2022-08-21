@@ -1,4 +1,4 @@
-name: a100
+# name: a100
 channels:
   - conda-forge
   - defaults
@@ -114,4 +114,4 @@ dependencies:
     - werkzeug==2.1.0
     - yaspin==2.1.0
     - zipp==3.7.0
-prefix: /home/ngkanats/anaconda3/envs/a100
+# prefix: /home/ngkanats/anaconda3/envs/a100

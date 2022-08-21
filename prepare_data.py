@@ -1,3 +1,12 @@
+'''
+Author: xushaocong
+Date: 2022-08-19 16:28:28
+LastEditTime: 2022-08-19 20:02:15
+LastEditors: xushaocong
+Description: 
+FilePath: /butd_detr/prepare_data.py
+email: xushaocong@stu.xmu.edu.cn
+'''
 import argparse
 
 from src.joint_det_dataset import Joint3DDataset

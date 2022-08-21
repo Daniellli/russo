@@ -988,7 +988,10 @@ def save_data(filename, split, data_path):
     import multiprocessing as mp
 
     # Read all scan files
-    scan_path = data_path + 'scans/'
+    #!+================
+    # scan_path = data_path + 'scans/'
+    scan_path = data_path
+    #!+================
     with open('data/meta_data/scannetv2_%s.txt' % split) as f:
         scan_ids = [line.rstrip() for line in f]
     print('{} scans found.'.format(len(scan_ids)))
