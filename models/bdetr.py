@@ -14,9 +14,7 @@ import torch
 import torch.nn.functional as F
 import torch.nn as nn
 #!+==============================================
-# from transformers import RobertaModel, RobertaTokenizerFast
-
-from transformers import AutoTokenizer, AutoModelForMaskedLM
+from transformers import RobertaModel, RobertaTokenizerFast
 #!+==============================================
 
 
@@ -65,27 +63,40 @@ class BeaUTyDETR(nn.Module):
         self.butd = butd
 
         # Visual encoder
+
+        
+        
         self.backbone_net = Pointnet2Backbone(
             input_feature_dim=input_feature_dim,
             width=1
         )
+        
+        
         if input_feature_dim == 3 and pointnet_ckpt is not None:
+            #!================================= 
+            #* 显存垃圾
+            # self.backbone_net.load_state_dict(torch.load(
+            #     pointnet_ckpt
+            # ), strict=False)
             self.backbone_net.load_state_dict(torch.load(
-                pointnet_ckpt
+                pointnet_ckpt,map_location=torch.device('cpu')
             ), strict=False)
+            #!=================================
+        
+
+
 
         # Text Encoder
         #*!=============================
-        
         # t_type = "roberta-base"
-        # self.tokenizer = RobertaTokenizerFast.from_pretrained(t_type)
-        # self.text_encoder = RobertaModel.from_pretrained(t_type)
-
-
-        self.tokenizer = AutoTokenizer.from_pretrained("roberta-base")
-        self.text_encoder = AutoModelForMaskedLM.from_pretrained("roberta-base")
-
+        # model_path = "~/.cache/huggingface/transformers/roberta"
+        model_path = "/home/DISCOVER_summer2022/xusc/.cache/huggingface/transformers/roberta"
+        self.tokenizer = RobertaTokenizerFast.from_pretrained(model_path)
+        # self.tokenizer = AutoTokenizer.from_pretrained(model_path)
+        self.text_encoder = RobertaModel.from_pretrained(model_path)
         #*!=============================
+        
+        
         for param in self.text_encoder.parameters():
             param.requires_grad = False
         
@@ -116,6 +127,7 @@ class BeaUTyDETR(nn.Module):
         )
         self.cross_encoder = BiEncoder(bi_layer, 3)
 
+        
         # Query initialization
         self.points_obj_cls = PointsObjClsModule(d_model)
         self.gsample_module = GeneralSamplingModule()
@@ -162,7 +174,7 @@ class BeaUTyDETR(nn.Module):
                 nn.ReLU(),
                 nn.Linear(d_model, 64)
             )
-
+        
         # Init
         self.init_bn_momentum()
 

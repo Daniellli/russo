@@ -24,6 +24,7 @@ from models import BeaUTyDETR
 from models import APCalculator, parse_predictions, parse_groundtruths
 
 
+from IPython import embed
 import ipdb
 st = ipdb.set_trace
 
@@ -85,6 +86,9 @@ class TrainTester(BaseTrainTester):
             num_class = 256
         else:
             num_class = 19
+
+
+        
         model = BeaUTyDETR(
             num_class=num_class,
             num_obj_class=485,
@@ -97,6 +101,7 @@ class TrainTester(BaseTrainTester):
             pointnet_ckpt=args.pp_checkpoint,
             self_attend=args.self_attend
         )
+
         return model
 
     @staticmethod
@@ -109,6 +114,11 @@ class TrainTester(BaseTrainTester):
             "det_class_ids": batch_data['all_detected_class_ids']
         }
 
+
+    '''
+    description:  评估代码,    
+    return {*}
+    '''
     @torch.no_grad()
     def evaluate_one_epoch(self, epoch, test_loader,
                            model, criterion, set_criterion, args):
@@ -281,9 +291,9 @@ class TrainTester(BaseTrainTester):
 if __name__ == '__main__':
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
     opt = parse_option()
-
-    os.environ["CUDA_VISIABLE_DEVICES"] = opt.gpu_ids
     
+    os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu_ids
+
     torch.cuda.set_device(opt.local_rank)
     torch.distributed.init_process_group(backend='nccl', init_method='env://')
     torch.backends.cudnn.enabled = True

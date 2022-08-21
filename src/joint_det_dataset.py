@@ -18,14 +18,9 @@ from six.moves import cPickle
 import numpy as np
 import torch
 from torch.utils.data import Dataset
-from transformers import RobertaTokenizerFast
-
 #!+=============
-# from transformers import AutoTokenizer, AutoModelForMaskedLM
-from transformers import AutoTokenizer
+from transformers import RobertaTokenizerFast,AutoTokenizer, AutoModelForMaskedLM
 #!+=============
-# tokenizer = AutoTokenizer.from_pretrained("roberta-base")
-# model = AutoModelForMaskedLM.from_pretrained("roberta-base")
 
 
 import wandb
@@ -96,8 +91,10 @@ class Joint3DDataset(Dataset):
         )
         self.multiview_data = {}
         #!+===========================================
-        # self.tokenizer = RobertaTokenizerFast.from_pretrained("roberta-base")
-        self.tokenizer = AutoTokenizer.from_pretrained("roberta-base")
+        # model_path = "~/.cache/huggingface/transformers/roberta"
+        model_path = "/home/DISCOVER_summer2022/xusc/.cache/huggingface/transformers/roberta"
+        self.tokenizer = RobertaTokenizerFast.from_pretrained(model_path)
+        # self.tokenizer = AutoTokenizer.from_pretrained(model_path)
         
         
         # if os.path.exists('data/cls_results.json'):
@@ -588,10 +585,23 @@ class Joint3DDataset(Dataset):
         detected_logits = np.zeros((MAX_NUM_OBJ, NUM_CLASSES))
 
         # Load
-        detected_dict = np.load(
-            f'{self.data_path}group_free_pred_bboxes_{split}/{scan_id}.npy',
-            allow_pickle=True
-        ).item()
+        #!+========================= 数据是随机打散放在group_free_pred_bboxes_test/group_free_pred_bboxes_train/group_free_pred_bboxes_val
+        # detected_dict = np.load(
+        #     f'{self.data_path}group_free_pred_bboxes_{split}/{scan_id}.npy',
+        #     allow_pickle=True
+        # ).item()
+        
+        train_file_name = f'{self.data_path}group_free_pred_bboxes_train/{scan_id}.npy'
+        test_file_name = f'{self.data_path}group_free_pred_bboxes_test/{scan_id}.npy'
+        val_file_name = f'{self.data_path}group_free_pred_bboxes_val/{scan_id}.npy'
+        
+        if osp.exists(train_file_name):
+            detected_dict = np.load(train_file_name,allow_pickle=True).item()
+        elif osp.exists(test_file_name):
+            detected_dict = np.load(test_file_name,allow_pickle=True).item()
+        else:
+            detected_dict = np.load(val_file_name,allow_pickle=True).item()
+        #!+=========================
 
         all_bboxes_ = np.array(detected_dict['box'])
         classes = detected_dict['class']

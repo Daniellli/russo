@@ -28,6 +28,10 @@ from models import HungarianMatcher, SetCriterion, compute_hungarian_loss
 from utils import get_scheduler, setup_logger
 
 
+
+
+from IPython import embed
+
 def parse_option():
     """Parse cmd arguments."""
     parser = argparse.ArgumentParser()
@@ -63,10 +67,14 @@ def parse_option():
     parser.add_argument('--use_color', action='store_true',
                         help='Use RGB color in input.')
     parser.add_argument('--use_multiview', action='store_true')
+    #*========================
     parser.add_argument('--butd', action='store_true')
+    #*========================
     parser.add_argument('--butd_gt', action='store_true')
+    #*========================
     parser.add_argument('--butd_cls', action='store_true')
     parser.add_argument('--augment_det', action='store_true')
+    #*========================
     parser.add_argument('--num_workers', type=int, default=4)
 
     # Training
@@ -131,7 +139,10 @@ def load_checkpoint(args, model, optimizer, scheduler):
         args.start_epoch = int(checkpoint['epoch']) + 1
     except Exception:
         args.start_epoch = 0
+    
+    
     model.load_state_dict(checkpoint['model'], strict=True)
+
     if not args.eval and not args.reduce_lr:
         optimizer.load_state_dict(checkpoint['optimizer'])
         scheduler.load_state_dict(checkpoint['scheduler'])
@@ -208,6 +219,7 @@ class BaseTrainTester:
         train_dataset, test_dataset = self.get_datasets(args)
         #* 存在一个问题就是val 的数据抽取的不合法,在group_free_pred_bboxes_val 找不到对应的数据
         # Samplers and loaders
+        
         g = torch.Generator()
         g.manual_seed(0)
         train_sampler = DistributedSampler(train_dataset)
@@ -289,6 +301,12 @@ class BaseTrainTester:
         return optimizer
 
     def main(self, args):
+
+        
+        #!======================= 避免数据跑到其他卡上
+        torch.cuda.set_device(args.local_rank) 
+        #!=======================
+        
         """Run main training/testing pipeline."""
         # Get loaders
         train_loader, test_loader = self.get_loaders(args)
@@ -299,6 +317,9 @@ class BaseTrainTester:
 
         # Get model
         model = self.get_model(args)
+        
+        
+        
 
         # Get criterion
         criterion, set_criterion = self.get_criterion(args)
@@ -310,12 +331,16 @@ class BaseTrainTester:
         scheduler = get_scheduler(optimizer, len(train_loader), args)
 
         # Move model to devices
-        if torch.cuda.is_available():
-            model = model.cuda()
-        model = DistributedDataParallel(
-            model, device_ids=[args.local_rank],
-            broadcast_buffers=False  # , find_unused_parameters=True
-        )
+        # if torch.cuda.is_available():
+        #     model = model.cuda(args.local_rank)
+        # model = DistributedDataParallel(
+        #     model, device_ids=[args.local_rank],
+        #     broadcast_buffers=True  # , find_unused_parameters=True
+        # )
+        #!+===========mine
+        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model.cuda(args.local_rank))
+        model = DistributedDataParallel(model,device_ids=[args.local_rank],find_unused_parameters=True,broadcast_buffers = True) 
+        #!+===========
 
         # Check for a checkpoint
         if args.checkpoint_path:
@@ -460,6 +485,10 @@ class BaseTrainTester:
                 for key in sorted(stat_dict.keys()):
                     stat_dict[key] = 0
 
+    '''
+    description: 
+    return {*}
+    '''
     @torch.no_grad()
     def _main_eval_branch(self, batch_idx, batch_data, test_loader, model,
                           stat_dict,
@@ -473,6 +502,8 @@ class BaseTrainTester:
             inputs["train"] = False
 
         # Forward pass
+        #? what is the output of model 
+        embed()
         end_points = model(inputs)
 
         # Compute loss
