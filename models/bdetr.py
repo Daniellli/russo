@@ -13,7 +13,12 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
-from transformers import RobertaModel, RobertaTokenizerFast
+#!+==============================================
+# from transformers import RobertaModel, RobertaTokenizerFast
+
+from transformers import AutoTokenizer, AutoModelForMaskedLM
+#!+==============================================
+
 
 from .backbone_module import Pointnet2Backbone
 from .modules import (
@@ -70,12 +75,20 @@ class BeaUTyDETR(nn.Module):
             ), strict=False)
 
         # Text Encoder
-        t_type = "roberta-base"
-        self.tokenizer = RobertaTokenizerFast.from_pretrained(t_type)
-        self.text_encoder = RobertaModel.from_pretrained(t_type)
+        #*!=============================
+        
+        # t_type = "roberta-base"
+        # self.tokenizer = RobertaTokenizerFast.from_pretrained(t_type)
+        # self.text_encoder = RobertaModel.from_pretrained(t_type)
+
+
+        self.tokenizer = AutoTokenizer.from_pretrained("roberta-base")
+        self.text_encoder = AutoModelForMaskedLM.from_pretrained("roberta-base")
+
+        #*!=============================
         for param in self.text_encoder.parameters():
             param.requires_grad = False
-
+        
         self.text_projector = nn.Sequential(
             nn.Linear(self.text_encoder.config.hidden_size, d_model),
             nn.LayerNorm(d_model, eps=1e-12),

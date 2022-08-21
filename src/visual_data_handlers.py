@@ -98,7 +98,7 @@ class Scan:
             self.scan_id, self.scan_id + '_vh_clean_2.ply'
         ))
         pc = np.stack([
-            np.asarray(data.elements[0].data['x']),
+            np.asarray(data.elements[0].data['x']),#* 提取点云数据
             np.asarray(data.elements[0].data['y']),
             np.asarray(data.elements[0].data['z'])
         ], axis=1)
@@ -113,22 +113,22 @@ class Scan:
         np.random.seed(1184)
         choices = np.random.choice(
             pc.shape[0],
-            keep_points,
+            keep_points,#* 这个是固定值,函数接受的参数定义好了
             replace=len(pc) < keep_points
         )
         self.choices = choices
         self.new_pts = np.zeros(len(pc)).astype(int)
         self.new_pts[choices] = np.arange(len(choices)).astype(int)
-        pc = pc[choices]
+        pc = pc[choices]#* 随机提取一些点
         if label is not None:
             label = label[choices]
         color = color[choices]
-        return pc, label, color
+        return pc, label, color#*  pc== point cloud ==(x,y,z)*N, label == None during loading training set , color == (RGB)data \in [0,1] 
 
     def load_point_clouds_of_all_objects(self):
         """Load point clouds for all objects."""
         # Load segments
-        segments_file = osp.join(
+        segments_file = osp.join(#! scene0000_00_vh_clean_2.0.010000.segs.json  , 主要就是一些index 
             self.top_scan_dir,
             self.scan_id, self.scan_id + '_vh_clean_2.0.010000.segs.json'
         )
@@ -143,25 +143,25 @@ class Scan:
         aggregation_file = osp.join(
             self.top_scan_dir,
             self.scan_id, self.scan_id + '.aggregation.json')
-        with open(aggregation_file) as fid:
+        with open(aggregation_file) as fid:#! scene0000_00.aggregation.json' 
             scan_aggregation = json.load(fid)
 
         # Iterate over objects
         self.three_d_objects = []
-        for object_info in scan_aggregation['segGroups']:
+        for object_info in scan_aggregation['segGroups']:#* 遍历每个object
             points = []
             for s in object_info['segments']:
                 points.extend(segments[s])
             points = np.array(list(set(points)))
             if self.choices is not None:
                 points = self.new_pts[points[np.isin(points, self.choices)]]
-            self.three_d_objects.append(dict({
+            self.three_d_objects.append(dict({#!  添加每个场景目标的id , 点云集,目标的label
                 'object_id': int(object_info['objectId']),
                 'points': np.array(points),
                 'instance_label': str(object_info['label'])
             }))
 
-        # Filter duplicate boxes
+        # Filter duplicate boxes#* 过滤重复目标,重复bbox
         obj_list = []
         for o in range(len(self.three_d_objects)):
             if o == 0:

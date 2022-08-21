@@ -19,6 +19,15 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 from transformers import RobertaTokenizerFast
+
+#!+=============
+# from transformers import AutoTokenizer, AutoModelForMaskedLM
+from transformers import AutoTokenizer
+#!+=============
+# tokenizer = AutoTokenizer.from_pretrained("roberta-base")
+# model = AutoModelForMaskedLM.from_pretrained("roberta-base")
+
+
 import wandb
 
 from data.model_util_scannet import ScannetDatasetConfig
@@ -31,6 +40,7 @@ DC = ScannetDatasetConfig(NUM_CLASSES)
 DC18 = ScannetDatasetConfig(18)
 MAX_NUM_OBJ = 132
 
+import os.path as osp
 
 class Joint3DDataset(Dataset):
     """Dataset utilities for ReferIt3D."""
@@ -85,10 +95,18 @@ class Joint3DDataset(Dataset):
             "enet_feats_maxpool.hdf5"
         )
         self.multiview_data = {}
-        self.tokenizer = RobertaTokenizerFast.from_pretrained("roberta-base")
-        if os.path.exists('data/cls_results.json'):
-            with open('data/cls_results.json') as fid:
+        #!+===========================================
+        # self.tokenizer = RobertaTokenizerFast.from_pretrained("roberta-base")
+        self.tokenizer = AutoTokenizer.from_pretrained("roberta-base")
+        
+        
+        # if os.path.exists('data/cls_results.json'):
+        #     with open('data/cls_results.json') as fid:
+        #         self.cls_results = json.load(fid)  # {scan_id: [class0, ...]}
+        if os.path.exists('data/cls_demo_results.json'):
+            with open('data/cls_demo_results.json') as fid:
                 self.cls_results = json.load(fid)  # {scan_id: [class0, ...]}
+        #!+===========================================
 
         # load
         print('Loading %s files, take a breath!' % split)
@@ -133,7 +151,8 @@ class Joint3DDataset(Dataset):
             split = 'test'
         with open('data/meta_data/sr3d_%s_scans.txt' % split) as f:
             scan_ids = set(eval(f.read()))
-        with open(self.data_path + 'refer_it_3d/%s.csv' % dset) as f:
+        # with open(self.data_path + 'refer_it_3d/%s.csv' % dset) as f:
+        with open(self.data_path + '/refer_it_3d/%s.csv' % dset) as f:
             csv_reader = csv.reader(f)
             headers = next(csv_reader)
             headers = {header: h for h, header in enumerate(headers)}
@@ -273,8 +292,15 @@ class Joint3DDataset(Dataset):
     def load_scannet_annos(self):
         """Load annotations of scannet."""
         split = 'train' if self.split == 'train' else 'val'
-        with open('data/meta_data/scannetv2_%s.txt' % split) as f:
+        #!==========================================
+        # with open('data/meta_data/scannetv2_%s.txt' % split) as f:
+        #     scan_ids = [line.rstrip() for line in f]
+
+        with open('data/meta_data/scandemo_%s.txt' % split) as f:
             scan_ids = [line.rstrip() for line in f]
+        #!==========================================
+
+
         annos = []
         for scan_id in scan_ids:
             scan = self.scans[scan_id]
@@ -990,10 +1016,15 @@ def save_data(filename, split, data_path):
     # Read all scan files
     #!+================
     # scan_path = data_path + 'scans/'
-    scan_path = data_path
-    #!+================
-    with open('data/meta_data/scannetv2_%s.txt' % split) as f:
+    scan_path = osp.join(data_path,'scans','mini_scans')
+    
+    #* 下载太慢了, 测试mini scannet
+    # with open('data/meta_data/scannetv2_%s.txt' % split) as f:
+    #     scan_ids = [line.rstrip() for line in f]
+    with open('data/meta_data/scandemo_%s.txt' % split) as f:
         scan_ids = [line.rstrip() for line in f]
+    #!+================
+
     print('{} scans found.'.format(len(scan_ids)))
 
     # Load data

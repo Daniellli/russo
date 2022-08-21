@@ -281,6 +281,9 @@ class TrainTester(BaseTrainTester):
 if __name__ == '__main__':
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
     opt = parse_option()
+
+    os.environ["CUDA_VISIABLE_DEVICES"] = opt.gpu_ids
+    
     torch.cuda.set_device(opt.local_rank)
     torch.distributed.init_process_group(backend='nccl', init_method='env://')
     torch.backends.cudnn.enabled = True

@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-08-19 16:28:28
-LastEditTime: 2022-08-19 20:02:15
+LastEditTime: 2022-08-21 15:36:34
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/prepare_data.py

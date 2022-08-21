@@ -112,6 +112,9 @@ def parse_option():
     parser.add_argument('--pp_checkpoint', default=None)
     parser.add_argument('--reduce_lr', action='store_true')
 
+
+    parser.add_argument('--gpu-ids', default='7', type=str)
+
     args, _ = parser.parse_known_args()
 
     args.eval = args.eval or args.eval_train
@@ -203,6 +206,7 @@ class BaseTrainTester:
             np.random.seed(np.random.get_state()[1][0] + worker_id)
         # Datasets
         train_dataset, test_dataset = self.get_datasets(args)
+        #* 存在一个问题就是val 的数据抽取的不合法,在group_free_pred_bboxes_val 找不到对应的数据
         # Samplers and loaders
         g = torch.Generator()
         g.manual_seed(0)
@@ -218,6 +222,7 @@ class BaseTrainTester:
             drop_last=True,
             generator=g
         )
+        
         test_sampler = DistributedSampler(test_dataset, shuffle=False)
         test_loader = DataLoader(
             test_dataset,
