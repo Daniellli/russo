@@ -160,3 +160,6 @@ log
 log/*
 datasets
 datasets/*
+
+vis_results
+vis_results/*

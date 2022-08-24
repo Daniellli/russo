@@ -37,6 +37,11 @@ MAX_NUM_OBJ = 132
 
 import os.path as osp
 
+
+
+
+
+
 class Joint3DDataset(Dataset):
     """Dataset utilities for ReferIt3D."""
 
@@ -514,7 +519,7 @@ class Joint3DDataset(Dataset):
 
     def _get_target_boxes(self, anno, scan):
         """Return gt boxes to detect."""
-        bboxes = np.zeros((MAX_NUM_OBJ, 6))
+        bboxes = np.zeros((MAX_NUM_OBJ, 6))#* MAX_NUM_OBJ==132
         if isinstance(anno['target_id'], list):  # scannet
             tids = anno['target_id']
         else:  # referit dataset
@@ -536,7 +541,7 @@ class Joint3DDataset(Dataset):
             bboxes[:len(tids)] *= (0.95 + 0.1*np.random.random((len(tids), 6)))
         bboxes[len(tids):, :3] = 1000
         box_label_mask = np.zeros(MAX_NUM_OBJ)
-        box_label_mask[:len(tids)] = 1
+        box_label_mask[:len(tids)] = 1#* mast == 0 的就是 非目标, 是padding , maximun number == 132, 每个场景应该没有132个目标, 所以会有padding
         return bboxes, box_label_mask, point_instance_label
 
     def _get_scene_objects(self, scan):
@@ -708,7 +713,7 @@ class Joint3DDataset(Dataset):
                 ]
             anno['utterance'] = utterance
 
-        # Point cloud representation
+        # Point cloud representation#* point_cloud == [x,y,z,r,g,b], 50000 points 
         point_cloud, augmentations, og_color = self._get_pc(anno, scan)
 
         # "Target" boxes: append anchors if they're to be detected

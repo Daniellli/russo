@@ -29,8 +29,11 @@ from utils import get_scheduler, setup_logger
 
 
 
+from my_script.vis_utils import *
 
-from IPython import embed
+
+
+
 
 def parse_option():
     """Parse cmd arguments."""
@@ -122,6 +125,10 @@ def parse_option():
 
 
     parser.add_argument('--gpu-ids', default='7', type=str)
+    parser.add_argument('--vis-save-path', default='', type=str)
+    
+
+    
 
     args, _ = parser.parse_known_args()
 
@@ -219,7 +226,14 @@ class BaseTrainTester:
         train_dataset, test_dataset = self.get_datasets(args)
         #* 存在一个问题就是val 的数据抽取的不合法,在group_free_pred_bboxes_val 找不到对应的数据
         # Samplers and loaders
+
+        # for k in train_dataset.__getitem__(1).keys():
+        #     if hasattr(train_dataset.__getitem__(1)[k],"shape"):
+        #         print(k,train_dataset.__getitem__(1)[k].shape)
+            
         
+        
+
         g = torch.Generator()
         g.manual_seed(0)
         train_sampler = DistributedSampler(train_dataset)
@@ -331,15 +345,15 @@ class BaseTrainTester:
         scheduler = get_scheduler(optimizer, len(train_loader), args)
 
         # Move model to devices
-        # if torch.cuda.is_available():
-        #     model = model.cuda(args.local_rank)
-        # model = DistributedDataParallel(
-        #     model, device_ids=[args.local_rank],
-        #     broadcast_buffers=True  # , find_unused_parameters=True
-        # )
+        if torch.cuda.is_available():
+            model = model.cuda(args.local_rank)
+        model = DistributedDataParallel(
+            model, device_ids=[args.local_rank],
+            broadcast_buffers=True  # , find_unused_parameters=True
+        )
         #!+===========mine
-        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model.cuda(args.local_rank))
-        model = DistributedDataParallel(model,device_ids=[args.local_rank],find_unused_parameters=True,broadcast_buffers = True) 
+        # model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model.cuda(args.local_rank))
+        # model = DistributedDataParallel(model,device_ids=[args.local_rank],find_unused_parameters=True,broadcast_buffers = True) 
         #!+===========
 
         # Check for a checkpoint
@@ -503,13 +517,36 @@ class BaseTrainTester:
 
         # Forward pass
         #? what is the output of model 
-        embed()
+
+        #!+============================================
+        #* 132 == MAX_NUM_OBJ ,the max number of object  in that scenes 
+        # inputs['point_clouds']#*  [2, 50000, 6]
+        # inputs['text'] #* length = 2 
+        # inputs['det_boxes']#* [2, 132, 6]
+        # inputs['det_bbox_label_mask']#* [2,132]   , 对应是目标还是padding 
+        # inputs['det_class_ids']#* [2,132] , 对应类别信息
+
+        B,OB_NUM=inputs['det_class_ids'].shape
+        
+        for i in range(B):
+            print(inputs['text'][i])
+            draw_pc_box(
+                        numpy2open3d_colorful(inputs['point_clouds'][i].clone().detach().cpu().numpy()),
+                        inputs['det_boxes'][i][inputs['det_bbox_label_mask'][i]].clone().detach().cpu().numpy(),
+                        save_path=os.path.join(self.vis_save_path, '%s_gt.txt'%(batch_data['scan_ids'][i]))
+                        )  
+        #!+============================================
+            
+        
         end_points = model(inputs)
+
+
+
 
         # Compute loss
         for key in batch_data:
             assert (key not in end_points)
-            end_points[key] = batch_data[key]
+            end_points[key] = batch_data[key]#* 拿取 对应的数据
         _, end_points = self._compute_loss(
             end_points, criterion, set_criterion, args
         )

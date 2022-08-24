@@ -572,7 +572,7 @@ def compute_hungarian_loss(end_points, num_decoder_layers, set_criterion,
             output['proj_queries'] = end_points[f'{prefix}proj_queries']
             output['tokenized'] = end_points['tokenized']
 
-        # Get predicted boxes and labels
+        #* Get predicted boxes and labels, why the K equals to 256,n_class equals to 256, Q equals to 256
         pred_center = end_points[f'{prefix}center']  # B, K, 3
         pred_size = end_points[f'{prefix}pred_size']  # (B,K,3) (l,w,h)
         pred_bbox = torch.cat([pred_center, pred_size], dim=-1)

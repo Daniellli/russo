@@ -27,6 +27,16 @@ from models import APCalculator, parse_predictions, parse_groundtruths
 from IPython import embed
 import ipdb
 st = ipdb.set_trace
+import scipy.io as scio
+import sys 
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(BASE_DIR)
+
+
+
+import os.path as osp
+import time
 
 
 class TrainTester(BaseTrainTester):
@@ -35,6 +45,12 @@ class TrainTester(BaseTrainTester):
     def __init__(self, args):
         """Initialize."""
         super().__init__(args)
+
+        if args.eval:
+            self.vis_save_path = osp.join("vis_results",time.strftime("%Y:%m:%d",time.gmtime(time.time()))+"_"+str(int(time.time())))
+            os.makedirs(self.vis_save_path)
+            
+            
 
     @staticmethod
     def get_datasets(args):
@@ -222,27 +238,30 @@ class TrainTester(BaseTrainTester):
             25, 27, 29, 31, 32, 34, 36, 38, 39, 41, 42, 44, 45
         ])
         for batch_idx, batch_data in enumerate(test_loader):
+
+            #*  all_utterances = [data['utterances'] for data in test_loader]  #* a test for utterances 
             stat_dict, end_points = self._main_eval_branch(
                 batch_idx, batch_data, test_loader, model, stat_dict,
                 criterion, set_criterion, args
             )
-            # contrast
-            proj_tokens = end_points['proj_tokens']  # (B, tokens, 64)
-            proj_queries = end_points['last_proj_queries']  # (B, Q, 64)
+            #* contrast
+            proj_tokens = end_points['proj_tokens']  #* (B, tokens, 64)
+            proj_queries = end_points['last_proj_queries']  #* (B, Q, 64)
             sem_scores = torch.matmul(proj_queries, proj_tokens.transpose(-1, -2))
-            sem_scores_ = sem_scores / 0.07  # (B, Q, tokens)
+            sem_scores_ = sem_scores / 0.07  #* (B, Q, tokens)
             sem_scores = torch.zeros(sem_scores_.size(0), sem_scores_.size(1), 256)
             sem_scores = sem_scores.to(sem_scores_.device)
             sem_scores[:, :sem_scores_.size(1), :sem_scores_.size(2)] = sem_scores_
             end_points['last_sem_cls_scores'] = sem_scores
-            # end contrast
+            #* end contrast
             sem_cls = torch.zeros_like(end_points['last_sem_cls_scores'])[..., :19]
             for w, t in zip(wordidx, tokenidx):
                 sem_cls[..., w] += end_points['last_sem_cls_scores'][..., t]
             end_points['last_sem_cls_scores'] = sem_cls
 
-            # Parse predictions
-            # for prefix in prefixes:
+            #* Parse predictions
+            #* for prefix in prefixes:
+            #* 最后一部分是 6个decoder layer, 最后一个的输出是前缀是last_ 
             prefix = 'last_'
             batch_pred_map_cls = parse_predictions(
                 end_points, CONFIG_DICT, prefix,
@@ -252,6 +271,8 @@ class TrainTester(BaseTrainTester):
                 size_cls_agnostic=True)
             batch_pred_map_cls_dict[prefix].append(batch_pred_map_cls)
             batch_gt_map_cls_dict[prefix].append(batch_gt_map_cls)
+            
+
 
         mAP = 0.0
         # for prefix in prefixes:
@@ -288,6 +309,9 @@ class TrainTester(BaseTrainTester):
         return None
 
 
+
+
+
 if __name__ == '__main__':
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
     opt = parse_option()
@@ -299,6 +323,5 @@ if __name__ == '__main__':
     torch.backends.cudnn.enabled = True
     torch.backends.cudnn.benchmark = True
     torch.backends.cudnn.deterministic = True
-
     train_tester = TrainTester(opt)
     ckpt_path = train_tester.main(opt)

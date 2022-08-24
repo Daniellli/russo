@@ -233,10 +233,10 @@ class BeaUTyDETR(nn.Module):
         """
         # Within-modality encoding
         end_points = self._run_backbones(inputs)
-        points_xyz = end_points['fp2_xyz']  # (B, points, 3)
-        points_features = end_points['fp2_features']  # (B, F, points)
-        text_feats = end_points['text_feats']  # (B, L, F)
-        text_padding_mask = end_points['text_attention_mask']  # (B, L)
+        points_xyz = end_points['fp2_xyz']  #* (B, points, 3)
+        points_features = end_points['fp2_features']  #* (B, F, points)
+        text_feats = end_points['text_feats']  #* (B, L, F)
+        text_padding_mask = end_points['text_attention_mask']  #* (B, L)
 
         # Box encoding
         if self.butd:
@@ -252,7 +252,7 @@ class BeaUTyDETR(nn.Module):
             detected_mask = None
             detected_feats = None
 
-        # Cross-modality encoding
+        #* Cross-modality encoding
         points_features, text_feats = self.cross_encoder(
             vis_feats=points_features.transpose(1, 2).contiguous(),
             pos_feats=self.pos_embed(points_xyz).transpose(1, 2).contiguous(),
@@ -275,7 +275,7 @@ class BeaUTyDETR(nn.Module):
             )
             end_points['proj_tokens'] = proj_tokens
 
-        # Query Points Generation
+        #* Query Points Generation
         end_points = self._generate_queries(
             points_xyz, points_features, end_points
         )
@@ -288,7 +288,7 @@ class BeaUTyDETR(nn.Module):
                 self.contrastive_align_projection_image(query), p=2, dim=-1
             )
 
-        # Proposals (one for each query)
+        #* Proposals (one for each query)
         proposal_center, proposal_size = self.proposal_head(
             cluster_feature,
             base_xyz=cluster_xyz,
@@ -299,7 +299,7 @@ class BeaUTyDETR(nn.Module):
         base_size = proposal_size.detach().clone()  # (B, V, 3)
         query_mask = None
 
-        # Decoder
+        #* Decoder
         for i in range(self.num_decoder_layers):
             prefix = 'last_' if i == self.num_decoder_layers-1 else f'{i}head_'
 
@@ -313,7 +313,7 @@ class BeaUTyDETR(nn.Module):
             else:
                 raise NotImplementedError
 
-            # Transformer Decoder Layer
+            #* Transformer Decoder Layer
             query = self.decoder[i](
                 query, points_features.transpose(1, 2).contiguous(),
                 text_feats, query_pos,
@@ -331,15 +331,15 @@ class BeaUTyDETR(nn.Module):
                     self.contrastive_align_projection_image(query), p=2, dim=-1
                 )
 
-            # Prediction
+            #* Prediction
             base_xyz, base_size = self.prediction_heads[i](
                 query.transpose(1, 2).contiguous(),  # (B, F, V)
                 base_xyz=cluster_xyz,
                 end_points=end_points,
                 prefix=prefix
             )
-            base_xyz = base_xyz.detach().clone()
-            base_size = base_size.detach().clone()
+            base_xyz = base_xyz.detach().clone() #???
+            base_size = base_size.detach().clone()#? 为什么没返回
 
         return end_points
 
