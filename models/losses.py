@@ -15,6 +15,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.distributed as dist
 
+import os.path as osp
+import numpy as np
 
 def is_dist_avail_and_initialized():
     if not dist.is_available():
@@ -349,11 +351,13 @@ class SetCriterion(nn.Module):
         super().__init__()
         self.matcher = matcher
         self.eos_coef = eos_coef
-        self.losses = losses
+        self.losses = losses #* ==['boxes', 'label']
         self.temperature = temperature
 
     def loss_labels_st(self, outputs, targets, indices, num_boxes):
-        """Soft token prediction (with objectness)."""
+        """Soft token prediction (with objectness).""" 
+        #* soft token loss , 
+        #* 每个query 都要预测一个 256维度的分布, 与256 个token 对应, gt就是positive_map(是一个对应的gt token 位置为1 ,其他位置为0的一个map)
         logits = outputs["pred_logits"].log_softmax(-1)  # (B, Q, 256)
         positive_map = torch.cat([t["positive_map"] for t in targets])
 
@@ -366,10 +370,10 @@ class SetCriterion(nn.Module):
             offset += len(targets[i]["boxes"])
         tgt_idx = torch.cat(tgt_idx)
 
-        # Labels, by default lines map to the last element, no_object
+        #? Labels, by default lines map to the last element, no_object
         tgt_pos = positive_map[tgt_idx]
         target_sim = torch.zeros_like(logits)
-        target_sim[:, :, -1] = 1
+        target_sim[:, :, -1] = 1 #* 匹配到最后一个表示no matched 
         target_sim[src_idx] = tgt_pos
 
         # Compute entropy
@@ -390,14 +394,14 @@ class SetCriterion(nn.Module):
         return losses
 
     def loss_boxes(self, outputs, targets, indices, num_boxes):
-        """Compute bbox losses."""
+        """Compute bbox losses. """#?  1.  gt 的bbox 指的是文本对应的bbox,     计算predicted bbox是否和这个bbox对应!
         assert 'pred_boxes' in outputs
         idx = self._get_src_permutation_idx(indices)
-        src_boxes = outputs['pred_boxes'][idx]
+        src_boxes = outputs['pred_boxes'][idx]#? ==torch.cat([outputs['pred_boxes'][idx[0][0],idx[1][0]].view(-1,6),outputs['pred_boxes'][idx[0][1],idx[1][1]].view(-1,6)])
         target_boxes = torch.cat([
             t['boxes'][i] for t, (_, i) in zip(targets, indices)
         ], dim=0)
-
+        #*  
         loss_bbox = (
             F.l1_loss(
                 src_boxes[..., :3], target_boxes[..., :3],
@@ -407,9 +411,9 @@ class SetCriterion(nn.Module):
                 src_boxes[..., 3:], target_boxes[..., 3:],
                 reduction='none'
             )
-        )
+        ) #* 位置算 L1 loss, 大小也算L1 loss但是乘了0.2 
         losses = {}
-        losses['loss_bbox'] = loss_bbox.sum() / num_boxes
+        losses['loss_bbox'] = loss_bbox.sum() / num_boxes #* 
 
         loss_giou = 1 - torch.diag(generalized_box_iou3d(
             box_cxcyczwhd_to_xyzxyz(src_boxes),
@@ -494,7 +498,7 @@ class SetCriterion(nn.Module):
             torch.full_like(src, i) for i, (src, _) in enumerate(indices)
         ])
         src_idx = torch.cat([src for (src, _) in indices])
-        return batch_idx, src_idx
+        return batch_idx, src_idx #* 
 
     def _get_tgt_permutation_idx(self, indices):
         # permute targets following indices
@@ -505,7 +509,7 @@ class SetCriterion(nn.Module):
         return batch_idx, tgt_idx
 
     def get_loss(self, loss, outputs, targets, indices, num_boxes, **kwargs):
-        loss_map = {
+        loss_map = {#* 三个loss function 
             'labels': self.loss_labels_st,
             'boxes': self.loss_boxes,
             'contrastive_align': self.loss_contrastive_align
@@ -522,7 +526,7 @@ class SetCriterion(nn.Module):
              targets: list of dicts, such that len(targets) == batch_size.
         """
         # Retrieve the matching between outputs and targets
-        indices = self.matcher(outputs, targets)
+        indices = self.matcher(outputs, targets) #* return [B,matched_pair_number], 每个数据的格式 是[matched_id , key], key用于区分是第几个pair ,与配对的数据无关
 
         num_boxes = sum(len(inds[1]) for inds in indices)
         num_boxes = torch.as_tensor(
@@ -545,10 +549,13 @@ class SetCriterion(nn.Module):
 def compute_hungarian_loss(end_points, num_decoder_layers, set_criterion,
                            query_points_obj_topk=5):
     """Compute Hungarian matching loss containing CE, bbox and giou."""
+    #!================================================================
+    DEBUG = True
+    #!================================================================
     prefixes = ['last_'] + [f'{i}head_' for i in range(num_decoder_layers - 1)]
-    prefixes = ['proposal_'] + prefixes
+    prefixes = ['proposal_'] + prefixes #* proposal 是第一个, last 是最后一个 
 
-    # Ground-truth
+    #* Ground-truth
     gt_center = end_points['center_label'][:, :, 0:3]  # B, G, 3
     gt_size = end_points['size_gts']  # (B,G,3)
     gt_labels = end_points['sem_cls_label']  # (B, G)
@@ -558,10 +565,10 @@ def compute_hungarian_loss(end_points, num_decoder_layers, set_criterion,
     target = [
         {
             "labels": gt_labels[b, box_label_mask[b].bool()],
-            "boxes": gt_bbox[b, box_label_mask[b].bool()],
-            "positive_map": positive_map[b, box_label_mask[b].bool()]
-        }
-        for b in range(gt_labels.shape[0])
+            "boxes": gt_bbox[b, box_label_mask[b].bool()],#* 
+            "positive_map": positive_map[b, box_label_mask[b].bool()] #* 分布? 用于计算 token 和query 的soft token loss 
+        }#* 每个box 最多对应在 256个token中只能有一个响应的地方,  
+        for b in range(gt_labels.shape[0]) 
     ]
 
     loss_ce, loss_bbox, loss_giou, loss_contrastive_align = 0, 0, 0, 0
@@ -581,7 +588,51 @@ def compute_hungarian_loss(end_points, num_decoder_layers, set_criterion,
         output["pred_boxes"] = pred_bbox
 
         # Compute all the requested losses
-        losses, _ = set_criterion(output, target)
+        #!================================================================
+        if DEBUG:
+            with open ('vis_results/current_path.txt','r') as f :
+                debug_save_path = f.read().strip()
+            
+            losses, indices = set_criterion(output, target) #* indices : 
+
+            # permute predictions following indices
+            batch_idx = torch.cat([
+                torch.full_like(src, i) for i, (src, _) in enumerate(indices)
+            ])
+            src_idx = torch.cat([src for (src, _) in indices])
+            
+            pred_bb = output['pred_boxes'][batch_idx,src_idx]
+
+            # pred_bb = [output['pred_boxes'][idx ,key.item()]  for idx, (key,key_id)  in enumerate(indices)]
+            # gt_bbox = [x['boxes'][0] for x in target]
+
+            gt_bbox = torch.cat([
+                t['boxes'][i] for t, (_, i) in zip(target, indices)
+            ], dim=0)
+
+            batch_size = len(indices)
+
+            bbox_num_per_batch =int( gt_bbox.shape[0]/batch_size)
+
+            for idx in range(len(indices)):
+                np.savetxt(osp.join(debug_save_path, 
+                                '%s_gt_%sbox.txt'%(end_points['scan_ids'][idx],prefix)),
+                                gt_bbox[idx*bbox_num_per_batch:(idx+1)*bbox_num_per_batch].detach().cpu().numpy(),
+                                fmt='%s',delimiter=' ')
+
+                np.savetxt(osp.join(debug_save_path,'%s_pred_%sbox.txt'%(end_points['scan_ids'][idx],prefix)),
+                            pred_bb[idx*bbox_num_per_batch:(idx+1)*bbox_num_per_batch].detach().cpu().numpy(),
+                            fmt='%s')
+        else :
+            losses, _ = set_criterion(output, target)
+
+
+
+
+    
+        #!================================================================
+
+
         for loss_key in losses.keys():
             end_points[f'{prefix}_{loss_key}'] = losses[loss_key]
         loss_ce += losses.get('loss_ce', 0)

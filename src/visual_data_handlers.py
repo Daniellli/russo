@@ -81,6 +81,12 @@ class Scan:
         if load_objects:
             self.load_point_clouds_of_all_objects()
 
+    '''
+    description:  随机采样 keep_points 个点云数据, 为什么是50000?
+    param {*} self
+    param {*} keep_points: 
+    return {*}
+    '''
     def load_point_cloud(self, keep_points=50000):
         """Load point-cloud information."""
         # Load labels

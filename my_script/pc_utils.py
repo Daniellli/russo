@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-08-22 15:05:23
-LastEditTime: 2022-08-24 23:30:15
+LastEditTime: 2022-08-25 13:04:11
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/my_script/pc_utils.py
@@ -225,6 +225,22 @@ def write_ply(points, filename, text=True):
 
     PlyData([el,color2], text=text).write(filename)
 
+'''
+description:  保存带颜色的点云 
+param {*} points
+param {*} filename
+return {*}
+'''
+def write_pc_as_ply(points, filename):
+
+    """ input: Nx3, write points to filename as PLY format. """
+    vertex = [(x,y,z,r*255,g*255,b*255) for x,y,z,r,g,b in points]
+    vertex = np.array(vertex, dtype=[('x', 'f4'), ('y', 'f4'),('z', 'f4'),('red', 'u1'), ('green', 'u1'),('blue', 'u1')])
+
+    el = PlyElement.describe(vertex, 'vertex', comments=['vertices'])
+    PlyData([el], text=True).write(filename)
+    
+    
     
 
 
@@ -448,35 +464,42 @@ def write_oriented_bbox(scene_bbox, out_filename, colors=None):
         trns = np.eye(4)
         trns[0:3, 3] = ctr
         trns[3,3] = 1.0            
-        #!=======没有normal 
-        # trns[0:3,0:3] = heading2rotmat(box[6])
-        
+
+        #* dose it have normal ?
+        if len(box) >6: 
+            trns[0:3,0:3] = heading2rotmat(box[6])
+        else : #* by default : normal == 0
+            trns[0:3,0:3] = heading2rotmat(0)
+            
+
         if color is None:
             color = (1, 1, 1, 0.3)
-        
-        box_trimesh_fmt = trimesh.creation.box(lengths, trns, visual=trimesh.visual.ColorVisuals(
-            face_colors=list((color for k in range(12)))
-        ))
+        #* draw box 
+        box_trimesh_fmt = trimesh.creation.box(
+            lengths, trns, 
+            visual=trimesh.visual.ColorVisuals(face_colors=list((color for k in range(12))))
+        )
+
         return box_trimesh_fmt
 
     scene = trimesh.scene.Scene()
-    
-    if len(scene_bbox) > 0:
+    num= len(scene_bbox)
+    if num > 0:
+        
         if colors is None:
-            colors = []
-            for i in range(len(scene_bbox)):
-                colors.append((0.7, 0.7, 0.7, 0.3))
+            colors = [(0.7, 0.7, 0.7, 0.3) for i in range(num) ]
+
         for box, color in zip(scene_bbox, colors):
             scene.add_geometry(convert_oriented_box_to_trimesh_fmt(box, color=color))        
-        
+
         mesh_list = trimesh.util.concatenate(scene.dump())
         # save to ply file    
         mesh_list.export(out_filename, file_type='ply')
+
     else:
         with open(out_filename, "w+") as f:
             f.write("")
     
-    return
 
 def write_oriented_bbox_camera_coord(scene_bbox, out_filename):
     """Export oriented (around Y axis) scene bbox to meshes

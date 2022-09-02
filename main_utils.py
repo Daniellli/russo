@@ -13,6 +13,7 @@
 import argparse
 import json
 import os
+from posixpath import dirname
 import random
 import time
 
@@ -23,14 +24,22 @@ from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel
+import wandb
 
 from models import HungarianMatcher, SetCriterion, compute_hungarian_loss
 from utils import get_scheduler, setup_logger
 
 
 
-from my_script.vis_utils import *
+# from my_script.vis_utils import *
+from my_script.pc_utils import *
 
+from loguru import logger
+
+
+import os.path as osp
+
+from IPython import embed
 
 
 
@@ -123,9 +132,14 @@ def parse_option():
     parser.add_argument('--pp_checkpoint', default=None)
     parser.add_argument('--reduce_lr', action='store_true')
 
-
+    #* mine args 
     parser.add_argument('--gpu-ids', default='7', type=str)
     parser.add_argument('--vis-save-path', default='', type=str)
+    parser.add_argument('--upload-wandb',action='store_true', help="upload to wandb or not ?")
+    parser.add_argument('--save-input-output',action='store_true', help="save-input-output")
+
+
+    
     
 
     
@@ -230,10 +244,6 @@ class BaseTrainTester:
         # for k in train_dataset.__getitem__(1).keys():
         #     if hasattr(train_dataset.__getitem__(1)[k],"shape"):
         #         print(k,train_dataset.__getitem__(1)[k].shape)
-            
-        
-        
-
         g = torch.Generator()
         g.manual_seed(0)
         train_sampler = DistributedSampler(train_dataset)
@@ -318,7 +328,8 @@ class BaseTrainTester:
 
         
         #!======================= 避免数据跑到其他卡上
-        torch.cuda.set_device(args.local_rank) 
+        torch.cuda.set_device(args.local_rank)
+        logger.info(f"args.local_rank == {args.local_rank}")
         #!=======================
         
         """Run main training/testing pipeline."""
@@ -430,6 +441,7 @@ class BaseTrainTester:
         )
         return loss, end_points
 
+
     @staticmethod
     def _accumulate_stats(stat_dict, end_points):
         for key in end_points:
@@ -441,6 +453,11 @@ class BaseTrainTester:
                 else:
                     stat_dict[key] += end_points[key].item()
         return stat_dict
+
+
+
+
+
 
     def train_one_epoch(self, epoch, train_loader, model,
                         criterion, set_criterion,
@@ -471,6 +488,12 @@ class BaseTrainTester:
             loss, end_points = self._compute_loss(
                 end_points, criterion, set_criterion, args
             )
+
+            #!===================
+            if args.upload_wandb and args.local_rank==0:
+                wandb.log({"loss":loss.clone().detach().item()})
+            #!===================
+
             optimizer.zero_grad()
             loss.backward()
             if args.clip_norm > 0:
@@ -499,6 +522,62 @@ class BaseTrainTester:
                 for key in sorted(stat_dict.keys()):
                     stat_dict[key] = 0
 
+    
+
+    ''' 
+    description: 检查输入 
+    param {*} self
+    param {*} inputs
+    return {*}
+    '''
+    def check_input(self,batch_data):
+        #* 132 == MAX_NUM_OBJ ,the max number of object  in that scenes 
+        # inputs['point_clouds']#*  [2, 50000, 6]
+        # inputs['text'] #* length = 2 
+        # inputs['det_boxes']#* [2, 132, 6]
+        # inputs['det_bbox_label_mask']#* [2,132]   , 对应是目标还是padding 
+        # inputs['det_class_ids']#* [2,132] , 对应类别信息
+        inputs = self._get_inputs(batch_data)
+        B,OB_NUM=inputs['det_class_ids'].shape
+        for i in range(B):
+            print(inputs['text'][i])
+
+            # draw_pc_box(
+            #             numpy2open3d_colorful(inputs['point_clouds'][i].clone().detach().cpu().numpy()),
+            #             inputs['det_boxes'][i][inputs['det_bbox_label_mask'][i]].clone().detach().cpu().numpy(),
+            #             save_path=os.path.join(self.vis_save_path, '%s_gt.txt'%(batch_data['scan_ids'][i]))
+            #             )  
+            
+            write_pc_as_ply(
+                        inputs['point_clouds'][i].clone().detach().cpu().numpy(),
+                        os.path.join(self.vis_save_path, '%s_gt.ply'%(batch_data['scan_ids'][i]))
+                    )
+
+            
+
+            #* ply format bounding box 
+            # write_oriented_bbox(
+            #         inputs['det_boxes'][i][inputs['det_bbox_label_mask'][i]].clone().detach().cpu().numpy(),
+            #         os.path.join(self.vis_save_path, '%s_box.ply'%(batch_data['scan_ids'][i])),colors=None
+            # )#* colors 可以定义框的颜色
+
+
+            #* open3d  format bounding box 
+            np.savetxt(os.path.join(self.vis_save_path, '%s_box.txt'%(batch_data['scan_ids'][i])),
+            inputs['det_boxes'][i][inputs['det_bbox_label_mask'][i]].clone().detach().cpu().numpy(),
+            fmt='%s')
+            
+
+
+
+            #* write utterances
+            with open(os.path.join(self.vis_save_path, '%s_utterances.txt'%(batch_data['scan_ids'][i])), 'w') as f :
+                f.write(batch_data['utterances'][i])
+            
+
+
+     
+    
     '''
     description: 
     return {*}
@@ -519,36 +598,21 @@ class BaseTrainTester:
         #? what is the output of model 
 
         #!+============================================
-        #* 132 == MAX_NUM_OBJ ,the max number of object  in that scenes 
-        # inputs['point_clouds']#*  [2, 50000, 6]
-        # inputs['text'] #* length = 2 
-        # inputs['det_boxes']#* [2, 132, 6]
-        # inputs['det_bbox_label_mask']#* [2,132]   , 对应是目标还是padding 
-        # inputs['det_class_ids']#* [2,132] , 对应类别信息
-
-        B,OB_NUM=inputs['det_class_ids'].shape
         
-        for i in range(B):
-            print(inputs['text'][i])
-            draw_pc_box(
-                        numpy2open3d_colorful(inputs['point_clouds'][i].clone().detach().cpu().numpy()),
-                        inputs['det_boxes'][i][inputs['det_bbox_label_mask'][i]].clone().detach().cpu().numpy(),
-                        save_path=os.path.join(self.vis_save_path, '%s_gt.txt'%(batch_data['scan_ids'][i]))
-                        )  
+        if self.DEBUG:
+            self.check_input(batch_data) 
+            with open (osp.join(osp.dirname(self.vis_save_path),'current_path.txt'),'w') as f :#* save path
+                f.write(self.vis_save_path)
         #!+============================================
-            
-        
+        #         
         end_points = model(inputs)
-
-
-
 
         # Compute loss
         for key in batch_data:
             assert (key not in end_points)
             end_points[key] = batch_data[key]#* 拿取 对应的数据
         _, end_points = self._compute_loss(
-            end_points, criterion, set_criterion, args
+            end_points, criterion, set_criterion, args 
         )
         for key in end_points:
             if 'pred_size' in key:
@@ -564,6 +628,7 @@ class BaseTrainTester:
                 if 'loss' in key and 'proposal_' not in key
                 and 'last_' not in key and 'head_' not in key
             ]))
+            
         return stat_dict, end_points
 
     @torch.no_grad()

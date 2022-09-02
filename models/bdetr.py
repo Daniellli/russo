@@ -232,7 +232,7 @@ class BeaUTyDETR(nn.Module):
             end_points: dict
         """
         # Within-modality encoding
-        end_points = self._run_backbones(inputs)
+        end_points = self._run_backbones(inputs)#* 点云, text feature, bbox feature pass through backbone 
         points_xyz = end_points['fp2_xyz']  #* (B, points, 3)
         points_features = end_points['fp2_features']  #* (B, F, points)
         text_feats = end_points['text_feats']  #* (B, L, F)
@@ -241,7 +241,7 @@ class BeaUTyDETR(nn.Module):
         # Box encoding
         if self.butd:
             # attend on those features
-            detected_mask = ~inputs['det_bbox_label_mask']
+            detected_mask = ~inputs['det_bbox_label_mask']#* 是padding的 box mask 
             detected_feats = torch.cat([
                 self.box_embeddings(inputs['det_boxes']),
                 self.class_embeddings(self.butd_class_embeddings(
@@ -254,32 +254,35 @@ class BeaUTyDETR(nn.Module):
 
         #* Cross-modality encoding
         points_features, text_feats = self.cross_encoder(
-            vis_feats=points_features.transpose(1, 2).contiguous(),
-            pos_feats=self.pos_embed(points_xyz).transpose(1, 2).contiguous(),
+            vis_feats=points_features.transpose(1, 2).contiguous(), #* point cloud feature
+            pos_feats=self.pos_embed(points_xyz).transpose(1, 2).contiguous(), #* point cloud feature
             padding_mask=torch.zeros(
                 len(points_xyz), points_xyz.size(1)
             ).to(points_xyz.device).bool(),
-            text_feats=text_feats,
-            text_padding_mask=text_padding_mask,
+            text_feats=text_feats, #* text feature 
+            text_padding_mask=text_padding_mask,#* text mask, 为true 表示是需要检测的文本 , 
             end_points=end_points,
-            detected_feats=detected_feats,
-            detected_mask=detected_mask
+            detected_feats=detected_feats,#* bbox feature 
+            detected_mask=detected_mask #*   box mask 
         )
+
+        
+
         points_features = points_features.transpose(1, 2)
-        points_features = points_features.contiguous()  # (B, F, points)
+        points_features = points_features.contiguous()  # (B, F, points) #* 只提取了 bbox 区域的feature?  
         end_points["text_memory"] = text_feats
-        end_points['seed_features'] = points_features
-        if self.contrastive_align_loss:
+        end_points['seed_features'] = points_features 
+        if self.contrastive_align_loss: #* 提取token表征,    为了和后面的query 计算 constrastive loss , 也就是拉近配对的token and query distance 
             proj_tokens = F.normalize(
                 self.contrastive_align_projection_text(text_feats), p=2, dim=-1
             )
             end_points['proj_tokens'] = proj_tokens
 
-        #* Query Points Generation
+        #* Query Points Generation,  一个sentence 最有有256 个query与之对应, 所以这个的query是 256, B = 2 
         end_points = self._generate_queries(
             points_xyz, points_features, end_points
         )
-        cluster_feature = end_points['query_points_feature']  # (B, F, V)
+        cluster_feature = end_points['query_points_feature']  #* (B, F, V) == (batch_size, feature_channel_num,  query_vector_len)
         cluster_xyz = end_points['query_points_xyz']  # (B, V, 3)
         query = self.decoder_query_proj(cluster_feature)
         query = query.transpose(1, 2).contiguous()  # (B, V, F)
@@ -287,17 +290,17 @@ class BeaUTyDETR(nn.Module):
             end_points['proposal_proj_queries'] = F.normalize(
                 self.contrastive_align_projection_image(query), p=2, dim=-1
             )
-
-        #* Proposals (one for each query)
+        #*  query 数量是固定256 , token 数量是根据utterence 来定的 ,可能几十可能上百
+        #* Proposals (one for each query) , 这些是proposed box ,  就是该utterence 下指定的 目标bbox proposal , 在过一个Hunagrian match 就能得到 配对后的 真的proposal 了
         proposal_center, proposal_size = self.proposal_head(
             cluster_feature,
             base_xyz=cluster_xyz,
             end_points=end_points,
             prefix='proposal_'
         )
-        base_xyz = proposal_center.detach().clone()  # (B, V, 3)
+        base_xyz = proposal_center.detach().clone()  # (B, V, 3) 
         base_size = proposal_size.detach().clone()  # (B, V, 3)
-        query_mask = None
+        query_mask = None#? 这是做什么用的? 
 
         #* Decoder
         for i in range(self.num_decoder_layers):
@@ -313,7 +316,7 @@ class BeaUTyDETR(nn.Module):
             else:
                 raise NotImplementedError
 
-            #* Transformer Decoder Layer
+            #* Transformer Decoder Layer, 这个query position 是动态变化的 
             query = self.decoder[i](
                 query, points_features.transpose(1, 2).contiguous(),
                 text_feats, query_pos,

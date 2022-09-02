@@ -19,7 +19,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 #!+=============
-from transformers import RobertaTokenizerFast,AutoTokenizer, AutoModelForMaskedLM
+from transformers import RobertaTokenizerFast
 #!+=============
 
 
@@ -60,14 +60,14 @@ class Joint3DDataset(Dataset):
         self.use_height = use_height
         self.overfit = overfit
         self.detect_intermediate = detect_intermediate
-        self.augment = self.split == 'train'
-        self.use_multiview = use_multiview
+        self.augment = self.split == 'train' #*如果是训练集就进行数据增强 
+        self.use_multiview = use_multiview 
         self.data_path = data_path
-        self.visualize = False  # manually set this to True to debug
+        self.visualize = False  #* manually set this to True to debug
         self.butd = butd
         self.butd_gt = butd_gt
         self.butd_cls = butd_cls
-        self.joint_det = (  # joint usage of detection/grounding phrases
+        self.joint_det = (  #* joint usage of detection/grounding phrases , 
             'scannet' in dataset_dict
             and len(dataset_dict.keys()) > 1
             and self.split == 'train'
@@ -102,12 +102,12 @@ class Joint3DDataset(Dataset):
         # self.tokenizer = AutoTokenizer.from_pretrained(model_path)
         
         
-        # if os.path.exists('data/cls_results.json'):
-        #     with open('data/cls_results.json') as fid:
-        #         self.cls_results = json.load(fid)  # {scan_id: [class0, ...]}
-        if os.path.exists('data/cls_demo_results.json'):
-            with open('data/cls_demo_results.json') as fid:
+        if os.path.exists('data/cls_results.json'):
+            with open('data/cls_results.json') as fid:
                 self.cls_results = json.load(fid)  # {scan_id: [class0, ...]}
+        # if os.path.exists('data/cls_demo_results.json'):
+        #     with open('data/cls_demo_results.json') as fid:
+        #         self.cls_results = json.load(fid)  # {scan_id: [class0, ...]}
         #!+===========================================
 
         # load
@@ -295,11 +295,11 @@ class Joint3DDataset(Dataset):
         """Load annotations of scannet."""
         split = 'train' if self.split == 'train' else 'val'
         #!==========================================
-        # with open('data/meta_data/scannetv2_%s.txt' % split) as f:
-        #     scan_ids = [line.rstrip() for line in f]
-
-        with open('data/meta_data/scandemo_%s.txt' % split) as f:
+        with open('data/meta_data/scannetv2_%s.txt' % split) as f:
             scan_ids = [line.rstrip() for line in f]
+
+        # with open('data/meta_data/scandemo_%s.txt' % split) as f:
+        #     scan_ids = [line.rstrip() for line in f]
         #!==========================================
 
 
@@ -485,8 +485,11 @@ class Joint3DDataset(Dataset):
             cat_names = anno['target']
         else:
             cat_names = [anno['target']]
-        if self.detect_intermediate:
+
+
+        if self.detect_intermediate:#* 如果是nr3d 是没有anchor的
             cat_names += anno['anchors']
+
         for c, cat_name in enumerate(cat_names):
             start_span = caption.find(' ' + cat_name + ' ')
             len_ = len(cat_name)
@@ -523,9 +526,14 @@ class Joint3DDataset(Dataset):
         if isinstance(anno['target_id'], list):  # scannet
             tids = anno['target_id']
         else:  # referit dataset
-            tids = [anno['target_id']]
+            #* tids: target ids , 主要要识别的id , 通过utterence 识别的目标
+            tids = [anno['target_id']] 
+
+            #* 如果只是单纯的目标检测, 那么就需要把anchor 也一起检测了, anchor就是 用于帮助指向 target 的 目标 , 
+            #* 比如 the chair near the  door  , target 是 chair , anchor 是door
             if self.detect_intermediate:
                 tids += anno.get('anchor_ids', [])
+
         point_instance_label = -np.ones(len(scan.pc))
         for t, tid in enumerate(tids):
             point_instance_label[scan.three_d_objects[tid]['points']] = t
@@ -533,15 +541,19 @@ class Joint3DDataset(Dataset):
         bboxes[:len(tids)] = np.stack([
             scan.get_object_bbox(tid).reshape(-1) for tid in tids
         ])
+
         bboxes = np.concatenate((
             (bboxes[:, :3] + bboxes[:, 3:]) * 0.5,
             bboxes[:, 3:] - bboxes[:, :3]
         ), 1)
+
         if self.split == 'train' and self.augment:  # jitter boxes
             bboxes[:len(tids)] *= (0.95 + 0.1*np.random.random((len(tids), 6)))
+
         bboxes[len(tids):, :3] = 1000
         box_label_mask = np.zeros(MAX_NUM_OBJ)
         box_label_mask[:len(tids)] = 1#* mast == 0 的就是 非目标, 是padding , maximun number == 132, 每个场景应该没有132个目标, 所以会有padding
+
         return bboxes, box_label_mask, point_instance_label
 
     def _get_scene_objects(self, scan):
@@ -591,21 +603,21 @@ class Joint3DDataset(Dataset):
 
         # Load
         #!+========================= 数据是随机打散放在group_free_pred_bboxes_test/group_free_pred_bboxes_train/group_free_pred_bboxes_val
-        # detected_dict = np.load(
-        #     f'{self.data_path}group_free_pred_bboxes_{split}/{scan_id}.npy',
-        #     allow_pickle=True
-        # ).item()
+        detected_dict = np.load(
+            f'{self.data_path}group_free_pred_bboxes_{split}/{scan_id}.npy',
+            allow_pickle=True
+        ).item()
         
-        train_file_name = f'{self.data_path}group_free_pred_bboxes_train/{scan_id}.npy'
-        test_file_name = f'{self.data_path}group_free_pred_bboxes_test/{scan_id}.npy'
-        val_file_name = f'{self.data_path}group_free_pred_bboxes_val/{scan_id}.npy'
+        # train_file_name = f'{self.data_path}group_free_pred_bboxes_train/{scan_id}.npy'
+        # test_file_name = f'{self.data_path}group_free_pred_bboxes_test/{scan_id}.npy'
+        # val_file_name = f'{self.data_path}group_free_pred_bboxes_val/{scan_id}.npy'
         
-        if osp.exists(train_file_name):
-            detected_dict = np.load(train_file_name,allow_pickle=True).item()
-        elif osp.exists(test_file_name):
-            detected_dict = np.load(test_file_name,allow_pickle=True).item()
-        else:
-            detected_dict = np.load(val_file_name,allow_pickle=True).item()
+        # if osp.exists(train_file_name):
+        #     detected_dict = np.load(train_file_name,allow_pickle=True).item()
+        # elif osp.exists(test_file_name):
+        #     detected_dict = np.load(test_file_name,allow_pickle=True).item()
+        # else:
+        #     detected_dict = np.load(val_file_name,allow_pickle=True).item()
         #!+=========================
 
         all_bboxes_ = np.array(detected_dict['box'])
@@ -673,6 +685,7 @@ class Joint3DDataset(Dataset):
             self.random_utt = self.joint_det and np.random.random() > 0.5
             sampled_classes = self._sample_classes(anno['scan_id'])
             utterance = self._create_scannet_utterance(sampled_classes)
+            
             # Target ids
             if not self.random_utt:  # detection18 phrase
                 anno['target_id'] = np.where(np.array([
@@ -692,6 +705,8 @@ class Joint3DDataset(Dataset):
                     ]]] in sampled_classes
                     for ind in range(len(scan.three_d_objects))
                 ])[:MAX_NUM_OBJ])[0].tolist()
+
+
             # Target names
             if not self.random_utt:
                 anno['target'] = [
@@ -723,20 +738,20 @@ class Joint3DDataset(Dataset):
         # Positive map for soft-token and contrastive losses
         tokens_positive, positive_map = self._get_token_positive_map(anno)
 
-        # Scene gt boxes
+        #* Scene gt boxes, 
         (
             class_ids, all_bboxes, all_bbox_label_mask
         ) = self._get_scene_objects(scan)
 
-        # Detected boxes
+        #* Detected boxes
         (
             all_detected_bboxes, all_detected_bbox_label_mask,
             detected_class_ids, detected_logits
         ) = self._get_detected_objects(split, anno['scan_id'], augmentations)
 
-        # Assume a perfect object detector
+        # Assume a perfect object detector 
         if self.butd_gt:
-            all_detected_bboxes = all_bboxes
+            all_detected_bboxes = all_bboxes #* 使用groundtruth bbox
             all_detected_bbox_label_mask = all_bbox_label_mask
             detected_class_ids = class_ids
 
@@ -748,9 +763,11 @@ class Joint3DDataset(Dataset):
             classes = np.array(self.cls_results[anno['scan_id']])
             detected_class_ids[all_bbox_label_mask] = classes[classes > -1]
 
+
         # Visualize for debugging
         if self.visualize and anno['dataset'].startswith('sr3d'):
             self._visualize_scene(anno, point_cloud, og_color, all_bboxes)
+
 
         # Return
         _labels = np.zeros(MAX_NUM_OBJ)
@@ -761,12 +778,14 @@ class Joint3DDataset(Dataset):
                 ]]
                 for ind in anno['target_id']
             ])
+
         ret_dict = {
             'box_label_mask': box_label_mask.astype(np.float32),
             'center_label': gt_bboxes[:, :3].astype(np.float32),
             'sem_cls_label': _labels.astype(np.int64),
             'size_gts': gt_bboxes[:, 3:].astype(np.float32),
         }
+
         ret_dict.update({
             "scan_ids": anno['scan_id'],
             "point_clouds": point_cloud.astype(np.float32),
@@ -1031,13 +1050,14 @@ def save_data(filename, split, data_path):
     # Read all scan files
     #!+================
     # scan_path = data_path + 'scans/'
-    scan_path = osp.join(data_path,'scans','mini_scans')
+    # scan_path = osp.join(data_path,'scans','mini_scans')
+    scan_path = osp.join(data_path,'scans')
     
     #* 下载太慢了, 测试mini scannet
-    # with open('data/meta_data/scannetv2_%s.txt' % split) as f:
-    #     scan_ids = [line.rstrip() for line in f]
-    with open('data/meta_data/scandemo_%s.txt' % split) as f:
+    with open('data/meta_data/scannetv2_%s.txt' % split) as f:
         scan_ids = [line.rstrip() for line in f]
+    # with open('data/meta_data/scandemo_%s.txt' % split) as f:
+    #     scan_ids = [line.rstrip() for line in f]
     #!+================
 
     print('{} scans found.'.format(len(scan_ids)))

@@ -30,6 +30,9 @@ st = ipdb.set_trace
 import scipy.io as scio
 import sys 
 
+
+import wandb
+from loguru import logger 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(BASE_DIR)
 
@@ -46,9 +49,11 @@ class TrainTester(BaseTrainTester):
         """Initialize."""
         super().__init__(args)
 
-        if args.eval:
+        if args.eval and args.local_rank == 0 : #* for debug ? 
             self.vis_save_path = osp.join("vis_results",time.strftime("%Y:%m:%d",time.gmtime(time.time()))+"_"+str(int(time.time())))
             os.makedirs(self.vis_save_path)
+
+        self.DEBUG = args.save_input_output
             
             
 
@@ -58,22 +63,24 @@ class TrainTester(BaseTrainTester):
         dataset_dict = {}  # dict to use multiple datasets
         for dset in args.dataset:
             dataset_dict[dset] = 1
+
         if args.joint_det:
             dataset_dict['scannet'] = 10
+
         print('Loading datasets:', sorted(list(dataset_dict.keys())))
         train_dataset = Joint3DDataset(
             dataset_dict=dataset_dict,
-            test_dataset=args.test_dataset,
+            test_dataset=args.test_dataset, #? only test set need ? 
             split='train' if not args.debug else 'val',
             use_color=args.use_color, use_height=args.use_height,
             overfit=args.debug,
             data_path=args.data_root,
-            detect_intermediate=args.detect_intermediate,
-            use_multiview=args.use_multiview,
-            butd=args.butd,
-            butd_gt=args.butd_gt,
-            butd_cls=args.butd_cls,
-            augment_det=args.augment_det
+            detect_intermediate=args.detect_intermediate,#? 
+            use_multiview=args.use_multiview, #? 
+            butd=args.butd, #? 
+            butd_gt=args.butd_gt,#? 
+            butd_cls=args.butd_cls,#? 
+            augment_det=args.augment_det#? 
         )
         test_dataset = Joint3DDataset(
             dataset_dict=dataset_dict,
@@ -104,17 +111,16 @@ class TrainTester(BaseTrainTester):
             num_class = 19
 
 
-        
         model = BeaUTyDETR(
             num_class=num_class,
             num_obj_class=485,
             input_feature_dim=num_input_channel,
-            num_queries=args.num_target,
+            num_queries=args.num_target, #? 
             num_decoder_layers=args.num_decoder_layers,
             self_position_embedding=args.self_position_embedding,
             contrastive_align_loss=args.use_contrastive_align,
-            butd=args.butd or args.butd_gt or args.butd_cls,
-            pointnet_ckpt=args.pp_checkpoint,
+            butd=args.butd or args.butd_gt or args.butd_cls, #* 是否使用gt来负责这个visual grounding 而不是 detected bbox 
+            pointnet_ckpt=args.pp_checkpoint,  #* pretrained model
             self_attend=args.self_attend
         )
 
@@ -153,6 +159,8 @@ class TrainTester(BaseTrainTester):
         stat_dict = {}
         model.eval()  # set model to eval mode (for bn and dp)
 
+
+        
         if args.num_decoder_layers > 0:
             prefixes = ['last_', 'proposal_']
             prefixes = ['last_']
@@ -160,7 +168,8 @@ class TrainTester(BaseTrainTester):
         else:
             prefixes = ['proposal_']  # only proposal
         prefixes += [f'{i}head_' for i in range(args.num_decoder_layers - 1)]
-
+        
+        #?
         if args.butd_cls:
             evaluator = GroundingGTEvaluator(prefixes=prefixes)
         else:
@@ -168,9 +177,14 @@ class TrainTester(BaseTrainTester):
                 only_root=True, thresholds=[0.25, 0.5],
                 topks=[1, 5, 10], prefixes=prefixes
             )
-
         # Main eval branch
+        # DEBUG=True
         for batch_idx, batch_data in enumerate(test_loader):
+            #!=================
+            # if DEBUG:
+            #     test_loader.dataset.__getitem__(batch_idx * args.batch_size)
+            #     test_loader.dataset.__getitem__(batch_idx * args.batch_size+1)
+            #!=================
             stat_dict, end_points = self._main_eval_branch(
                 batch_idx, batch_data, test_loader, model, stat_dict,
                 criterion, set_criterion, args
@@ -310,18 +324,30 @@ class TrainTester(BaseTrainTester):
 
 
 
-
-
 if __name__ == '__main__':
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
     opt = parse_option()
-    
-    os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu_ids
+    # os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu_ids
+    # logger.info(f"gpu ids == {opt.gpu_ids}")
+    # logger.info(os.environ["CUDA_VISIBLE_DEVICES"] )
+     
+    # torch.distributed.init_process_group(backend='nccl', init_method='env://')
+    torch.distributed.init_process_group(backend='nccl')
 
-    torch.cuda.set_device(opt.local_rank)
-    torch.distributed.init_process_group(backend='nccl', init_method='env://')
     torch.backends.cudnn.enabled = True
     torch.backends.cudnn.benchmark = True
+
     torch.backends.cudnn.deterministic = True
+    
+    # torch.cuda.set_device(opt.local_rank)
     train_tester = TrainTester(opt)
+
+    if opt.upload_wandb and opt.local_rank==0:
+        run=wandb.init(project="BUTD_DETR")
+        run.name = "test_"+run.name
+        for k, v in opt.__dict__.items():
+            setattr(wandb.config,k,v)
+
     ckpt_path = train_tester.main(opt)
+    
+    
