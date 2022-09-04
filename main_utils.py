@@ -396,7 +396,7 @@ class BaseTrainTester:
 
         # Training loop
         #!===============================
-        best_performce = {'Acc@0.25-top1':0,'Acc@0.50-top1':0}
+        best_performce = 0
         save_dir = osp.join(args.log_dir,'performance.txt')
         if osp.exists(save_dir):
             os.remove(save_dir)
@@ -436,8 +436,10 @@ class BaseTrainTester:
                 if dist.get_rank() == 0:
                     with open(save_dir, 'a+')as f :
                         f.write( f"epoch:{epoch},"+','.join(["%s:%.4f"%(k,v) for k,v in performance.items()])+"\n")
-                    if performance is not None and performance['Acc@0.25-top1'] > best_performce['Acc@0.25-top1']:
-                        best_performce['Acc@0.25-top1'] =  performance['Acc@0.25-top1'] 
+                        
+                    acc_key = list(performance.keys())[0]
+                    if performance is not None and performance[acc_key] > best_performce:
+                        best_performce =  performance[acc_key]
                         save_checkpoint(args, epoch, model, optimizer, scheduler ,is_best=True)            
                 #!+==========================================
 

@@ -196,6 +196,7 @@ class TrainTester(BaseTrainTester):
             if evaluator is not None:
                 evaluator.print_stats()
                 #!===================
+                ans = {}
                 if args.butd_cls: #* 给定 GT, 进行分类 
                     prefix ='last_' #* last layer 
                     mode ='bbf'  #* Box given span (contrastive)
@@ -205,7 +206,6 @@ class TrainTester(BaseTrainTester):
                     prefix ='last_' #* last layer 
                     mode ='bbf'  #* Box given span (contrastive)
                     topk=1
-                    ans = {}
                     for t in evaluator.thresholds:
                         ans[f'Acc@{t}-top1'] = evaluator.dets[(prefix, t, topk, mode)]/max(evaluator.gts[(prefix, t, topk, mode)], 1)
                 #!===================
