@@ -424,14 +424,14 @@ class BaseTrainTester:
                 # )
                 # if dist.get_rank() == 0:
                 #     save_checkpoint(args, epoch, model, optimizer, scheduler) 
-
                 performance = self.evaluate_one_epoch(
                     epoch, test_loader,
                     model, criterion, set_criterion, args
                 )
+
                 if dist.get_rank() == 0:
                     with open(save_dir, 'a+')as f :
-                        f.write( f"epoch:{epoch}"+','.join([f"{k}:{v}" for k,v in performance.items()])+"\n")
+                        f.write( f"epoch:{epoch},"+','.join(["%s:%.4f"%(k,v) for k,v in performance.items()])+"\n")
                     if performance is not None and performance['Acc@0.25-top1'] > best_performce['Acc@0.25-top1']:
                         best_performce['Acc@0.25-top1'] =  performance['Acc@0.25-top1'] 
                         save_checkpoint(args, epoch, model, optimizer, scheduler ,is_best=True)            

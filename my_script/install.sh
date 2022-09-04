@@ -1,7 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-08-19 16:32:03
- # @LastEditTime: 2022-09-04 13:02:41
+ # @LastEditTime: 2022-09-04 14:15:27
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/install.sh
@@ -66,7 +66,7 @@ mv ~/exp/data/butd_data/roberta   ~/.cache/huggingface/transformers/
 
 #* 
 # mkdir logs
-# python prepare_data.py --data_root datasets  2>&1 | tee -a logs/install.log
+python prepare_data.py --data_root datasets  2>&1 | tee -a logs/install.log
 
 
 

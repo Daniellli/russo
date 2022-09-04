@@ -302,6 +302,7 @@ class GroundingGTEvaluator:
         for prefix in self.prefixes:
             for mode in ['bbs', 'bbf']:
                 print(prefix, mode_str[mode], f'Acc: {self.dets[(prefix, mode)] / self.gts[(prefix, mode)]}')
+
         print('\nAnalysis')
         for field in ['easy', 'hard', 'vd', 'vid', 'unique', 'multi']:
             print(field, self.dets[field] / self.gts[field])
