@@ -176,7 +176,7 @@ def load_checkpoint(args, model, optimizer, scheduler):
     torch.cuda.empty_cache()
 
 
-def save_checkpoint(args, epoch, model, optimizer, scheduler, save_cur=False):
+def save_checkpoint(args, epoch, model, optimizer, scheduler, save_cur=False,is_best=False):
     """Save checkpoint if requested."""
     if save_cur or epoch % args.save_freq == 0:
         state = {
@@ -187,7 +187,12 @@ def save_checkpoint(args, epoch, model, optimizer, scheduler, save_cur=False):
             'scheduler': scheduler.state_dict(),
             'epoch': epoch
         }
-        spath = os.path.join(args.log_dir, f'ckpt_epoch_{epoch}.pth')
+        
+        if is_best:
+            spath = os.path.join(args.log_dir, f'ckpt_epoch_{epoch}_best.pth')
+        else :
+            spath = os.path.join(args.log_dir, f'ckpt_epoch_{epoch}.pth')
+
         state['save_path'] = spath
         torch.save(state, spath)
         print("Saved in {}".format(spath))
@@ -236,16 +241,20 @@ class BaseTrainTester:
             np.random.seed(worker_seed)
             random.seed(worker_seed)
             np.random.seed(np.random.get_state()[1][0] + worker_id)
+
+        #* do not need to load train set when args.evals == True 
         # Datasets
         train_dataset, test_dataset = self.get_datasets(args)
         #* 存在一个问题就是val 的数据抽取的不合法,在group_free_pred_bboxes_val 找不到对应的数据
         # Samplers and loaders
-
         # for k in train_dataset.__getitem__(1).keys():
         #     if hasattr(train_dataset.__getitem__(1)[k],"shape"):
         #         print(k,train_dataset.__getitem__(1)[k].shape)
+
+        
         g = torch.Generator()
         g.manual_seed(0)
+        
         train_sampler = DistributedSampler(train_dataset)
         train_loader = DataLoader(
             train_dataset,
@@ -382,6 +391,12 @@ class BaseTrainTester:
             return
 
         # Training loop
+        #!===============================
+        best_performce = {'Acc@0.25-top1':0,'Acc@0.50-top1':0}
+        save_dir = osp.join(args.log_dir,'performance.txt')
+        if osp.exists(save_dir):
+            os.remove(save_dir)
+        #!===============================
         for epoch in range(args.start_epoch, args.max_epoch + 1):
             train_loader.sampler.set_epoch(epoch)
             tic = time.time()
@@ -398,14 +413,29 @@ class BaseTrainTester:
                     optimizer.param_groups[1]['lr']
                 )
             )
+            # save model
             if epoch % args.val_freq == 0:
-                if dist.get_rank() == 0:  # save model
-                    save_checkpoint(args, epoch, model, optimizer, scheduler)
+                # save_checkpoint(args, epoch, model, optimizer, scheduler)
                 print("Test evaluation.......")
-                self.evaluate_one_epoch(
+                #!+==========================================
+                # self.evaluate_one_epoch(
+                #     epoch, test_loader,
+                #     model, criterion, set_criterion, args
+                # )
+                # if dist.get_rank() == 0:
+                #     save_checkpoint(args, epoch, model, optimizer, scheduler) 
+
+                performance = self.evaluate_one_epoch(
                     epoch, test_loader,
                     model, criterion, set_criterion, args
                 )
+                if dist.get_rank() == 0:
+                    with open(save_dir, 'a+')as f :
+                        f.write( f"epoch:{epoch}"+','.join([f"{k}:{v}" for k,v in performance.items()])+"\n")
+                    if performance is not None and performance['Acc@0.25-top1'] > best_performce['Acc@0.25-top1']:
+                        best_performce['Acc@0.25-top1'] =  performance['Acc@0.25-top1'] 
+                        save_checkpoint(args, epoch, model, optimizer, scheduler ,is_best=True)            
+                #!+==========================================
 
         # Training is over, evaluate
         save_checkpoint(args, 'last', model, optimizer, scheduler, True)

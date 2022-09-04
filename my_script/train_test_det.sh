@@ -1,7 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-08-21 10:26:03
- # @LastEditTime: 2022-09-02 22:45:30
+ # @LastEditTime: 2022-09-04 11:03:17
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/train_test_det.sh
@@ -11,14 +11,17 @@
 
 
 # train_data="sr3d nr3d scanrefer scannet sr3d+"
-train_data=nr3d;
-test_data=nr3d;
+train_data=scanrefer;
+test_data=scanrefer;
 DATA_ROOT=datasets/
 # gpu_ids="1,2"
-gpu_ids="0,3,5"
-gpu_num=3
+gpu_ids="2,3,4,5,6,7"
+gpu_num=6
 b_size=8
 port=29526
+
+# resume_mode_path=logs/bdetr/nr3d/1662171305/ckpt_epoch_50.pth;
+# resume_mode_path=logs/bdetr/nr3d/train1/ckpt_epoch_100.pth;
 
 #* train
 # TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=0 python -m torch.distributed.launch --nproc_per_node 1 --master_port $RANDOM \
@@ -27,7 +30,7 @@ CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_nod
     --use_color \
     --weight_decay 0.0005 \
     --data_root $DATA_ROOT \
-    --val_freq 5 --batch_size $b_size --save_freq 5 --print_freq 1 \
+    --val_freq 5 --batch_size $b_size --save_freq 5 --print_freq 5 \
     --lr_backbone=1e-3 --lr=1e-4 \
     --dataset $train_data --test_dataset $test_data \
     --detect_intermediate --joint_det \
@@ -36,9 +39,10 @@ CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_nod
     --lr_decay_epochs 25 26 \
     --pp_checkpoint $DATA_ROOT/gf_detector_l6o256.pth \
     --butd --self_attend --augment_det \
-    --max_epoch 50 \
+    --max_epoch 150 \
     --upload-wandb \
     2>&1 | tee -a logs/train.log
+    # --checkpoint_path $resume_mode_path \
 
 
 #* det : --butd --augment_det \

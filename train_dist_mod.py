@@ -180,11 +180,6 @@ class TrainTester(BaseTrainTester):
         # Main eval branch
         # DEBUG=True
         for batch_idx, batch_data in enumerate(test_loader):
-            #!=================
-            # if DEBUG:
-            #     test_loader.dataset.__getitem__(batch_idx * args.batch_size)
-            #     test_loader.dataset.__getitem__(batch_idx * args.batch_size+1)
-            #!=================
             stat_dict, end_points = self._main_eval_branch(
                 batch_idx, batch_data, test_loader, model, stat_dict,
                 criterion, set_criterion, args
@@ -193,10 +188,23 @@ class TrainTester(BaseTrainTester):
                 for prefix in prefixes:
                     evaluator.evaluate(end_points, prefix)
         evaluator.synchronize_between_processes()
+
+        #!===================
+        ans = None
+        #!===================
         if dist.get_rank() == 0:
             if evaluator is not None:
                 evaluator.print_stats()
-        return None
+                #!===================
+                prefix ='last_' #* last layer 
+                mode ='bbf'  #* Box given span (contrastive)
+                topk=1
+                ans = {}
+                for t in evaluator.thresholds:
+                    ans[f'Acc@{t}-top1'] = evaluator.dets[(prefix, t, topk, mode)]/max(evaluator.gts[(prefix, t, topk, mode)], 1)
+                #!===================
+
+        return ans
 
     @torch.no_grad()
     def evaluate_one_epoch_det(self, epoch, test_loader,
@@ -327,7 +335,7 @@ class TrainTester(BaseTrainTester):
 if __name__ == '__main__':
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
     opt = parse_option()
-    # os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu_ids
+    
     # logger.info(f"gpu ids == {opt.gpu_ids}")
     # logger.info(os.environ["CUDA_VISIBLE_DEVICES"] )
      

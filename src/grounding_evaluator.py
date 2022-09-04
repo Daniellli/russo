@@ -12,7 +12,11 @@ from models.losses import _iou3d_par, box_cxcyczwhd_to_xyzxyz
 import utils.misc as misc
 
 import ipdb
+
+from IPython import embed
 st = ipdb.set_trace
+
+
 
 class GroundingEvaluator:
     """
@@ -59,6 +63,9 @@ class GroundingEvaluator:
             'bbs': 'Box given span (soft-token)',
             'bbf': 'Box given span (contrastive)'
         }
+        #!+============
+        # embed()
+        #!+============
         for prefix in self.prefixes:
             for mode in ['bbs', 'bbf']:
                 for t in self.thresholds:
@@ -73,6 +80,7 @@ class GroundingEvaluator:
                             for k in self.topks
                         ])
                     )
+
         print('\nAnalysis')
         for field in ['easy', 'hard', 'vd', 'vid', 'unique', 'multi']:
             print(field, self.dets[field] / self.gts[field])
