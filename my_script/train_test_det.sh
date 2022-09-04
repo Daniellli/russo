@@ -1,7 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-08-21 10:26:03
- # @LastEditTime: 2022-09-04 11:03:17
+ # @LastEditTime: 2022-09-04 13:03:48
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/train_test_det.sh
@@ -15,9 +15,9 @@ train_data=scanrefer;
 test_data=scanrefer;
 DATA_ROOT=datasets/
 # gpu_ids="1,2"
-gpu_ids="2,3,4,5,6,7"
-gpu_num=6
-b_size=8
+gpu_ids="0,1,2,3,4,5,6,7"
+gpu_num=8
+b_size=2
 port=29526
 
 # resume_mode_path=logs/bdetr/nr3d/1662171305/ckpt_epoch_50.pth;
