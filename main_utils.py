@@ -113,7 +113,7 @@ def parse_option():
     # io
     parser.add_argument('--checkpoint_path', default=None,
                         help='Model checkpoint path')
-    parser.add_argument('--log_dir', default='log',
+    parser.add_argument('--log_dir', default='logs',
                         help='Dump dir to save model checkpoint')
     parser.add_argument('--print_freq', type=int, default=10)  # batch-wise
     parser.add_argument('--save_freq', type=int, default=10)  # epoch-wise
@@ -161,6 +161,10 @@ def load_checkpoint(args, model, optimizer, scheduler):
     except Exception:
         args.start_epoch = 0
     
+    #!==============================save author pretrained model 
+    with open( osp.join(args.log_dir,"author_model_config.json"),'w')as f :
+        json.dump(checkpoint['config'].__dict__,f)
+    #!==============================
     
     model.load_state_dict(checkpoint['model'], strict=True)
 

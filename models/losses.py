@@ -550,7 +550,7 @@ def compute_hungarian_loss(end_points, num_decoder_layers, set_criterion,
                            query_points_obj_topk=5):
     """Compute Hungarian matching loss containing CE, bbox and giou."""
     #!================================================================
-    DEBUG = True
+    DEBUG = False
     #!================================================================
     prefixes = ['last_'] + [f'{i}head_' for i in range(num_decoder_layers - 1)]
     prefixes = ['proposal_'] + prefixes #* proposal 是第一个, last 是最后一个 
