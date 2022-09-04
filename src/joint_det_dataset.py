@@ -97,7 +97,7 @@ class Joint3DDataset(Dataset):
         self.multiview_data = {}
         #!+===========================================
         # model_path = "~/.cache/huggingface/transformers/roberta"
-        model_path = "/home/DISCOVER_summer2022/xusc/.cache/huggingface/transformers/roberta"
+        model_path = "/data/xusc/.cache/huggingface/transformers/roberta"
         self.tokenizer = RobertaTokenizerFast.from_pretrained(model_path)
         # self.tokenizer = AutoTokenizer.from_pretrained(model_path)
         

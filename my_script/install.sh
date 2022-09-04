@@ -17,7 +17,10 @@
 #* Compile the CUDA layers for PointNet++, which we used in the backbone network: sh init.sh
 
 #* env install , 除了cerberus2 的环境 还需要额外安装下面环境
+#! : 1. make log dir 
 mkdir logs
+
+#! 2. bash to run follow line
 pip install transformers
 pip install plyfile
 pip install h5py
@@ -31,6 +34,8 @@ pip install trimesh
 
 
 pip install huggingface_hub
+
+#!: 3. run follow line one by one
 # huggingface-cli login
 # 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
 
@@ -39,18 +44,16 @@ pip install huggingface_hub
 #* refer data 
 mkdir datasets
 cd datasets
-ln -s  ../../data/butd_data/scanrefer scanrefer
-ln -s  ../../data/butd_data/refer_it_3d refer_it_3d
-mv  ../../data/butd_data/gf_detector_l6o256.pth  ./
-mv  ../../data/butd_data/group_free_pred_bboxes_* ./
-mv  ../../data/butd_data/pretrained ../
+ln -s  ~/exp/data/butd_data/scanrefer scanrefer
+ln -s  ~/exp/data/butd_data/refer_it_3d refer_it_3d
+mv  ~/exp/data/butd_data/gf_detector_l6o256.pth  ./
+mv  ~/exp/data/butd_data/group_free_pred_bboxes_* ./
+mv  ~/exp/data/butd_data/pretrained ../
 
 
 
-
-
-ln -s  ../../data/scannet/scans scans
-ln -s  ../../data/scannet/scans_test scans_test
+ln -s  ~/exp/data/scannet/scans scans
+ln -s  ~/exp/data/scannet/scans_test scans_test
 
 
 #* cache 
@@ -63,6 +66,8 @@ mv ~/exp/data/butd_data/roberta   ~/.cache/huggingface/transformers/
 
 #* can not run 
 # python scripts/download_scannet_files.py  > logs/install.log 
+
+
 
 #* 
 # mkdir logs
