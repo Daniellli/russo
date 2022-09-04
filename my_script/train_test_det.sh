@@ -14,9 +14,10 @@
 train_data=scanrefer;
 test_data=scanrefer;
 DATA_ROOT=datasets/
-gpu_ids="4,5,6,7"
-gpu_num=4
-b_size=4
+# gpu_ids="1,2"
+gpu_ids="6"
+gpu_num=1
+b_size=2
 port=29526
 # resume_mode_path=logs/bdetr/nr3d/1662171305/ckpt_epoch_50.pth;
 # resume_mode_path=logs/bdetr/nr3d/train1/ckpt_epoch_100.pth;

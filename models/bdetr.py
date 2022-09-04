@@ -17,6 +17,8 @@ import torch.nn as nn
 from transformers import RobertaModel, RobertaTokenizerFast
 #!+==============================================
 
+import os
+import os.path as osp
 
 from .backbone_module import Pointnet2Backbone
 from .modules import (
@@ -27,6 +29,8 @@ from .encoder_decoder_layers import (
     BiEncoder, BiEncoderLayer, BiDecoderLayer
 )
 
+
+from IPython import embed
 
 class BeaUTyDETR(nn.Module):
     """
@@ -88,9 +92,8 @@ class BeaUTyDETR(nn.Module):
 
         # Text Encoder
         #*!=============================
-        # t_type = "roberta-base"
-        # model_path = "~/.cache/huggingface/transformers/roberta"
-        model_path = "/home/DISCOVER_summer2022/xusc/.cache/huggingface/transformers/roberta"
+        model_path=osp.join(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__))))),'.cache/huggingface/transformers/roberta')
+        # model_path = "/data/xusc/.cache/huggingface/transformers/roberta"
         self.tokenizer = RobertaTokenizerFast.from_pretrained(model_path)
         # self.tokenizer = AutoTokenizer.from_pretrained(model_path)
         self.text_encoder = RobertaModel.from_pretrained(model_path)
