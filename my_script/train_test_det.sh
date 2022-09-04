@@ -15,8 +15,8 @@ train_data=scanrefer;
 test_data=scanrefer;
 DATA_ROOT=datasets/
 # gpu_ids="1,2"
-gpu_ids="0,1,2,3,4,5,6,7"
-gpu_num=8
+gpu_ids="6"
+gpu_num=1
 b_size=2
 port=29526
 

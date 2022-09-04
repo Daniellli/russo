@@ -22,7 +22,7 @@ from torch.utils.data import Dataset
 from transformers import RobertaTokenizerFast
 #!+=============
 
-
+from IPython import embed
 import wandb
 
 from data.model_util_scannet import ScannetDatasetConfig
@@ -96,8 +96,10 @@ class Joint3DDataset(Dataset):
         )
         self.multiview_data = {}
         #!+===========================================
-        # model_path = "~/.cache/huggingface/transformers/roberta"
-        model_path = "/data/xusc/.cache/huggingface/transformers/roberta"
+        # print(osp.join(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__))))),'.cache/huggingface/transformers/roberta'))
+        model_path=osp.join(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__))))),'.cache/huggingface/transformers/roberta')
+
+
         self.tokenizer = RobertaTokenizerFast.from_pretrained(model_path)
         # self.tokenizer = AutoTokenizer.from_pretrained(model_path)
         
