@@ -1,7 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-08-21 22:20:53
- # @LastEditTime: 2022-09-03 20:58:07
+ # @LastEditTime: 2022-09-05 14:58:42
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/test.sh
@@ -10,18 +10,20 @@
 
 
 # train_data="sr3d nr3d scanrefer scannet sr3d+"
-train_data=scanrefer
-test_data=scanrefer
+train_data=sr3d
+test_data=sr3d
 DATA_ROOT=datasets/
-gpu_ids="1,2"
-gpu_num=2
-b_size=4
+gpu_ids="1"
+gpu_num=1
+b_size=64
 port=29527
 #* test 
 # test_model=pretrained/bdetr_nr3d_43.3.pth;
 # test_model=pretrained/bdetr_nr3d_cls_55_4.pth;
-test_model=pretrained/scanrefer_det_52.2.pth;
+# test_model=pretrained/scanrefer_det_52.2.pth;
 # test_model=pretrained/bdetr_sr3d_cls_67.1.pth;
+test_model=pretrained/sr3d_butd_det_52.1_27.pth;
+# test_model=logs/bdetr/sr3d/train1/ckpt_epoch_105.pth;
 # test_model=logs/bdetr/sr3d/train1/ckpt_epoch_95.pth;
 
 #* test single model 
@@ -30,7 +32,7 @@ CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_nod
     --use_color \
     --weight_decay 0.0005 \
     --data_root $DATA_ROOT \
-    --val_freq  --batch_size $b_size --save_freq 5 --print_freq 1 \
+    --val_freq 1 --batch_size $b_size --save_freq 1 --print_freq 1 \
     --lr_backbone=1e-3 --lr=1e-4 \
     --dataset $train_data --test_dataset $test_data \
     --detect_intermediate --joint_det \
@@ -42,6 +44,8 @@ CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_nod
     --eval \
     --checkpoint_path $test_model \
     2>&1 | tee -a logs/test.log
+
+
 
 
 #* test multiple model 

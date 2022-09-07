@@ -1,7 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-08-21 10:26:03
- # @LastEditTime: 2022-09-04 14:20:15
+ # @LastEditTime: 2022-09-07 07:38:28
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/train_test_det.sh
@@ -10,38 +10,36 @@
 
 
 
-# train_data="sr3d nr3d scanrefer scannet sr3d+"
 train_data=scanrefer;
 test_data=scanrefer;
 DATA_ROOT=datasets/
-# gpu_ids="1,2"
-gpu_ids="6"
-gpu_num=1
-b_size=2
+gpu_ids="1,2,3,4,5,6,7"
+gpu_num=7
+b_size=12
 port=29526
-# resume_mode_path=logs/bdetr/nr3d/1662171305/ckpt_epoch_50.pth;
-# resume_mode_path=logs/bdetr/nr3d/train1/ckpt_epoch_100.pth;
+save_interval=1
 
+resume_mode_path=logs/bdetr/scanrefer/train2/ckpt_epoch_90_best.pth
 #* train
-# TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=0 python -m torch.distributed.launch --nproc_per_node 1 --master_port $RANDOM \
-CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
-    train_dist_mod.py --num_decoder_layers 6 \
-    --use_color \
-    --weight_decay 0.0005 \
-    --data_root $DATA_ROOT \
-    --val_freq 5 --batch_size $b_size --save_freq 5 --print_freq 5 \
-    --lr_backbone=1e-3 --lr=1e-4 \
-    --dataset $train_data --test_dataset $test_data \
-    --detect_intermediate --joint_det \
-    --use_soft_token_loss --use_contrastive_align \
-    --log_dir ./logs/bdetr \
-    --lr_decay_epochs 25 26 \
-    --pp_checkpoint $DATA_ROOT/gf_detector_l6o256.pth \
-    --butd --self_attend --augment_det \
-    --max_epoch 150 \
-    2>&1 | tee -a logs/train.log
-    # --upload-wandb \
-    # --checkpoint_path $resume_mode_path \
+# CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
+#     train_dist_mod.py --num_decoder_layers 6 \
+#     --use_color \
+#     --weight_decay 0.0005 \
+#     --data_root $DATA_ROOT \
+#     --val_freq $save_interval --batch_size $b_size --save_freq $save_interval --print_freq 10 \
+#     --lr_backbone=1e-3 --lr=1e-4 \
+#     --dataset $train_data --test_dataset $test_data \
+#     --detect_intermediate --joint_det \
+#     --use_soft_token_loss --use_contrastive_align \
+#     --log_dir ./logs/bdetr \
+#     --pp_checkpoint $DATA_ROOT/gf_detector_l6o256.pth \
+#     --butd --self_attend --augment_det \
+#     --max_epoch 400 \
+#     --upload-wandb \
+#     2>&1 | tee -a logs/train.log
+
+
+    
 
 
 #* det : --butd --augment_det \
@@ -63,7 +61,40 @@ CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_nod
 
 
 
+#* resume scanfer
+#* update params : lr_backbone,lr,text_encoder_lr,reduce_lr
+CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
+    train_dist_mod.py --num_decoder_layers 6 \
+    --use_color \
+    --weight_decay 0.0005 \
+    --data_root $DATA_ROOT \
+    --val_freq $save_interval --batch_size $b_size --save_freq $save_interval --print_freq 5 \
+    --lr_backbone=1e-4 --lr=1e-5 \
+    --dataset $train_data --test_dataset $test_data \
+    --detect_intermediate --joint_det \
+    --use_soft_token_loss --use_contrastive_align \
+    --log_dir ./logs/bdetr \
+    --pp_checkpoint $DATA_ROOT/gf_detector_l6o256.pth \
+    --butd --self_attend --augment_det \
+    --max_epoch 400 \
+    --upload-wandb \
+    --checkpoint_path $resume_mode_path \
+    2>&1 | tee -a logs/train.log
 
 
 
-
+    # --text_encoder_lr 1e-6 \
+    # --reduce_lr \
+#!======================================
+# 2. "lr": 0.0001, 改成1e-5 
+# 3. "lr_backbone": 0.001, 改成1e-4
+# 4. "text_encoder_lr": 1e-05, ---> 1e-6
+# 5. "lr_decay_epochs": [
+#   25,
+#   26
+# ], -- > "lr_decay_epochs": [
+#   280,
+#   340
+# ],
+# 7. reduce_lr
+#!======================================

@@ -163,7 +163,11 @@ def load_checkpoint(args, model, optimizer, scheduler):
     
     #!==============================save author pretrained model 
     with open( osp.join(args.log_dir,"author_model_config.json"),'w')as f :
-        json.dump(checkpoint['config'].__dict__,f)
+        tmp = checkpoint['config'].__dict__
+        tmp['save_epoch'] = checkpoint['epoch']
+        tmp['save_path'] = checkpoint['save_path']
+        json.dump(tmp,f)
+
     #!==============================
     
     model.load_state_dict(checkpoint['model'], strict=True)
