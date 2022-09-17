@@ -1,7 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-08-21 22:20:53
- # @LastEditTime: 2022-09-05 14:58:42
+ # @LastEditTime: 2022-09-17 17:38:33
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/test.sh
@@ -10,19 +10,19 @@
 
 
 # train_data="sr3d nr3d scanrefer scannet sr3d+"
-train_data=sr3d
-test_data=sr3d
+train_data=scanrefer
+test_data=scanrefer
 DATA_ROOT=datasets/
-gpu_ids="1"
+gpu_ids="0"
 gpu_num=1
-b_size=64
+b_size=12
 port=29527
 #* test 
 # test_model=pretrained/bdetr_nr3d_43.3.pth;
 # test_model=pretrained/bdetr_nr3d_cls_55_4.pth;
-# test_model=pretrained/scanrefer_det_52.2.pth;
+test_model=pretrained/scanrefer_det_52.2.pth;
 # test_model=pretrained/bdetr_sr3d_cls_67.1.pth;
-test_model=pretrained/sr3d_butd_det_52.1_27.pth;
+# test_model=pretrained/sr3d_butd_det_52.1_27.pth;
 # test_model=logs/bdetr/sr3d/train1/ckpt_epoch_105.pth;
 # test_model=logs/bdetr/sr3d/train1/ckpt_epoch_95.pth;
 
@@ -43,8 +43,8 @@ CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_nod
     --butd --self_attend --augment_det \
     --eval \
     --checkpoint_path $test_model \
+    --scanrefer-test \
     2>&1 | tee -a logs/test.log
-
 
 
 

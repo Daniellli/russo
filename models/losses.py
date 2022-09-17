@@ -281,8 +281,8 @@ class HungarianMatcher(nn.Module):
         bs, num_queries = outputs["pred_logits"].shape[:2]
 
         # We flatten to compute the cost matrices in a batch
-        out_prob = outputs["pred_logits"].flatten(0, 1).softmax(-1)  # [B*Q, C]
-        out_bbox = outputs["pred_boxes"].flatten(0, 1)  # [B*Q, 6]
+        out_prob = outputs["pred_logits"].flatten(0, 1).softmax(-1)  #* [B*Q, C],#* B,query_num, distribution_for_tokens 前两维铺平, 对最后一维取softmax, 
+        out_bbox = outputs["pred_boxes"].flatten(0, 1)  #* [B*Q, 6]
 
         # Also concat the target labels and boxes
         positive_map = torch.cat([t["positive_map"] for t in targets])
@@ -293,7 +293,7 @@ class HungarianMatcher(nn.Module):
             # pad if necessary
             if out_prob.shape[-1] != positive_map.shape[-1]:
                 positive_map = positive_map[..., :out_prob.shape[-1]]
-            cost_class = -torch.matmul(out_prob, positive_map.transpose(0, 1))
+            cost_class = -torch.matmul(out_prob, positive_map.transpose(0, 1)) #* generating [BxQ, positive_map_num] 
         else:
             # Compute the classification cost.
             # Contrary to the loss, we don't use the NLL,
@@ -312,7 +312,7 @@ class HungarianMatcher(nn.Module):
             box_cxcyczwhd_to_xyzxyz(tgt_bbox)
         )
 
-        # Final cost matrix
+        # Final cost matrix, #* multiple the corresponding weights 
         C = (
             self.cost_bbox * cost_bbox
             + self.cost_class * cost_class
@@ -320,6 +320,7 @@ class HungarianMatcher(nn.Module):
         ).view(bs, num_queries, -1).cpu()
 
         sizes = [len(v["boxes"]) for v in targets]
+        #* scipy 的linear assignment problem solution,  也就是Hungarian match problem, 求助cost最小的 match 
         indices = [
             linear_sum_assignment(c[i])
             for i, c in enumerate(C.split(sizes, -1))

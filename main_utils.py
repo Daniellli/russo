@@ -37,6 +37,8 @@ from my_script.pc_utils import *
 from loguru import logger
 
 
+
+
 import os.path as osp
 
 from IPython import embed
@@ -137,6 +139,11 @@ def parse_option():
     parser.add_argument('--vis-save-path', default='', type=str)
     parser.add_argument('--upload-wandb',action='store_true', help="upload to wandb or not ?")
     parser.add_argument('--save-input-output',action='store_true', help="save-input-output")
+
+    parser.add_argument('--scanrefer-test',action='store_true', help="scanrefer-test")
+
+
+
 
 
     
@@ -645,18 +652,21 @@ class BaseTrainTester:
                 f.write(self.vis_save_path)
         #!+============================================
         #         
-        end_points = model(inputs)
+        end_points = model(inputs)#* the length of end_points  == 60, last item ==  last_sem_cls_scores
 
         # Compute loss
-        for key in batch_data:
+        for key in batch_data: 
             assert (key not in end_points)
-            end_points[key] = batch_data[key]#* 拿取 对应的数据
-        _, end_points = self._compute_loss(
+            end_points[key] = batch_data[key]#*  the length of end_points == 86, last item ==  target_cid 
+
+
+        _, end_points = self._compute_loss(#*  the length of end_points == 120
             end_points, criterion, set_criterion, args 
         )
         for key in end_points:
             if 'pred_size' in key:
                 end_points[key] = torch.clamp(end_points[key], min=1e-6)
+
 
         # Accumulate statistics and print out
         stat_dict = self._accumulate_stats(stat_dict, end_points)
