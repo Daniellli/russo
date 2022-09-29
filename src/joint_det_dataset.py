@@ -1014,6 +1014,11 @@ def rot_z(pc, theta):
     ).T
 
 
+'''
+description: 
+param {*} box:  格式是 xyz whl 
+return {*}
+'''
 def box2points(box):
     """Convert box center/hwd coordinates to vertices (8x3)."""
     x_min, y_min, z_min = (box[:, :3] - (box[:, 3:] / 2)).transpose(1, 0)
