@@ -43,7 +43,20 @@ import os.path as osp
 
 from IPython import embed
 
+from collections import OrderedDict
 
+'''
+description:  将分布式存储的模型转正常model
+param {*} model
+return {*}
+'''
+def detach_module(model):
+    new_state_dict = OrderedDict()
+    for k, v in model.items():
+        name = k[7:] # module字段在最前面，从第7个字符开始就可以去掉module
+        new_state_dict[name] = v #新字典的key值对应的value一一对应
+
+    return new_state_dict 
 
 
 def parse_option():
@@ -115,7 +128,7 @@ def parse_option():
     # io
     parser.add_argument('--checkpoint_path', default=None,
                         help='Model checkpoint path')
-    parser.add_argument('--log_dir', default='logs',
+    parser.add_argument('--log_dir', default='logs/bdetr',
                         help='Dump dir to save model checkpoint')
     parser.add_argument('--print_freq', type=int, default=10)  # batch-wise
     parser.add_argument('--save_freq', type=int, default=10)  # epoch-wise
@@ -158,7 +171,7 @@ def parse_option():
     return args
 
 
-def load_checkpoint(args, model, optimizer, scheduler):
+def load_checkpoint(args, model, optimizer, scheduler,distributed2common=False):
     """Load from checkpoint."""
     print("=> loading checkpoint '{}'".format(args.checkpoint_path))
 
@@ -167,17 +180,16 @@ def load_checkpoint(args, model, optimizer, scheduler):
         args.start_epoch = int(checkpoint['epoch']) + 1
     except Exception:
         args.start_epoch = 0
-    
-    #!==============================save author pretrained model 
-    with open( osp.join(args.log_dir,"author_model_config.json"),'w')as f :
-        tmp = checkpoint['config'].__dict__
-        tmp['save_epoch'] = checkpoint['epoch']
-        tmp['save_path'] = checkpoint['save_path']
-        json.dump(tmp,f)
 
-    #!==============================
+
+    #todo checkpoint['model']  delete ".module"
+    if distributed2common:
+        common_model = detach_module(checkpoint['model'])
+        model.load_state_dict(common_model, True)
+    else :
+        model.load_state_dict(checkpoint['model'], True)
     
-    model.load_state_dict(checkpoint['model'], strict=True)
+
 
     if not args.eval and not args.reduce_lr:
         optimizer.load_state_dict(checkpoint['optimizer'])
@@ -189,6 +201,7 @@ def load_checkpoint(args, model, optimizer, scheduler):
 
     del checkpoint
     torch.cuda.empty_cache()
+
 
 
 def save_checkpoint(args, epoch, model, optimizer, scheduler, save_cur=False,is_best=False):
@@ -366,6 +379,7 @@ class BaseTrainTester:
 
         # Get model
         model = self.get_model(args)
+   
         
         
         
@@ -680,6 +694,83 @@ class BaseTrainTester:
             ]))
             
         return stat_dict, end_points
+
+    
+    ''' 
+    description: 检查输入 
+    param {*} self
+    param {*} inputs
+    return {*}
+    '''
+    def check_input(self,inputs,scan_ids,FLAG='student'):
+        #* 132 == MAX_NUM_OBJ ,the max number of object  in that scenes 
+        # inputs['point_clouds']#*  [2, 50000, 6]
+        # inputs['text'] #* length = 2 
+        # inputs['det_boxes']#* [2, 132, 6]
+        # inputs['det_bbox_label_mask']#* [2,132]   , 对应是目标还是padding 
+        # inputs['det_class_ids']#* [2,132] , 对应类别信息
+
+
+
+        B,N,_=inputs['point_clouds'].shape
+
+        for i in range(B):
+            # print(inputs['text'][i])
+
+            # draw_pc_box(
+            #             numpy2open3d_colorful(inputs['point_clouds'][i].clone().detach().cpu().numpy()),
+            #             inputs['det_boxes'][i][inputs['det_bbox_label_mask'][i]].clone().detach().cpu().numpy(),
+            #             save_path=os.path.join(self.vis_save_path, '%s_gt.txt'%(batch_data['scan_ids'][i]))
+            #             )  
+            
+            write_pc_as_ply(
+                        inputs['point_clouds'][i].clone().detach().cpu().numpy(),
+                        os.path.join(self.vis_save_path,scan_ids[i], '%s_gt_%s.ply'%(scan_ids[i],FLAG))
+                    )
+
+            
+
+            #* ply format bounding box 
+            # write_oriented_bbox(
+            #         inputs['det_boxes'][i][inputs['det_bbox_label_mask'][i]].clone().detach().cpu().numpy(),
+            #         os.path.join(self.vis_save_path, '%s_box.ply'%(batch_data['scan_ids'][i])),colors=None
+            # )#* colors 可以定义框的颜色
+
+
+            #* open3d  format bounding box 
+            np.savetxt(os.path.join(self.vis_save_path, scan_ids[i],'%s_box_%s.txt'%(scan_ids[i],FLAG)),
+            inputs['det_boxes'][i][inputs['det_bbox_label_mask'][i]].clone().detach().cpu().numpy(),
+            fmt='%s')
+            
+
+
+
+            #* write utterances
+            with open(os.path.join(self.vis_save_path, scan_ids[i],'%s_utterances_%s.txt'%(scan_ids[i],FLAG)), 'w') as f :
+                f.write(inputs['text'][i])
+
+
+     
+    '''
+    description:  检查target box
+    param {*} self
+    param {*} batch_data
+    param {*} conrresponding_pc
+    param {*} scan_ids
+    return {*}
+    '''
+    def check_target(self,batch_data,scan_ids):
+        flag = 'target'
+        mask = batch_data['box_label_mask']
+        gt_box = torch.cat([batch_data['center_label'],batch_data['size_gts']],dim=2)
+        for i in range(len(mask)):
+            #* open3d  format bounding box 
+            np.savetxt(os.path.join(self.vis_save_path, scan_ids[i],'%s_box_%s.txt'%(scan_ids[i],flag)),
+                        gt_box[i][mask[i].bool()].clone().detach().cpu().numpy(),fmt='%s')
+
+
+                
+                
 
     @torch.no_grad()
     def evaluate_one_epoch(self, epoch, test_loader,

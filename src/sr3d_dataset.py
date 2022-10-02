@@ -1,3 +1,12 @@
+'''
+Author: xushaocong
+Date: 2022-10-02 21:28:11
+LastEditTime: 2022-10-02 21:58:56
+LastEditors: xushaocong
+Description: 
+FilePath: /butd_detr/src/sr3d_dataset.py
+email: xushaocong@stu.xmu.edu.cn
+'''
 # ------------------------------------------------------------------------
 # BEAUTY DETR
 # Copyright (c) 2022 Ayush Jain & Nikolaos Gkanatsios
@@ -42,7 +51,7 @@ import os.path as osp
 
 
 
-class Joint3DDataset(Dataset):
+class SR3DDataset(Dataset):
     """Dataset utilities for ReferIt3D."""
 
     def __init__(self, dataset_dict={'sr3d': 1, 'scannet': 10},
@@ -451,6 +460,10 @@ class Joint3DDataset(Dataset):
             multiview_data = self._load_multiview(scan_id)
 
         # d. Augmentations
+        #!+========
+        origin_pc = np.concatenate([scan.pc.copy(), color.copy()], 1)
+        #!+========
+
         augmentations = {}
         if self.split == 'train' and self.augment:
             rotate_natural = (
@@ -475,7 +488,7 @@ class Joint3DDataset(Dataset):
         if multiview_data is not None:
             point_cloud = np.concatenate([point_cloud, multiview_data], 1)
 
-        return point_cloud, augmentations, scan.color
+        return point_cloud, augmentations, scan.color,origin_pc
 
     def _get_token_positive_map(self, anno):
         """Return correspondence of boxes to tokens."""
@@ -672,6 +685,37 @@ class Joint3DDataset(Dataset):
             detected_class_ids, detected_logits
         )
 
+    
+    '''
+    description:  对detector 的bbox进行数据增强 ,#! 没有加入噪声
+    param {*} self
+    param {*} all_detected_bboxes
+    param {*} augmentations
+    return {*}
+    '''
+    def transformation_box(self,boxes,augmentations):
+        
+        #* do not transformation bbox 
+        if len(augmentations.keys()) >0:  #* 不是训练的集的话 这个      augmentations 就是空
+            all_det_pts = box2points(boxes).reshape(-1, 3)
+
+
+            all_det_pts = rot_z(all_det_pts, augmentations['theta_z'])  
+            all_det_pts = rot_x(all_det_pts, augmentations['theta_x'])
+            all_det_pts = rot_y(all_det_pts, augmentations['theta_y'])
+
+            if augmentations.get('yz_flip', False):
+                all_det_pts[:, 0] = -all_det_pts[:, 0]
+            if augmentations.get('xz_flip', False):
+                all_det_pts[:, 1] = -all_det_pts[:, 1]
+
+            
+            all_det_pts += augmentations['shift']
+            all_det_pts *= augmentations['scale']
+            boxes = points2box(all_det_pts.reshape(-1, 8, 3))
+
+        return boxes
+
     def __getitem__(self, index):
         """Get current batch for input index."""
         split = self.split
@@ -731,7 +775,7 @@ class Joint3DDataset(Dataset):
             anno['utterance'] = utterance
 
         # Point cloud representation#* point_cloud == [x,y,z,r,g,b], 50000 points 
-        point_cloud, augmentations, og_color = self._get_pc(anno, scan)
+        point_cloud, augmentations, og_color ,origin_pc= self._get_pc(anno, scan)
 
         # "Target" boxes: append anchors if they're to be detected
         gt_bboxes, box_label_mask, point_instance_label = \
@@ -750,6 +794,13 @@ class Joint3DDataset(Dataset):
             all_detected_bboxes, all_detected_bbox_label_mask,
             detected_class_ids, detected_logits
         ) = self._get_detected_objects(split, anno['scan_id'], augmentations)
+
+        #!===================
+        teacher_box = all_bboxes.copy()
+        teacher_box = self.transformation_box(teacher_box,augmentations)
+ 
+
+        #!===================
 
         # Assume a perfect object detector 
         if self.butd_gt:
@@ -833,7 +884,10 @@ class Joint3DDataset(Dataset):
                 class_ids[anno['target_id']]
                 if isinstance(anno['target_id'], int)
                 else class_ids[anno['target_id'][0]]
-            )
+            ),
+            "pc_before_aug":origin_pc.astype(np.float32),
+            "teacher_box":teacher_box.astype(np.float32),
+
         })
         return ret_dict
 
