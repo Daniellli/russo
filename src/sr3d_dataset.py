@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 21:28:11
-LastEditTime: 2022-10-02 21:58:56
+LastEditTime: 2022-10-02 23:09:21
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/sr3d_dataset.py
@@ -404,6 +404,8 @@ class SR3DDataset(Dataset):
             if augmentations['xz_flip']:
                 pc[:, 1] = -pc[:, 1]
         else:
+            augmentations['yz_flip'] =False
+            augmentations['xz_flip'] =False
             theta_z = (2*np.random.rand() - 1) * 5
         augmentations['theta_z'] = theta_z
         pc[:, :3] = rot_z(pc[:, :3], theta_z)
@@ -887,6 +889,7 @@ class SR3DDataset(Dataset):
             ),
             "pc_before_aug":origin_pc.astype(np.float32),
             "teacher_box":teacher_box.astype(np.float32),
+            "augmentations":augmentations
 
         })
         return ret_dict

@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 19:34:49
-LastEditTime: 2022-10-02 22:15:34
+LastEditTime: 2022-10-02 23:00:58
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/mean_teacher2.py
@@ -58,6 +58,8 @@ from main_utils import *
 
 import os.path as osp
 import time
+
+from my_script.consistant_loss import get_consistency_loss
 
 
 class MeanTeacher(BaseTrainTester):
@@ -523,6 +525,27 @@ class MeanTeacher(BaseTrainTester):
 
     
 
+    ''' 
+    description:  就是 不是直接用args.consistency_weight  , 而是用这个公式不断靠近这个consistency_weight,E.g.0.1,0.2....10
+    param {*} self
+    param {*} epoch
+    return {*}
+    '''
+    def get_current_consistency_weight(self,epoch,args):
+        
+        def sigmoid_rampup(current,args):
+            # rampup_length =  args.max_epoch - args.start_epoch +1
+            rampup_length = 10
+            current=  current-args.start_epoch
+            current = np.clip(current,0,rampup_length)
+            phase = 1.0 - current / rampup_length
+            return float(np.exp(-5.0 * phase * phase))#* initial : 0.007082523
+
+        # Consistency ramp-up from https://arxiv.org/abs/1610.02242
+        return args.consistency_weight * sigmoid_rampup(epoch,args)
+
+    
+
     def train_one_epoch(self, epoch, train_loader, model,ema_model,
                         criterion, set_criterion,
                         optimizer, scheduler, args):
@@ -539,6 +562,8 @@ class MeanTeacher(BaseTrainTester):
         # Loop over batches
         total_iteration=train_loader.__len__()/args.batch_size
         logger.info(f"total_iteration == {total_iteration}")
+        consistency_weight = self.get_current_consistency_weight(epoch,args)
+        logger.info(f"consistency_weight  : {consistency_weight}")
         
         for batch_idx, batch_data in enumerate(train_loader):
             # Move to GPU
@@ -577,9 +602,24 @@ class MeanTeacher(BaseTrainTester):
                 end_points, criterion, set_criterion, args
             )
 
+
+            end_points = get_consistency_loss(end_points, teacher_end_points,batch_data['augmentations'])
+            center_consistency_loss = end_points['center_consistency_loss'] 
+            consistent_loss = (center_consistency_loss)* consistency_weight
+
+
+            #* total loss
+            if consistent_loss is not None:
+                loss  += consistent_loss
+            
+
             #!===================
             if args.upload_wandb and args.local_rank==0:
-                wandb.log({"loss":loss.clone().detach().item()})
+                
+                wandb.log({"student_supervised_loss":loss.clone().detach().item(),
+                            "center_consistency_loss":center_consistency_loss.clone().detach().item(),
+                            "consistent_loss":consistent_loss.clone().detach().item(),
+                        })
             #!===================
 
             optimizer.zero_grad()
@@ -589,6 +629,7 @@ class MeanTeacher(BaseTrainTester):
                     model.parameters(), args.clip_norm
                 )
                 stat_dict['grad_norm'] = grad_total_norm
+
             optimizer.step()
             scheduler.step()
 
@@ -641,10 +682,6 @@ class MeanTeacher(BaseTrainTester):
         ema_model = self.get_model(args)
         for param in ema_model.parameters():
             param.detach_()
-
-
-        
-        
 
         # Get criterion
         criterion, set_criterion = self.get_criterion(args)
