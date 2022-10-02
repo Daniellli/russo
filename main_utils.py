@@ -204,7 +204,8 @@ def load_checkpoint(args, model, optimizer, scheduler,distributed2common=False):
 
 
 
-def save_checkpoint(args, epoch, model, optimizer, scheduler, save_cur=False,is_best=False):
+
+def save_checkpoint(args, epoch, model, optimizer, scheduler, save_cur=False,is_best=False,prefix=None):
     """Save checkpoint if requested."""
     if save_cur or epoch % args.save_freq == 0:
         state = {
@@ -217,15 +218,23 @@ def save_checkpoint(args, epoch, model, optimizer, scheduler, save_cur=False,is_
         }
         
         if is_best:
-            spath = os.path.join(args.log_dir, f'ckpt_epoch_{epoch}_best.pth')
+            if prefix is not None :
+                spath = os.path.join(args.log_dir, f'{prefix}ckpt_epoch_{epoch}_best.pth')
+            else :
+                spath = os.path.join(args.log_dir, f'ckpt_epoch_{epoch}_best.pth')
         else :
             spath = os.path.join(args.log_dir, f'ckpt_epoch_{epoch}.pth')
+
+        
+            
 
         state['save_path'] = spath
         torch.save(state, spath)
         print("Saved in {}".format(spath))
     else:
         print("not saving checkpoint")
+
+        
 
 
 class BaseTrainTester:
