@@ -156,6 +156,9 @@ def parse_option():
     parser.add_argument('--scanrefer-test',action='store_true', help="scanrefer-test")
 
 
+    parser.add_argument('--consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
+
+
 
 
 
