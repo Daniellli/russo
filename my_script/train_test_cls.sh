@@ -1,7 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-08-21 19:15:53
- # @LastEditTime: 2022-10-03 17:32:55
+ # @LastEditTime: 2022-10-03 21:02:43
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/train_test_cls.sh
@@ -35,15 +35,14 @@ b_size=8
 # b_size=12
 
 
-
 resume_mode_path="pretrained/bdetr_sr3d_cls_67.1.pth"
 port=29522
 
 
 
-
+#* for  semi supervision architecture 
 TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
-    mean_teacher2.py --num_decoder_layers 6 \
+    train_dist_mod.py --num_decoder_layers 6 \
     --use_color \
     --weight_decay 0.0005 \
     --data_root $DATA_ROOT \
@@ -57,9 +56,33 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --pp_checkpoint $DATA_ROOT/gf_detector_l6o256.pth \
     --butd_cls --self_attend \
     --max_epoch 200 \
-    --checkpoint_path $resume_mode_path \
+    
     --consistency_weight 1e-4 \
     --upload-wandb \
     2>&1 | tee -a logs/train_test_cls.log
+
+# --checkpoint_path $resume_mode_path \
+
+#*  for mean teacher  
+# TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
+#     mean_teacher2.py --num_decoder_layers 6 \
+#     --use_color \
+#     --weight_decay 0.0005 \
+#     --data_root $DATA_ROOT \
+#     --val_freq 1 --batch_size $b_size --save_freq 1 --print_freq 1 \
+#     --lr_backbone=1e-3 --lr=1e-4 \
+#     --dataset $train_data --test_dataset $test_data \
+#     --detect_intermediate --joint_det \
+#     --use_soft_token_loss --use_contrastive_align \
+#     --log_dir ./logs/bdetr \
+#     --lr_decay_epochs 25 26 \
+#     --pp_checkpoint $DATA_ROOT/gf_detector_l6o256.pth \
+#     --butd_cls --self_attend \
+#     --max_epoch 200 \
+#     --checkpoint_path $resume_mode_path \
+#     --consistency_weight 1e-4 \
+#     --upload-wandb \
+#     2>&1 | tee -a logs/train_test_cls.log
+
 
     

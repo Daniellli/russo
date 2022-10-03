@@ -142,6 +142,11 @@ class Joint3DDataset(Dataset):
         annos = loaders[dset]()
         if self.overfit:
             annos = annos[:128]
+        #!+===================
+        LAVEL_DATA_PROPORTION = 0.5 #* 用于训练的数据百分比
+        total_num = len(annos)
+        annos = annos[:int(total_num*LAVEL_DATA_PROPORTION)]#* annos 内的数据顺序是固定的,  
+        #!+===================
         return annos
 
     def load_sr3dplus_annos(self):
