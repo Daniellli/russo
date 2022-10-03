@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-09-22 23:13:23
-LastEditTime: 2022-10-03 16:24:47
+LastEditTime: 2022-10-03 17:31:16
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/my_script/consistant_loss.py
@@ -30,6 +30,7 @@ from my_script.pc_utils import *
 
 import torch.nn.functional as F
 
+from IPython import embed
 
 DEBUG_FILT = "/data/xusc/exp/butd_detr/logs/debug"
 
@@ -269,8 +270,11 @@ def compute_bbox_consistency_loss_size(bbox, ema_bbox,mask=None,clip=False):
         
     return size_loss.sum()
 
+
+
 def soft_token_consist_loss_kl(cls_scores, ema_cls_scores,mask=None):
     #* ? 
+    B,Q,T=cls_scores.shape
     cls_log_prob = F.log_softmax(cls_scores, dim=2) #(B, num_proposal, num_class)
     ema_cls_prob = F.softmax(ema_cls_scores, dim=2) #(B, num_proposal, num_class)
 
@@ -281,7 +285,9 @@ def soft_token_consist_loss_kl(cls_scores, ema_cls_scores,mask=None):
         class_consistency_loss[~mask] =0
     
 
-    return class_consistency_loss.sum()
+    # return class_consistency_loss.sum()
+    #* class_consistency_loss : [B,Q,T] 
+    return (class_consistency_loss.mean(-1).sum(-1)/(mask.sum(-1)+1e-10)).sum()/B
 
 
 
@@ -495,12 +501,12 @@ def compute_refer_consistency_loss(end_points, ema_end_points,augmentation, pref
 
     # bbox_loss = bbox_distance_loss(student_out['pred_boxes'],teacher_out['pred_boxes'],mask= mask)
     
-    soft_token_loss = soft_token_consist_loss(student_out['pred_logits'],teacher_out['pred_logits'],mask= mask)
-    # soft_token_kl_loss=soft_token_consist_loss_kl(student_out['pred_logits'],teacher_out['pred_logits'],mask= mask) #* 这个可能会比cross entropy更好
+    # soft_token_loss = soft_token_consist_loss(student_out['pred_logits'],teacher_out['pred_logits'],mask= mask)
+    soft_token_kl_loss=soft_token_consist_loss_kl(student_out['pred_logits'],teacher_out['pred_logits'],mask= mask) #* 这个可能会比cross entropy更好
     
 
     # center_loss,size_loss = compute_bbox_consistency_loss(student_out['pred_boxes'],teacher_out['pred_boxes'])
-    # center_loss = compute_bbox_consistency_loss(student_out['pred_boxes'],teacher_bbox,mask)
+    center_loss = compute_bbox_consistency_loss(student_out['pred_boxes'],teacher_bbox,mask)
     # size_loss = compute_bbox_consistency_loss_size(student_out['pred_boxes'],teacher_bbox,mask)
 
     # student_out['proj_tokens']#* [B,token_num,64],  
@@ -513,7 +519,7 @@ def compute_refer_consistency_loss(end_points, ema_end_points,augmentation, pref
 
     # return soft_token_loss,soft_token_kl_loss,center_loss,size_loss
     # return soft_token_loss
-    return soft_token_loss
+    return center_loss,soft_token_kl_loss
     
 
 
@@ -568,9 +574,9 @@ def get_consistency_loss(end_points, ema_end_points,augmentation):
         end_points: dict
     """
     
-    soft_token_consistency_loss_sum = torch.tensor(0.).cuda()
-    # soft_token_kl_consistency_loss_sum = torch.tensor(0.).cuda()
-    # center_consistency_loss_sum = torch.tensor(0.).cuda()
+    # soft_token_consistency_loss_sum = torch.tensor(0.).cuda()
+    soft_token_kl_consistency_loss_sum = torch.tensor(0.).cuda()
+    center_consistency_loss_sum = torch.tensor(0.).cuda()
     # size_consistency_loss_sum = torch.tensor(0.).cuda()
 
     
@@ -598,22 +604,21 @@ def get_consistency_loss(end_points, ema_end_points,augmentation):
         # soft_token_loss,soft_token_kl_loss,center_loss,size_loss= compute_refer_consistency_loss(end_points, ema_end_points, prefix=prefix)
         # center_loss,soft_token_kl_loss= compute_refer_consistency_loss(end_points, ema_end_points,augmentation, prefix=prefix)
         # center_loss= compute_refer_consistency_loss(end_points, ema_end_points,augmentation, prefix=prefix)
-        soft_token_loss= compute_refer_consistency_loss(end_points, ema_end_points, augmentation,prefix=prefix)
+        # soft_token_loss= compute_refer_consistency_loss(end_points, ema_end_points, augmentation,prefix=prefix)
+        center_loss,soft_token_kl_loss= compute_refer_consistency_loss(end_points, ema_end_points, augmentation,prefix=prefix)
         # center_loss= compute_refer_consistency_loss(end_points, ema_end_points, augmentation,prefix=prefix)
         # size_loss= compute_refer_consistency_loss(end_points, ema_end_points,augmentation, prefix=prefix)
         
 
-        soft_token_consistency_loss_sum+=soft_token_loss
-        # soft_token_kl_consistency_loss_sum+=soft_token_kl_loss
-
-        # center_consistency_loss_sum+=center_loss
+        # soft_token_consistency_loss_sum+=soft_token_loss
+        soft_token_kl_consistency_loss_sum+=soft_token_kl_loss
+        center_consistency_loss_sum+=center_loss
         # size_consistency_loss_sum+=size_loss
         
         
-    end_points['soft_token_consistency_loss'] = soft_token_consistency_loss_sum / len(prefixes)
-    # end_points['soft_token_kl_consistency_loss'] = soft_token_kl_consistency_loss_sum / len(prefixes)
-
-    # end_points['center_consistency_loss'] = center_consistency_loss_sum / len(prefixes)
+    # end_points['soft_token_consistency_loss'] = soft_token_consistency_loss_sum / len(prefixes)
+    end_points['soft_token_kl_consistency_loss'] = soft_token_kl_consistency_loss_sum / len(prefixes)
+    end_points['center_consistency_loss'] = center_consistency_loss_sum / len(prefixes)
     # end_points['size_consistency_loss'] = size_consistency_loss_sum / len(prefixes)
 
     return end_points

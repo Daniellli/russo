@@ -1,7 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-08-21 19:15:53
- # @LastEditTime: 2022-10-03 16:35:08
+ # @LastEditTime: 2022-10-03 17:32:55
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/train_test_cls.sh
@@ -23,13 +23,13 @@ DATA_ROOT=datasets/
 
 # gpu_ids="0,2,3,5,6"
 # gpu_num=5
-# gpu_ids="0,1,2,3,4,5,6,7"
-# gpu_num=8
+gpu_ids="0,1,2,3,4,5,6,7"
+gpu_num=8
+b_size=8
 
-
-gpu_ids="0,1,2,3"
-gpu_num=4
-b_size=44
+# gpu_ids="0,1,2,3"
+# gpu_num=4
+# b_size=44
 # gpu_ids="0,1"
 # gpu_num=2
 # b_size=12

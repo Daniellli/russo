@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 19:34:49
-LastEditTime: 2022-10-03 16:27:14
+LastEditTime: 2022-10-03 17:03:37
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/mean_teacher2.py
@@ -604,30 +604,40 @@ class MeanTeacher(BaseTrainTester):
 
 
             end_points = get_consistency_loss(end_points, teacher_end_points,batch_data['augmentations'])
-            # center_consistency_loss = end_points['center_consistency_loss']
-            soft_token_consistency_loss = end_points['soft_token_consistency_loss']
+            soft_token_kl_consistency_loss = end_points['soft_token_kl_consistency_loss']
+            center_consistency_loss = end_points['center_consistency_loss']
+            # soft_token_consistency_loss = end_points['soft_token_consistency_loss']
 
-            
-            consistent_loss = (soft_token_consistency_loss)* consistency_weight
+            consistent_loss = (soft_token_kl_consistency_loss+center_consistency_loss)* consistency_weight
 
 
             #* total loss
+            
             if consistent_loss is not None:
-                loss  += consistent_loss
+                # loss  += consistent_loss
+                total_loss = loss+consistent_loss
+            else:
+                total_loss = loss
+
             
 
             #!===================
             if args.upload_wandb and args.local_rank==0:
                 
                 wandb.log({"student_supervised_loss":loss.clone().detach().item(),
-                            # "center_consistency_loss":center_consistency_loss.clone().detach().item(),
-                            "soft_token_consistency_loss":soft_token_consistency_loss.clone().detach().item(),
+                            "center_consistency_loss":center_consistency_loss.clone().detach().item(),
+                            # "soft_token_consistency_loss":soft_token_consistency_loss.clone().detach().item(),
+                            "soft_token_kl_consistency_loss":soft_token_kl_consistency_loss.clone().detach().item(),
                             "consistent_loss":consistent_loss.clone().detach().item(),
+                            "total_loss":total_loss.clone().detach().item(),
                         })
-            #!===================
-
+            
             optimizer.zero_grad()
-            loss.backward()
+
+            
+            # loss.backward()
+            total_loss.backward()
+            #!===================
             if args.clip_norm > 0:
                 grad_total_norm = torch.nn.utils.clip_grad_norm_(
                     model.parameters(), args.clip_norm
