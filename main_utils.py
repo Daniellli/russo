@@ -392,9 +392,6 @@ class BaseTrainTester:
         # Get model
         model = self.get_model(args)
    
-        
-        
-        
 
         # Get criterion
         criterion, set_criterion = self.get_criterion(args)
@@ -471,6 +468,9 @@ class BaseTrainTester:
                 )
 
                 if dist.get_rank() == 0:
+                    if args.upload_wandb:
+                        wandb.log(performance)
+                        
                     with open(save_dir, 'a+')as f :
                         f.write( f"epoch:{epoch},"+','.join(["%s:%.4f"%(k,v) for k,v in performance.items()])+"\n")
                         

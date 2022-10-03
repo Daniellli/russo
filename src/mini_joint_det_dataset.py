@@ -1,3 +1,12 @@
+'''
+Author: xushaocong
+Date: 2022-10-03 21:56:43
+LastEditTime: 2022-10-03 22:05:32
+LastEditors: xushaocong
+Description: 
+FilePath: /butd_detr/src/mini_joint_det_dataset.py
+email: xushaocong@stu.xmu.edu.cn
+'''
 # ------------------------------------------------------------------------
 # BEAUTY DETR
 # Copyright (c) 2022 Ayush Jain & Nikolaos Gkanatsios
@@ -51,8 +60,14 @@ class Joint3DDataset(Dataset):
                  data_path='./',
                  use_color=False, use_height=False, use_multiview=False,
                  detect_intermediate=False,
-                 butd=False, butd_gt=False, butd_cls=False, augment_det=False):
+                 butd=False, butd_gt=False, butd_cls=False, augment_det=False,
+                 label_data_proportion=0.5):
         """Initialize dataset (here for ReferIt3D utterances)."""
+        #!+==================================
+
+        self.label_data_proportion = label_data_proportion
+
+        #!+==================================
         self.dataset_dict = dataset_dict
         self.test_dataset = test_dataset
         self.split = split
@@ -138,6 +153,14 @@ class Joint3DDataset(Dataset):
         annos = loaders[dset]()
         if self.overfit:
             annos = annos[:128]
+
+        
+        
+        if self.split == 'train':
+            total_num = len(annos)
+            annos = annos[:int(total_num*self.label_data_proportion)]#* annos 内的数据顺序是固定的,  
+        
+        
         return annos
 
     def load_sr3dplus_annos(self):

@@ -1,3 +1,12 @@
+# Update log 
+
+train_dist_mod_2.py : 修改了get_datasets  , 换成了可以添加加载数据集比例的dataset 
+
+
+
+
+
+
 # Bottom Up Top Down Detection Transformers for Language Grounding in Images and Point Clouds
 
 
