@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 19:34:49
-LastEditTime: 2022-10-02 23:00:58
+LastEditTime: 2022-10-03 16:27:14
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/mean_teacher2.py
@@ -604,8 +604,11 @@ class MeanTeacher(BaseTrainTester):
 
 
             end_points = get_consistency_loss(end_points, teacher_end_points,batch_data['augmentations'])
-            center_consistency_loss = end_points['center_consistency_loss'] 
-            consistent_loss = (center_consistency_loss)* consistency_weight
+            # center_consistency_loss = end_points['center_consistency_loss']
+            soft_token_consistency_loss = end_points['soft_token_consistency_loss']
+
+            
+            consistent_loss = (soft_token_consistency_loss)* consistency_weight
 
 
             #* total loss
@@ -617,7 +620,8 @@ class MeanTeacher(BaseTrainTester):
             if args.upload_wandb and args.local_rank==0:
                 
                 wandb.log({"student_supervised_loss":loss.clone().detach().item(),
-                            "center_consistency_loss":center_consistency_loss.clone().detach().item(),
+                            # "center_consistency_loss":center_consistency_loss.clone().detach().item(),
+                            "soft_token_consistency_loss":soft_token_consistency_loss.clone().detach().item(),
                             "consistent_loss":consistent_loss.clone().detach().item(),
                         })
             #!===================

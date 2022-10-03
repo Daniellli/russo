@@ -1,7 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-08-21 19:15:53
- # @LastEditTime: 2022-10-02 23:06:50
+ # @LastEditTime: 2022-10-03 16:35:08
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/train_test_cls.sh
@@ -23,11 +23,23 @@ DATA_ROOT=datasets/
 
 # gpu_ids="0,2,3,5,6"
 # gpu_num=5
-gpu_ids="0,1,2,3,4,5,6,7"
-gpu_num=8
-b_size=8
+# gpu_ids="0,1,2,3,4,5,6,7"
+# gpu_num=8
+
+
+gpu_ids="0,1,2,3"
+gpu_num=4
+b_size=44
+# gpu_ids="0,1"
+# gpu_num=2
+# b_size=12
+
+
+
 resume_mode_path="pretrained/bdetr_sr3d_cls_67.1.pth"
 port=29522
+
+
 
 
 TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
@@ -46,8 +58,8 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --butd_cls --self_attend \
     --max_epoch 200 \
     --checkpoint_path $resume_mode_path \
+    --consistency_weight 1e-4 \
     --upload-wandb \
-    --consistency_weight 1e-2 \
     2>&1 | tee -a logs/train_test_cls.log
 
     
