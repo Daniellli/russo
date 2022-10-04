@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-09-22 23:13:23
-LastEditTime: 2022-10-03 17:31:16
+LastEditTime: 2022-10-04 09:37:54
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/my_script/consistant_loss.py
@@ -20,14 +20,8 @@ import sys
 sys.path.append("/data/xusc/exp/butd_detr")
 import torch
 import torch.nn as nn
-
-
 import os.path as osp
-
 from my_script.pc_utils import *
-
-
-
 import torch.nn.functional as F
 
 from IPython import embed

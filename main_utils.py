@@ -435,6 +435,7 @@ class BaseTrainTester:
         if osp.exists(save_dir):
             os.remove(save_dir)
         #!===============================
+        
         for epoch in range(args.start_epoch, args.max_epoch + 1):
             train_loader.sampler.set_epoch(epoch)
             tic = time.time()

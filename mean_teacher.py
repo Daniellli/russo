@@ -1,10 +1,10 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 19:34:49
-LastEditTime: 2022-10-03 17:03:37
+LastEditTime: 2022-10-04 16:17:35
 LastEditors: xushaocong
-Description: 
-FilePath: /butd_detr/mean_teacher2.py
+Description:  全监督的mean teacher 
+FilePath: /butd_detr/mean_teacher.py
 email: xushaocong@stu.xmu.edu.cn
 '''
 # ------------------------------------------------------------------------

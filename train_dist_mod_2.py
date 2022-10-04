@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-03 22:00:15
-LastEditTime: 2022-10-04 08:39:13
+LastEditTime: 2022-10-04 17:28:33
 LastEditors: xushaocong
 Description:  修改get_datasets , 换成可以添加使用数据集比例的dataloader
 FilePath: /butd_detr/train_dist_mod_2.py
@@ -28,7 +28,7 @@ import torch.distributed as dist
 from main_utils import parse_option, BaseTrainTester
 from data.model_util_scannet import ScannetDatasetConfig
 # from src.joint_det_dataset import Joint3DDataset
-from src.mini_joint_det_dataset import Joint3DDataset
+from src.sr3d_dataset import SR3DDataset
 from src.grounding_evaluator import GroundingEvaluator, GroundingGTEvaluator
 from models import BeaUTyDETR
 from models import APCalculator, parse_predictions, parse_groundtruths
@@ -80,7 +80,7 @@ class TrainTester(BaseTrainTester):
             dataset_dict['scannet'] = 10
 
         print('Loading datasets:', sorted(list(dataset_dict.keys())))
-        train_dataset = Joint3DDataset(
+        train_dataset = SR3DDataset(
             dataset_dict=dataset_dict,
             test_dataset=args.test_dataset, #? only test set need ? 
             split='train' if not args.debug else 'val',
@@ -93,41 +93,24 @@ class TrainTester(BaseTrainTester):
             butd_gt=args.butd_gt,#? 
             butd_cls=args.butd_cls,#? 
             augment_det=args.augment_det,#? 
-            label_data_proportion=0.5
+            labeled_ratio=0.5
         )
-        #!+==============================================
-        if args.scanrefer_test:
-            test_dataset = Joint3DDataset(
-                dataset_dict=dataset_dict,
-                test_dataset=args.test_dataset,
-                split='test', #* load test data 
-                use_color=args.use_color, use_height=args.use_height,
-                overfit=args.debug,
-                data_path=args.data_root,
-                detect_intermediate=args.detect_intermediate,
-                use_multiview=args.use_multiview,
-                butd=args.butd,
-                butd_gt=args.butd_gt,
-                butd_cls=args.butd_cls
-            )
-        else :
-            test_dataset = Joint3DDataset(
-                dataset_dict=dataset_dict,
-                test_dataset=args.test_dataset,
-                split='val' if not args.eval_train else 'train',
-                use_color=args.use_color, use_height=args.use_height,
-                overfit=args.debug,
-                data_path=args.data_root,
-                detect_intermediate=args.detect_intermediate,
-                use_multiview=args.use_multiview,
-                butd=args.butd,
-                butd_gt=args.butd_gt,
-                butd_cls=args.butd_cls
-            )
+        
+        test_dataset = SR3DDataset(
+            dataset_dict=dataset_dict,
+            test_dataset=args.test_dataset,
+            split='val' if not args.eval_train else 'train',
+            use_color=args.use_color, use_height=args.use_height,
+            overfit=args.debug,
+            data_path=args.data_root,
+            detect_intermediate=args.detect_intermediate,
+            use_multiview=args.use_multiview,
+            butd=args.butd,
+            butd_gt=args.butd_gt,
+            butd_cls=args.butd_cls
+        )
 
-        #!+=============================================
-
-        #* 
+        
         return train_dataset, test_dataset
 
     @staticmethod

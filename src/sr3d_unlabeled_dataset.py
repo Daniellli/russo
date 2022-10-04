@@ -1,10 +1,19 @@
 '''
 Author: xushaocong
-Date: 2022-10-03 21:56:43
-LastEditTime: 2022-10-03 22:05:32
+Date: 2022-10-04 09:41:33
+LastEditTime: 2022-10-04 10:59:01
 LastEditors: xushaocong
 Description: 
-FilePath: /butd_detr/src/mini_joint_det_dataset.py
+FilePath: /butd_detr/src/sr3d_unlabeled_dataset.py
+email: xushaocong@stu.xmu.edu.cn
+'''
+'''
+Author: xushaocong
+Date: 2022-10-02 21:28:11
+LastEditTime: 2022-10-02 23:09:21
+LastEditors: xushaocong
+Description: 
+FilePath: /butd_detr/src/sr3d_dataset.py
 email: xushaocong@stu.xmu.edu.cn
 '''
 # ------------------------------------------------------------------------
@@ -38,20 +47,17 @@ from data.model_util_scannet import ScannetDatasetConfig
 from data.scannet_utils import read_label_mapping
 from src.visual_data_handlers import Scan
 from .scannet_classes import REL_ALIASES, VIEW_DEP_RELS
+import os.path as osp
 
 NUM_CLASSES = 485
 DC = ScannetDatasetConfig(NUM_CLASSES)
 DC18 = ScannetDatasetConfig(18)
 MAX_NUM_OBJ = 132
 
-import os.path as osp
 
 
 
-
-
-
-class Joint3DDataset(Dataset):
+class SR3DUnlabeledDataset(Dataset):
     """Dataset utilities for ReferIt3D."""
 
     def __init__(self, dataset_dict={'sr3d': 1, 'scannet': 10},
@@ -60,14 +66,8 @@ class Joint3DDataset(Dataset):
                  data_path='./',
                  use_color=False, use_height=False, use_multiview=False,
                  detect_intermediate=False,
-                 butd=False, butd_gt=False, butd_cls=False, augment_det=False,
-                 label_data_proportion=0.5):
+                 butd=False, butd_gt=False, butd_cls=False, augment_det=False):
         """Initialize dataset (here for ReferIt3D utterances)."""
-        #!+==================================
-
-        self.label_data_proportion = label_data_proportion
-
-        #!+==================================
         self.dataset_dict = dataset_dict
         self.test_dataset = test_dataset
         self.split = split
@@ -110,19 +110,17 @@ class Joint3DDataset(Dataset):
             "enet_feats_maxpool.hdf5"
         )
         self.multiview_data = {}
-        
+
+
         model_path=osp.join(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__))))),'.cache/huggingface/transformers/roberta')
 
         self.tokenizer = RobertaTokenizerFast.from_pretrained(model_path)
         
+        
         if os.path.exists('data/cls_results.json'):
             with open('data/cls_results.json') as fid:
                 self.cls_results = json.load(fid)  # {scan_id: [class0, ...]}
-        # if os.path.exists('data/cls_demo_results.json'):
-        #     with open('data/cls_demo_results.json') as fid:
-        #         self.cls_results = json.load(fid)  # {scan_id: [class0, ...]}
-        
-
+    
         # load
         print('Loading %s files, take a breath!' % split)
         if not os.path.exists(f'{self.data_path}/{split}_v3scans.pkl'):
@@ -138,8 +136,6 @@ class Joint3DDataset(Dataset):
                     _annos = self.load_annos(dset)
                     self.annos += (_annos * cnt)
 
-        if self.visualize:
-            wandb.init(project="vis", name="debug")
 
     def load_annos(self, dset):
         """Load annotations of given dataset."""
@@ -150,16 +146,11 @@ class Joint3DDataset(Dataset):
             'scanrefer': self.load_scanrefer_annos,
             'scannet': self.load_scannet_annos
         }
+
         annos = loaders[dset]()
+        
         if self.overfit:
             annos = annos[:128]
-
-        
-        
-        if self.split == 'train':
-            total_num = len(annos)
-            annos = annos[:int(total_num*self.label_data_proportion)]#* annos 内的数据顺序是固定的,  
-        
         
         return annos
 
@@ -414,6 +405,8 @@ class Joint3DDataset(Dataset):
             if augmentations['xz_flip']:
                 pc[:, 1] = -pc[:, 1]
         else:
+            augmentations['yz_flip'] =False
+            augmentations['xz_flip'] =False
             theta_z = (2*np.random.rand() - 1) * 5
         augmentations['theta_z'] = theta_z
         pc[:, :3] = rot_z(pc[:, :3], theta_z)
@@ -470,6 +463,10 @@ class Joint3DDataset(Dataset):
             multiview_data = self._load_multiview(scan_id)
 
         # d. Augmentations
+        #!+========
+        origin_pc = np.concatenate([scan.pc.copy(), color.copy()], 1)
+        #!+========
+
         augmentations = {}
         if self.split == 'train' and self.augment:
             rotate_natural = (
@@ -494,7 +491,7 @@ class Joint3DDataset(Dataset):
         if multiview_data is not None:
             point_cloud = np.concatenate([point_cloud, multiview_data], 1)
 
-        return point_cloud, augmentations, scan.color
+        return point_cloud, augmentations, scan.color,origin_pc
 
     def _get_token_positive_map(self, anno):
         """Return correspondence of boxes to tokens."""
@@ -691,6 +688,37 @@ class Joint3DDataset(Dataset):
             detected_class_ids, detected_logits
         )
 
+    
+    '''
+    description:  对detector 的bbox进行数据增强 ,#! 没有加入噪声
+    param {*} self
+    param {*} all_detected_bboxes
+    param {*} augmentations
+    return {*}
+    '''
+    def transformation_box(self,boxes,augmentations):
+        
+        #* do not transformation bbox 
+        if len(augmentations.keys()) >0:  #* 不是训练的集的话 这个      augmentations 就是空
+            all_det_pts = box2points(boxes).reshape(-1, 3)
+
+
+            all_det_pts = rot_z(all_det_pts, augmentations['theta_z'])  
+            all_det_pts = rot_x(all_det_pts, augmentations['theta_x'])
+            all_det_pts = rot_y(all_det_pts, augmentations['theta_y'])
+
+            if augmentations.get('yz_flip', False):
+                all_det_pts[:, 0] = -all_det_pts[:, 0]
+            if augmentations.get('xz_flip', False):
+                all_det_pts[:, 1] = -all_det_pts[:, 1]
+
+            
+            all_det_pts += augmentations['shift']
+            all_det_pts *= augmentations['scale']
+            boxes = points2box(all_det_pts.reshape(-1, 8, 3))
+
+        return boxes
+
     def __getitem__(self, index):
         """Get current batch for input index."""
         split = self.split
@@ -750,7 +778,7 @@ class Joint3DDataset(Dataset):
             anno['utterance'] = utterance
 
         # Point cloud representation#* point_cloud == [x,y,z,r,g,b], 50000 points 
-        point_cloud, augmentations, og_color = self._get_pc(anno, scan)
+        point_cloud, augmentations, og_color ,origin_pc= self._get_pc(anno, scan)
 
         # "Target" boxes: append anchors if they're to be detected
         gt_bboxes, box_label_mask, point_instance_label = \
@@ -769,6 +797,13 @@ class Joint3DDataset(Dataset):
             all_detected_bboxes, all_detected_bbox_label_mask,
             detected_class_ids, detected_logits
         ) = self._get_detected_objects(split, anno['scan_id'], augmentations)
+
+        #!===================
+        teacher_box = all_bboxes.copy()
+        teacher_box = self.transformation_box(teacher_box,augmentations)
+ 
+
+        #!===================
 
         # Assume a perfect object detector 
         if self.butd_gt:
@@ -852,7 +887,11 @@ class Joint3DDataset(Dataset):
                 class_ids[anno['target_id']]
                 if isinstance(anno['target_id'], int)
                 else class_ids[anno['target_id'][0]]
-            )
+            ),
+            "pc_before_aug":origin_pc.astype(np.float32),
+            "teacher_box":teacher_box.astype(np.float32),
+            "augmentations":augmentations
+
         })
         return ret_dict
 

@@ -1,7 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-08-21 19:15:53
- # @LastEditTime: 2022-10-03 22:04:49
+ # @LastEditTime: 2022-10-04 17:01:44
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/train_test_cls.sh
@@ -21,9 +21,9 @@ train_data=sr3d
 test_data=sr3d
 DATA_ROOT=datasets/
 
-gpu_ids="0,2,3,5"
-gpu_num=4
-b_size=12
+# gpu_ids="0,2,3,5"
+# gpu_num=4
+# b_size=12
 # gpu_ids="0,1,2,3,4,5,6,7"
 # gpu_num=8
 # b_size=8
@@ -32,9 +32,9 @@ b_size=12
 # gpu_num=4
 # b_size=44
 
-# gpu_ids="0,1"
-# gpu_num=2
-# b_size=12
+gpu_ids="0,1"
+gpu_num=2
+b_size=8
 
 resume_mode_path="pretrained/bdetr_sr3d_cls_67.1.pth"
 port=29522
@@ -66,7 +66,7 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
 
 #*  for mean teacher  
 # TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
-#     mean_teacher2.py --num_decoder_layers 6 \
+#     mean_teacher.py --num_decoder_layers 6 \
 #     --use_color \
 #     --weight_decay 0.0005 \
 #     --data_root $DATA_ROOT \
