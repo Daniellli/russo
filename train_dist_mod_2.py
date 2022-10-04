@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-03 22:00:15
-LastEditTime: 2022-10-03 22:10:34
+LastEditTime: 2022-10-04 08:39:13
 LastEditors: xushaocong
 Description:  修改get_datasets , 换成可以添加使用数据集比例的dataloader
 FilePath: /butd_detr/train_dist_mod_2.py
@@ -219,8 +219,7 @@ class TrainTester(BaseTrainTester):
                 criterion, set_criterion, args
             )
             #!==== generate result for upload evaluation server , scanrefer ===============================
-            SAVE_RES =  True
-
+            SAVE_RES =  False
             if SAVE_RES: 
                 #* end_points['last_sem_cls_scores']  : [B,query_num,distribution for tokens(256)]  
                 #* 1. 对 分布取softmax 
