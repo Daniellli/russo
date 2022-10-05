@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 19:34:49
-LastEditTime: 2022-10-05 12:19:30
+LastEditTime: 2022-10-05 21:55:25
 LastEditors: xushaocong
 Description:  全监督的mean teacher 
 FilePath: /butd_detr/mean_teacher.py
@@ -622,7 +622,7 @@ class MeanTeacher(BaseTrainTester):
             
 
             #!===================
-            if args.upload_wandb and args.local_rank==0:
+            if (batch_idx + 1) % args.print_freq == 0 and  args.upload_wandb and args.local_rank==0 :
                 
                 wandb.log({"student_supervised_loss":loss.clone().detach().item(),
                             "center_consistency_loss":center_consistency_loss.clone().detach().item(),

@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-04 19:55:17
-LastEditTime: 2022-10-05 11:45:49
+LastEditTime: 2022-10-05 21:53:09
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/train.py
@@ -198,7 +198,7 @@ class TrainTester(BaseTrainTester):
         super().__init__(args)
 
         if args.eval and args.local_rank == 0 : #* for debug ? 
-            self.vis_save_path = osp.join("vis_results",time.strftime("%Y:%m:%d",time.gmtime(time.time()))+"_"+str(int(time.time())))
+            self.vis_save_path = osp.join(args.log_dir,"vis_results",time.strftime("%Y:%m:%d",time.gmtime(time.time()))+"_"+str(int(time.time())))
             os.makedirs(self.vis_save_path)
 
         self.DEBUG = args.save_input_output

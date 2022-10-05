@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-03 22:00:15
-LastEditTime: 2022-10-05 11:45:29
+LastEditTime: 2022-10-05 21:48:38
 LastEditors: xushaocong
 Description:  修改get_datasets , 换成可以添加使用数据集比例的dataloader
 FilePath: /butd_detr/pretrain.py
@@ -195,6 +195,7 @@ class TrainTester(BaseTrainTester):
             )
         # Main eval branch
         # DEBUG=True
+        SAVE_RES =  False
         pred_bboxes = []
         for batch_idx, batch_data in enumerate(test_loader):#* the length of batch data == 26 , 
             stat_dict, end_points = self._main_eval_branch(
@@ -202,7 +203,7 @@ class TrainTester(BaseTrainTester):
                 criterion, set_criterion, args
             )
             #!==== generate result for upload evaluation server , scanrefer ===============================
-            SAVE_RES =  False
+            
             if SAVE_RES: 
                 #* end_points['last_sem_cls_scores']  : [B,query_num,distribution for tokens(256)]  
                 #* 1. 对 分布取softmax 
@@ -246,11 +247,12 @@ class TrainTester(BaseTrainTester):
         evaluator.synchronize_between_processes()
         #!===================
         #* dump for upload evaluation server 
-        logger.info("dumping...")
-        pred_path = os.path.join(args.log_dir, "pred.json")
-        with open(pred_path, "w") as f:
-            json.dump(pred_bboxes, f, indent=4)
-        logger.info("done!")
+        if SAVE_RES:
+            logger.info("dumping...")
+            pred_path = os.path.join(args.log_dir, "pred.json")
+            with open(pred_path, "w") as f:
+                json.dump(pred_bboxes, f, indent=4)
+            logger.info("done!")
         
         ans = None
         #!===================

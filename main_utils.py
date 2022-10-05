@@ -262,6 +262,7 @@ class BaseTrainTester:
             output=args.log_dir, distributed_rank=dist.get_rank(),
             name=name
         )
+        
         # Save config file and initialize tb writer
         if dist.get_rank() == 0:
             path = os.path.join(args.log_dir, "config.json")
