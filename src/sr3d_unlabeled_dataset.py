@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
-Date: 2022-10-04 09:41:33
-LastEditTime: 2022-10-04 10:59:01
+Date: 2022-10-04 19:55:59
+LastEditTime: 2022-10-04 23:23:31
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/sr3d_unlabeled_dataset.py
@@ -10,7 +10,7 @@ email: xushaocong@stu.xmu.edu.cn
 '''
 Author: xushaocong
 Date: 2022-10-02 21:28:11
-LastEditTime: 2022-10-02 23:09:21
+LastEditTime: 2022-10-04 19:55:44
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/sr3d_dataset.py
@@ -33,6 +33,7 @@ import os
 import random
 from six.moves import cPickle
 
+
 import numpy as np
 import torch
 from torch.utils.data import Dataset
@@ -47,14 +48,14 @@ from data.model_util_scannet import ScannetDatasetConfig
 from data.scannet_utils import read_label_mapping
 from src.visual_data_handlers import Scan
 from .scannet_classes import REL_ALIASES, VIEW_DEP_RELS
-import os.path as osp
 
 NUM_CLASSES = 485
 DC = ScannetDatasetConfig(NUM_CLASSES)
 DC18 = ScannetDatasetConfig(18)
 MAX_NUM_OBJ = 132
 
-
+import os.path as osp
+from loguru import logger 
 
 
 class SR3DUnlabeledDataset(Dataset):
@@ -66,8 +67,13 @@ class SR3DUnlabeledDataset(Dataset):
                  data_path='./',
                  use_color=False, use_height=False, use_multiview=False,
                  detect_intermediate=False,
-                 butd=False, butd_gt=False, butd_cls=False, augment_det=False):
+                 butd=False, butd_gt=False, butd_cls=False, augment_det=False,
+                 labeled_ratio=None):
         """Initialize dataset (here for ReferIt3D utterances)."""
+        #!+==================================
+        self.labeled_ratio = labeled_ratio
+        #!+==================================
+
         self.dataset_dict = dataset_dict
         self.test_dataset = test_dataset
         self.split = split
@@ -110,8 +116,7 @@ class SR3DUnlabeledDataset(Dataset):
             "enet_feats_maxpool.hdf5"
         )
         self.multiview_data = {}
-
-
+        
         model_path=osp.join(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__))))),'.cache/huggingface/transformers/roberta')
 
         self.tokenizer = RobertaTokenizerFast.from_pretrained(model_path)
@@ -120,7 +125,7 @@ class SR3DUnlabeledDataset(Dataset):
         if os.path.exists('data/cls_results.json'):
             with open('data/cls_results.json') as fid:
                 self.cls_results = json.load(fid)  # {scan_id: [class0, ...]}
-    
+
         # load
         print('Loading %s files, take a breath!' % split)
         if not os.path.exists(f'{self.data_path}/{split}_v3scans.pkl'):
@@ -135,23 +140,27 @@ class SR3DUnlabeledDataset(Dataset):
                 if cnt > 0:
                     _annos = self.load_annos(dset)
                     self.annos += (_annos * cnt)
+            
 
+        
 
     def load_annos(self, dset):
         """Load annotations of given dataset."""
-        loaders = {
-            'nr3d': self.load_nr3d_annos,
-            'sr3d': self.load_sr3d_annos,
-            'sr3d+': self.load_sr3dplus_annos,
-            'scanrefer': self.load_scanrefer_annos,
-            'scannet': self.load_scannet_annos
-        }
 
-        annos = loaders[dset]()
-        
+        #!===============
+        annos = None
+        if dset == "sr3d":
+            annos  = self.load_sr3d_annos()
+        elif dset == 'sr3d+':
+            annos  = self.load_sr3dplus_annos()
+        elif dset == 'scannet':
+            annos  = self.load_scannet_annos()
+        else :
+            raise Exception 
+
         if self.overfit:
             annos = annos[:128]
-        
+
         return annos
 
     def load_sr3dplus_annos(self):
@@ -163,8 +172,23 @@ class SR3DUnlabeledDataset(Dataset):
         split = self.split
         if split == 'val':
             split = 'test'
-        with open('data/meta_data/sr3d_%s_scans.txt' % split) as f:
-            scan_ids = set(eval(f.read()))
+            
+        if split== 'train' and self.labeled_ratio is not None:
+            with open(os.path.join('data/meta_data/sr3d_{}_{}.txt'.format(split,self.labeled_ratio)), 'r') as f:
+                labeled_scenes = f.read().split('\n')
+            logger.info(f"{len(labeled_scenes) } scenes loaded ")
+            scan_ids = set(labeled_scenes)
+            
+            #!+=============================
+            with open('data/meta_data/sr3d_%s_scans.txt' % split) as f:
+                all_scan_ids = set(eval(f.read()))
+
+            scan_ids = list(all_scan_ids-scan_ids)
+            #!+=============================
+        else :
+            with open('data/meta_data/sr3d_%s_scans.txt' % split) as f:
+                scan_ids = set(eval(f.read()))
+
         # with open(self.data_path + 'refer_it_3d/%s.csv' % dset) as f:
         with open(self.data_path + '/refer_it_3d/%s.csv' % dset) as f:
             csv_reader = csv.reader(f)
@@ -186,122 +210,10 @@ class SR3DUnlabeledDataset(Dataset):
                 and
                 str(line[headers['mentions_target_class']]).lower() == 'true'
             ]
+        
         return annos
 
-    def load_nr3d_annos(self):
-        """Load annotations of nr3d."""
-        split = self.split
-        if split == 'val':
-            split = 'test'
-        with open('data/meta_data/nr3d_%s_scans.txt' % split) as f:
-            scan_ids = set(eval(f.read()))
-        with open(self.data_path + 'refer_it_3d/nr3d.csv') as f:
-            csv_reader = csv.reader(f)
-            headers = next(csv_reader)
-            headers = {header: h for h, header in enumerate(headers)}
-            annos = [
-                {
-                    'scan_id': line[headers['scan_id']],
-                    'target_id': int(line[headers['target_id']]),
-                    'target': line[headers['instance_type']],
-                    'utterance': line[headers['utterance']],
-                    'anchor_ids': [],
-                    'anchors': [],
-                    'dataset': 'nr3d'
-                }
-                for line in csv_reader
-                if line[headers['scan_id']] in scan_ids
-                and
-                str(line[headers['mentions_target_class']]).lower() == 'true'
-                and
-                (
-                    str(line[headers['correct_guess']]).lower() == 'true'
-                    or split != 'test'
-                )
-            ]
-        # Add distractor info
-        for anno in annos:
-            anno['distractor_ids'] = [
-                ind
-                for ind in
-                range(len(self.scans[anno['scan_id']].three_d_objects))
-                if self.scans[anno['scan_id']].get_object_instance_label(ind)
-                == anno['target']
-                and ind != anno['target_id']
-            ]
-        # Filter out sentences that do not explicitly mention the target class
-        annos = [anno for anno in annos if anno['target'] in anno['utterance']]
-        return annos
 
-    def load_scanrefer_annos(self):
-        """Load annotations of ScanRefer."""
-        _path = self.data_path + 'scanrefer/ScanRefer_filtered'
-        split = self.split
-        if split in ('val', 'test'):
-            split = 'val'
-        with open(_path + '_%s.txt' % split) as f:
-            scan_ids = [line.rstrip().strip('\n') for line in f.readlines()]
-        with open(_path + '_%s.json' % split) as f:
-            reader = json.load(f)
-        annos = [
-            {
-                'scan_id': anno['scene_id'],
-                'target_id': int(anno['object_id']),
-                'distractor_ids': [],
-                'utterance': ' '.join(anno['token']),
-                'target': ' '.join(str(anno['object_name']).split('_')),
-                'anchors': [],
-                'anchor_ids': [],
-                'dataset': 'scanrefer'
-            }
-            for anno in reader
-            if anno['scene_id'] in scan_ids
-        ]
-        # Fix missing target reference
-        for anno in annos:
-            if anno['target'] not in anno['utterance']:
-                anno['utterance'] = (
-                    ' '.join(anno['utterance'].split(' . ')[0].split()[:-1])
-                    + ' ' + anno['target'] + ' . '
-                    + ' . '.join(anno['utterance'].split(' . ')[1:])
-                )
-        # Add distractor info
-        scene2obj = defaultdict(list)
-        sceneobj2used = defaultdict(list)
-        for anno in annos:
-            nyu_labels = [
-                self.label_mapclass[
-                    self.scans[anno['scan_id']].get_object_instance_label(ind)
-                ]
-                for ind in
-                range(len(self.scans[anno['scan_id']].three_d_objects))
-            ]
-            labels = [DC18.type2class.get(lbl, 17) for lbl in nyu_labels]
-            anno['distractor_ids'] = [
-                ind
-                for ind in
-                range(len(self.scans[anno['scan_id']].three_d_objects))
-                if labels[ind] == labels[anno['target_id']]
-                and ind != anno['target_id']
-            ][:32]
-            if anno['target_id'] not in sceneobj2used[anno['scan_id']]:
-                sceneobj2used[anno['scan_id']].append(anno['target_id'])
-                scene2obj[anno['scan_id']].append(labels[anno['target_id']])
-        # Add unique-multi
-        for anno in annos:
-            nyu_labels = [
-                self.label_mapclass[
-                    self.scans[anno['scan_id']].get_object_instance_label(ind)
-                ]
-                for ind in
-                range(len(self.scans[anno['scan_id']].three_d_objects))
-            ]
-            labels = [DC18.type2class.get(lbl, 17) for lbl in nyu_labels]
-            anno['unique'] = (
-                np.array(scene2obj[anno['scan_id']])
-                == labels[anno['target_id']]
-            ).sum() == 1
-        return annos
 
     def load_scannet_annos(self):
         """Load annotations of scannet."""
@@ -836,10 +748,10 @@ class SR3DUnlabeledDataset(Dataset):
             ])
 
         ret_dict = {
-            'box_label_mask': box_label_mask.astype(np.float32),
-            'center_label': gt_bboxes[:, :3].astype(np.float32),
-            'sem_cls_label': _labels.astype(np.int64),
-            'size_gts': gt_bboxes[:, 3:].astype(np.float32),
+            # 'box_label_mask': box_label_mask.astype(np.float32),
+            # 'center_label': gt_bboxes[:, :3].astype(np.float32),
+            # 'sem_cls_label': _labels.astype(np.int64),
+            # 'size_gts': gt_bboxes[:, 3:].astype(np.float32),
         }
 
         ret_dict.update({
@@ -849,33 +761,33 @@ class SR3DUnlabeledDataset(Dataset):
                 ' '.join(anno['utterance'].replace(',', ' ,').split())
                 + ' . not mentioned'
             ),
-            "tokens_positive": tokens_positive.astype(np.int64),
-            "positive_map": positive_map.astype(np.float32),
-            "relation": (
-                self._find_rel(anno['utterance'])
-                if anno['dataset'].startswith('sr3d')
-                else "none"
-            ),
-            "target_name": scan.get_object_instance_label(
-                anno['target_id'] if isinstance(anno['target_id'], int)
-                else anno['target_id'][0]
-            ),
-            "target_id": (
-                anno['target_id'] if isinstance(anno['target_id'], int)
-                else anno['target_id'][0]
-            ),
-            "point_instance_label": point_instance_label.astype(np.int64),
-            "all_bboxes": all_bboxes.astype(np.float32),
-            "all_bbox_label_mask": all_bbox_label_mask.astype(np.bool8),
-            "all_class_ids": class_ids.astype(np.int64),
-            "distractor_ids": np.array(
-                anno['distractor_ids']
-                + [-1] * (32 - len(anno['distractor_ids']))
-            ).astype(int),
-            "anchor_ids": np.array(
-                anno['anchor_ids']
-                + [-1] * (32 - len(anno['anchor_ids']))
-            ).astype(int),
+            # "tokens_positive": tokens_positive.astype(np.int64),
+            # "positive_map": positive_map.astype(np.float32),
+            # "relation": (
+            #     self._find_rel(anno['utterance'])
+            #     if anno['dataset'].startswith('sr3d')
+            #     else "none"
+            # ),
+            # "target_name": scan.get_object_instance_label(
+            #     anno['target_id'] if isinstance(anno['target_id'], int)
+            #     else anno['target_id'][0]
+            # ),
+            # "target_id": (
+            #     anno['target_id'] if isinstance(anno['target_id'], int)
+            #     else anno['target_id'][0]
+            # ),
+            # "point_instance_label": point_instance_label.astype(np.int64),
+            # "all_bboxes": all_bboxes.astype(np.float32),
+            # "all_bbox_label_mask": all_bbox_label_mask.astype(np.bool8),
+            # "all_class_ids": class_ids.astype(np.int64),
+            # "distractor_ids": np.array(
+            #     anno['distractor_ids']
+            #     + [-1] * (32 - len(anno['distractor_ids']))
+            # ).astype(int),
+            # "anchor_ids": np.array(
+            #     anno['anchor_ids']
+            #     + [-1] * (32 - len(anno['anchor_ids']))
+            # ).astype(int),
             "all_detected_boxes": all_detected_bboxes.astype(np.float32),
             "all_detected_bbox_label_mask": all_detected_bbox_label_mask.astype(np.bool8),
             "all_detected_class_ids": detected_class_ids.astype(np.int64),
@@ -883,15 +795,15 @@ class SR3DUnlabeledDataset(Dataset):
             "is_view_dep": self._is_view_dep(anno['utterance']),
             "is_hard": len(anno['distractor_ids']) > 1,
             "is_unique": len(anno['distractor_ids']) == 0,
-            "target_cid": (
-                class_ids[anno['target_id']]
-                if isinstance(anno['target_id'], int)
-                else class_ids[anno['target_id'][0]]
-            ),
+            # "target_cid": (
+            #     class_ids[anno['target_id']]
+            #     if isinstance(anno['target_id'], int)
+            #     else class_ids[anno['target_id'][0]]
+            # ),
             "pc_before_aug":origin_pc.astype(np.float32),
             "teacher_box":teacher_box.astype(np.float32),
-            "augmentations":augmentations
-
+            "augmentations":augmentations,
+            "supervised_mask":np.array(0).astype(np.int64)
         })
         return ret_dict
 

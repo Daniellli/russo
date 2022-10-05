@@ -1,7 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-08-21 19:15:53
- # @LastEditTime: 2022-10-04 17:01:44
+ # @LastEditTime: 2022-10-04 19:54:26
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/train_test_cls.sh
@@ -32,7 +32,7 @@ DATA_ROOT=datasets/
 # gpu_num=4
 # b_size=44
 
-gpu_ids="0,1"
+gpu_ids="1,2"
 gpu_num=2
 b_size=8
 
@@ -61,8 +61,14 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     2>&1 | tee -a logs/train_test_cls.log
 
 
+
+
+
+
 #* --lr_decay_epochs 作者最开始的设置是 25 26 现在是30 35 
 # --checkpoint_path $resume_mode_path \
+
+
 
 #*  for mean teacher  
 # TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \

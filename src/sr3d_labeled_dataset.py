@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
-Date: 2022-10-04 09:44:16
-LastEditTime: 2022-10-04 09:44:47
+Date: 2022-10-04 19:55:56
+LastEditTime: 2022-10-04 23:20:19
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/sr3d_labeled_dataset.py
@@ -9,11 +9,11 @@ email: xushaocong@stu.xmu.edu.cn
 '''
 '''
 Author: xushaocong
-Date: 2022-10-03 21:56:43
-LastEditTime: 2022-10-03 22:05:32
+Date: 2022-10-02 21:28:11
+LastEditTime: 2022-10-04 19:55:44
 LastEditors: xushaocong
 Description: 
-FilePath: /butd_detr/src/mini_joint_det_dataset.py
+FilePath: /butd_detr/src/sr3d_dataset.py
 email: xushaocong@stu.xmu.edu.cn
 '''
 # ------------------------------------------------------------------------
@@ -32,6 +32,7 @@ import multiprocessing as mp
 import os
 import random
 from six.moves import cPickle
+
 
 import numpy as np
 import torch
@@ -54,10 +55,7 @@ DC18 = ScannetDatasetConfig(18)
 MAX_NUM_OBJ = 132
 
 import os.path as osp
-
-
-
-
+from loguru import logger 
 
 
 class SR3DLabeledDataset(Dataset):
@@ -70,11 +68,12 @@ class SR3DLabeledDataset(Dataset):
                  use_color=False, use_height=False, use_multiview=False,
                  detect_intermediate=False,
                  butd=False, butd_gt=False, butd_cls=False, augment_det=False,
-                 label_data_proportion=0.5):
+                 labeled_ratio=None):
         """Initialize dataset (here for ReferIt3D utterances)."""
         #!+==================================
-        self.label_data_proportion = label_data_proportion
+        self.labeled_ratio = labeled_ratio
         #!+==================================
+
         self.dataset_dict = dataset_dict
         self.test_dataset = test_dataset
         self.split = split
@@ -122,13 +121,10 @@ class SR3DLabeledDataset(Dataset):
 
         self.tokenizer = RobertaTokenizerFast.from_pretrained(model_path)
         
+        
         if os.path.exists('data/cls_results.json'):
             with open('data/cls_results.json') as fid:
                 self.cls_results = json.load(fid)  # {scan_id: [class0, ...]}
-        # if os.path.exists('data/cls_demo_results.json'):
-        #     with open('data/cls_demo_results.json') as fid:
-        #         self.cls_results = json.load(fid)  # {scan_id: [class0, ...]}
-        
 
         # load
         print('Loading %s files, take a breath!' % split)
@@ -144,30 +140,27 @@ class SR3DLabeledDataset(Dataset):
                 if cnt > 0:
                     _annos = self.load_annos(dset)
                     self.annos += (_annos * cnt)
+            
 
-        if self.visualize:
-            wandb.init(project="vis", name="debug")
+        
 
     def load_annos(self, dset):
         """Load annotations of given dataset."""
-        loaders = {
-            'nr3d': self.load_nr3d_annos,
-            'sr3d': self.load_sr3d_annos,
-            'sr3d+': self.load_sr3dplus_annos,
-            'scanrefer': self.load_scanrefer_annos,
-            'scannet': self.load_scannet_annos
-        }
-        annos = loaders[dset]()
+
+        #!===============
+        annos = None
+        if dset == "sr3d":
+            annos  = self.load_sr3d_annos()
+        elif dset == 'sr3d+':
+            annos  = self.load_sr3dplus_annos()
+        elif dset == 'scannet':
+            annos  = self.load_scannet_annos()
+        else :
+            raise Exception 
+
         if self.overfit:
             annos = annos[:128]
 
-        
-        
-        if self.split == 'train':
-            total_num = len(annos)
-            annos = annos[:int(total_num*self.label_data_proportion)]#* annos 内的数据顺序是固定的,  
-        
-        
         return annos
 
     def load_sr3dplus_annos(self):
@@ -179,8 +172,17 @@ class SR3DLabeledDataset(Dataset):
         split = self.split
         if split == 'val':
             split = 'test'
-        with open('data/meta_data/sr3d_%s_scans.txt' % split) as f:
-            scan_ids = set(eval(f.read()))
+            
+        if split== 'train' and self.labeled_ratio is not None:
+            with open(os.path.join('data/meta_data/sr3d_{}_{}.txt'.format(split,self.labeled_ratio)), 'r') as f:
+                labeled_scenes = f.read().split('\n')
+            logger.info(f"{len(labeled_scenes) } scenes loaded ")
+            scan_ids = set(labeled_scenes)
+
+        else :
+            with open('data/meta_data/sr3d_%s_scans.txt' % split) as f:
+                scan_ids = set(eval(f.read()))
+
         # with open(self.data_path + 'refer_it_3d/%s.csv' % dset) as f:
         with open(self.data_path + '/refer_it_3d/%s.csv' % dset) as f:
             csv_reader = csv.reader(f)
@@ -202,122 +204,11 @@ class SR3DLabeledDataset(Dataset):
                 and
                 str(line[headers['mentions_target_class']]).lower() == 'true'
             ]
+        
+        
         return annos
 
-    def load_nr3d_annos(self):
-        """Load annotations of nr3d."""
-        split = self.split
-        if split == 'val':
-            split = 'test'
-        with open('data/meta_data/nr3d_%s_scans.txt' % split) as f:
-            scan_ids = set(eval(f.read()))
-        with open(self.data_path + 'refer_it_3d/nr3d.csv') as f:
-            csv_reader = csv.reader(f)
-            headers = next(csv_reader)
-            headers = {header: h for h, header in enumerate(headers)}
-            annos = [
-                {
-                    'scan_id': line[headers['scan_id']],
-                    'target_id': int(line[headers['target_id']]),
-                    'target': line[headers['instance_type']],
-                    'utterance': line[headers['utterance']],
-                    'anchor_ids': [],
-                    'anchors': [],
-                    'dataset': 'nr3d'
-                }
-                for line in csv_reader
-                if line[headers['scan_id']] in scan_ids
-                and
-                str(line[headers['mentions_target_class']]).lower() == 'true'
-                and
-                (
-                    str(line[headers['correct_guess']]).lower() == 'true'
-                    or split != 'test'
-                )
-            ]
-        # Add distractor info
-        for anno in annos:
-            anno['distractor_ids'] = [
-                ind
-                for ind in
-                range(len(self.scans[anno['scan_id']].three_d_objects))
-                if self.scans[anno['scan_id']].get_object_instance_label(ind)
-                == anno['target']
-                and ind != anno['target_id']
-            ]
-        # Filter out sentences that do not explicitly mention the target class
-        annos = [anno for anno in annos if anno['target'] in anno['utterance']]
-        return annos
 
-    def load_scanrefer_annos(self):
-        """Load annotations of ScanRefer."""
-        _path = self.data_path + 'scanrefer/ScanRefer_filtered'
-        split = self.split
-        if split in ('val', 'test'):
-            split = 'val'
-        with open(_path + '_%s.txt' % split) as f:
-            scan_ids = [line.rstrip().strip('\n') for line in f.readlines()]
-        with open(_path + '_%s.json' % split) as f:
-            reader = json.load(f)
-        annos = [
-            {
-                'scan_id': anno['scene_id'],
-                'target_id': int(anno['object_id']),
-                'distractor_ids': [],
-                'utterance': ' '.join(anno['token']),
-                'target': ' '.join(str(anno['object_name']).split('_')),
-                'anchors': [],
-                'anchor_ids': [],
-                'dataset': 'scanrefer'
-            }
-            for anno in reader
-            if anno['scene_id'] in scan_ids
-        ]
-        # Fix missing target reference
-        for anno in annos:
-            if anno['target'] not in anno['utterance']:
-                anno['utterance'] = (
-                    ' '.join(anno['utterance'].split(' . ')[0].split()[:-1])
-                    + ' ' + anno['target'] + ' . '
-                    + ' . '.join(anno['utterance'].split(' . ')[1:])
-                )
-        # Add distractor info
-        scene2obj = defaultdict(list)
-        sceneobj2used = defaultdict(list)
-        for anno in annos:
-            nyu_labels = [
-                self.label_mapclass[
-                    self.scans[anno['scan_id']].get_object_instance_label(ind)
-                ]
-                for ind in
-                range(len(self.scans[anno['scan_id']].three_d_objects))
-            ]
-            labels = [DC18.type2class.get(lbl, 17) for lbl in nyu_labels]
-            anno['distractor_ids'] = [
-                ind
-                for ind in
-                range(len(self.scans[anno['scan_id']].three_d_objects))
-                if labels[ind] == labels[anno['target_id']]
-                and ind != anno['target_id']
-            ][:32]
-            if anno['target_id'] not in sceneobj2used[anno['scan_id']]:
-                sceneobj2used[anno['scan_id']].append(anno['target_id'])
-                scene2obj[anno['scan_id']].append(labels[anno['target_id']])
-        # Add unique-multi
-        for anno in annos:
-            nyu_labels = [
-                self.label_mapclass[
-                    self.scans[anno['scan_id']].get_object_instance_label(ind)
-                ]
-                for ind in
-                range(len(self.scans[anno['scan_id']].three_d_objects))
-            ]
-            labels = [DC18.type2class.get(lbl, 17) for lbl in nyu_labels]
-            anno['unique'] = (
-                np.array(scene2obj[anno['scan_id']])
-                == labels[anno['target_id']]
-            ).sum() == 1
-        return annos
 
     def load_scannet_annos(self):
         """Load annotations of scannet."""
@@ -421,6 +312,8 @@ class SR3DLabeledDataset(Dataset):
             if augmentations['xz_flip']:
                 pc[:, 1] = -pc[:, 1]
         else:
+            augmentations['yz_flip'] =False
+            augmentations['xz_flip'] =False
             theta_z = (2*np.random.rand() - 1) * 5
         augmentations['theta_z'] = theta_z
         pc[:, :3] = rot_z(pc[:, :3], theta_z)
@@ -477,6 +370,10 @@ class SR3DLabeledDataset(Dataset):
             multiview_data = self._load_multiview(scan_id)
 
         # d. Augmentations
+        #!+========
+        origin_pc = np.concatenate([scan.pc.copy(), color.copy()], 1)
+        #!+========
+
         augmentations = {}
         if self.split == 'train' and self.augment:
             rotate_natural = (
@@ -501,7 +398,7 @@ class SR3DLabeledDataset(Dataset):
         if multiview_data is not None:
             point_cloud = np.concatenate([point_cloud, multiview_data], 1)
 
-        return point_cloud, augmentations, scan.color
+        return point_cloud, augmentations, scan.color,origin_pc
 
     def _get_token_positive_map(self, anno):
         """Return correspondence of boxes to tokens."""
@@ -698,6 +595,37 @@ class SR3DLabeledDataset(Dataset):
             detected_class_ids, detected_logits
         )
 
+    
+    '''
+    description:  对detector 的bbox进行数据增强 ,#! 没有加入噪声
+    param {*} self
+    param {*} all_detected_bboxes
+    param {*} augmentations
+    return {*}
+    '''
+    def transformation_box(self,boxes,augmentations):
+        
+        #* do not transformation bbox 
+        if len(augmentations.keys()) >0:  #* 不是训练的集的话 这个      augmentations 就是空
+            all_det_pts = box2points(boxes).reshape(-1, 3)
+
+
+            all_det_pts = rot_z(all_det_pts, augmentations['theta_z'])  
+            all_det_pts = rot_x(all_det_pts, augmentations['theta_x'])
+            all_det_pts = rot_y(all_det_pts, augmentations['theta_y'])
+
+            if augmentations.get('yz_flip', False):
+                all_det_pts[:, 0] = -all_det_pts[:, 0]
+            if augmentations.get('xz_flip', False):
+                all_det_pts[:, 1] = -all_det_pts[:, 1]
+
+            
+            all_det_pts += augmentations['shift']
+            all_det_pts *= augmentations['scale']
+            boxes = points2box(all_det_pts.reshape(-1, 8, 3))
+
+        return boxes
+
     def __getitem__(self, index):
         """Get current batch for input index."""
         split = self.split
@@ -757,7 +685,7 @@ class SR3DLabeledDataset(Dataset):
             anno['utterance'] = utterance
 
         # Point cloud representation#* point_cloud == [x,y,z,r,g,b], 50000 points 
-        point_cloud, augmentations, og_color = self._get_pc(anno, scan)
+        point_cloud, augmentations, og_color ,origin_pc= self._get_pc(anno, scan)
 
         # "Target" boxes: append anchors if they're to be detected
         gt_bboxes, box_label_mask, point_instance_label = \
@@ -776,6 +704,13 @@ class SR3DLabeledDataset(Dataset):
             all_detected_bboxes, all_detected_bbox_label_mask,
             detected_class_ids, detected_logits
         ) = self._get_detected_objects(split, anno['scan_id'], augmentations)
+
+        #!===================
+        teacher_box = all_bboxes.copy()
+        teacher_box = self.transformation_box(teacher_box,augmentations)
+ 
+
+        #!===================
 
         # Assume a perfect object detector 
         if self.butd_gt:
@@ -859,7 +794,12 @@ class SR3DLabeledDataset(Dataset):
                 class_ids[anno['target_id']]
                 if isinstance(anno['target_id'], int)
                 else class_ids[anno['target_id'][0]]
-            )
+            ),
+            "pc_before_aug":origin_pc.astype(np.float32),
+            "teacher_box":teacher_box.astype(np.float32),
+            "augmentations":augmentations,
+            "supervised_mask":np.array(1).astype(np.int64)
+
         })
         return ret_dict
 

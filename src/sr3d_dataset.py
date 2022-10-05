@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 21:28:11
-LastEditTime: 2022-10-04 17:23:50
+LastEditTime: 2022-10-04 19:55:44
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/sr3d_dataset.py
@@ -174,9 +174,6 @@ class SR3DDataset(Dataset):
             with open('data/meta_data/sr3d_%s_scans.txt' % split) as f:
                 scan_ids = set(eval(f.read()))
 
-
-
-        
         # with open(self.data_path + 'refer_it_3d/%s.csv' % dset) as f:
         with open(self.data_path + '/refer_it_3d/%s.csv' % dset) as f:
             csv_reader = csv.reader(f)
