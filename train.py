@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-04 19:55:17
-LastEditTime: 2022-10-04 23:25:35
+LastEditTime: 2022-10-05 11:45:49
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/train.py
@@ -83,6 +83,8 @@ import random
 
 from my_script.consistant_loss import get_consistency_loss
 
+
+from models import HungarianMatcher, SetCriterion, compute_hungarian_loss,compute_labeled_hungarian_loss
 def parse_option():
     """Parse cmd arguments."""
     parser = argparse.ArgumentParser()
@@ -177,10 +179,8 @@ def parse_option():
     parser.add_argument('--upload-wandb',action='store_true', help="upload to wandb or not ?")
     parser.add_argument('--save-input-output',action='store_true', help="save-input-output")
 
-    parser.add_argument('--scanrefer-test',action='store_true', help="scanrefer-test")
-
-
     parser.add_argument('--consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
+    parser.add_argument('--labeled_ratio', default=0.2, type=float,help=' labeled datasets ratio ')
 
 
     args, _ = parser.parse_known_args()
@@ -253,7 +253,7 @@ class TrainTester(BaseTrainTester):
             butd_gt=args.butd_gt,#? 
             butd_cls=args.butd_cls,#? 
             augment_det=args.augment_det,#? 
-            labeled_ratio=labeled_ratio
+            labeled_ratio=args.labeled_ratio
         )
         
         unlabeled_dataset = SR3DUnlabeledDataset(
@@ -269,7 +269,7 @@ class TrainTester(BaseTrainTester):
             butd_gt=args.butd_gt,#? 
             butd_cls=args.butd_cls,#? 
             augment_det=args.augment_det,#? 
-            labeled_ratio=labeled_ratio
+            labeled_ratio=args.labeled_ratio
         )
 
 
@@ -709,8 +709,6 @@ class TrainTester(BaseTrainTester):
                 unlabeled_loader_iter = iter(unlabeled_loader)
                 batch_data_unlabeled = next(unlabeled_loader_iter)
 
-            #todo finish 
-            
             # Move to GPU
             batch_data = self._to_gpu(batch_data)
             batch_data_unlabeled = self._to_gpu(batch_data_unlabeled)
@@ -746,11 +744,9 @@ class TrainTester(BaseTrainTester):
         
             # Forward pass
             end_points = model(inputs)
-            #!====================
             with torch.no_grad():
                 teacher_end_points = ema_model(teacher_input)   
 
-            #!====================
             # Compute loss and gradients, update parameters.
             for key in batch_data:
                 assert (key not in end_points)
@@ -764,17 +760,14 @@ class TrainTester(BaseTrainTester):
 
 
             end_points = get_consistency_loss(end_points, teacher_end_points,batch_data['augmentations'])
-            soft_token_kl_consistency_loss = end_points['soft_token_kl_consistency_loss']
-            center_consistency_loss = end_points['center_consistency_loss']
-            # soft_token_consistency_loss = end_points['soft_token_consistency_loss']
 
-            consistent_loss = (soft_token_kl_consistency_loss+center_consistency_loss)* consistency_weight
+            center_consistency_loss = end_points['center_consistency_loss']
+            soft_token_consistency_loss = end_points['soft_token_consistency_loss']
+            consistent_loss = (soft_token_consistency_loss+center_consistency_loss)* consistency_weight
 
 
             #* total loss
-            
             if consistent_loss is not None:
-                # loss  += consistent_loss
                 total_loss = loss+consistent_loss
             else:
                 total_loss = loss
@@ -786,16 +779,12 @@ class TrainTester(BaseTrainTester):
                 
                 wandb.log({"student_supervised_loss":loss.clone().detach().item(),
                             "center_consistency_loss":center_consistency_loss.clone().detach().item(),
-                            # "soft_token_consistency_loss":soft_token_consistency_loss.clone().detach().item(),
-                            "soft_token_kl_consistency_loss":soft_token_kl_consistency_loss.clone().detach().item(),
+                            "soft_token_consistency_loss":soft_token_consistency_loss.clone().detach().item(),
                             "consistent_loss":consistent_loss.clone().detach().item(),
                             "total_loss":total_loss.clone().detach().item(),
                         })
             
             optimizer.zero_grad()
-
-            
-            # loss.backward()
             total_loss.backward()
             #!===================
             if args.clip_norm > 0:
@@ -813,7 +802,6 @@ class TrainTester(BaseTrainTester):
             global_step = (batch_idx+1) + (epoch -args.start_epoch) *total_iteration
             alpha = 0.999
             self.update_ema_variables(model,ema_model,alpha,global_step)
-            
             #*===================================================
 
             # Accumulate statistics and print out
@@ -834,6 +822,23 @@ class TrainTester(BaseTrainTester):
                 for key in sorted(stat_dict.keys()):
                     stat_dict[key] = 0
 
+
+    @staticmethod
+    def get_criterion(args):
+        """Get loss criterion for training."""
+        matcher = HungarianMatcher(1, 0, 2, args.use_soft_token_loss)
+        losses = ['boxes', 'labels']
+        if args.use_contrastive_align:
+            losses.append('contrastive_align')
+        set_criterion = SetCriterion(
+            matcher=matcher,
+            losses=losses, eos_coef=0.1, temperature=0.07
+        )
+        # criterion = compute_hungarian_loss
+        criterion = compute_labeled_hungarian_loss
+        
+
+        return criterion, set_criterion
 
 
     def main(self, args):
@@ -906,7 +911,6 @@ class TrainTester(BaseTrainTester):
 
             tic = time.time()
             
-
 
             self.train_one_epoch(
                 epoch, labeled_loader, unlabeled_loader,model,ema_model,

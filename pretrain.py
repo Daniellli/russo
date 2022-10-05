@@ -1,10 +1,10 @@
 '''
 Author: xushaocong
 Date: 2022-10-03 22:00:15
-LastEditTime: 2022-10-04 17:28:33
+LastEditTime: 2022-10-05 11:45:29
 LastEditors: xushaocong
 Description:  修改get_datasets , 换成可以添加使用数据集比例的dataloader
-FilePath: /butd_detr/train_dist_mod_2.py
+FilePath: /butd_detr/pretrain.py
 email: xushaocong@stu.xmu.edu.cn
 '''
 # ------------------------------------------------------------------------
@@ -93,7 +93,7 @@ class TrainTester(BaseTrainTester):
             butd_gt=args.butd_gt,#? 
             butd_cls=args.butd_cls,#? 
             augment_det=args.augment_det,#? 
-            labeled_ratio=0.5
+            labeled_ratio=args.labeled_ratio
         )
         
         test_dataset = SR3DDataset(

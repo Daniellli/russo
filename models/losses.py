@@ -161,10 +161,17 @@ class SigmoidFocalClassificationLoss(nn.Module):
 
 
 def compute_points_obj_cls_loss_hard_topk(end_points, topk):
+    #!==============================================================
+    supervised_mask  = end_points['supervised_mask']
+    supervised_inds = torch.nonzero(supervised_mask).squeeze(1).long()
+    #!==============================================================
+
     box_label_mask = end_points['box_label_mask']
+
     seed_inds = end_points['seed_inds'].long()  # B, K
     seed_xyz = end_points['seed_xyz']  # B, K, 3
     seeds_obj_cls_logits = end_points['seeds_obj_cls_logits']  # B, 1, K
+
     gt_center = end_points['center_label'][:, :, :3]  # B, G, 3
     gt_size = end_points['size_gts'][:, :, :3]  # B, G, 3
     B = gt_center.shape[0]  # batch size
@@ -223,6 +230,92 @@ def compute_points_obj_cls_loss_hard_topk(end_points, topk):
     objectness_loss = cls_loss_src.sum() / B
 
     return objectness_loss
+
+
+
+
+
+'''
+description: 
+param {*} end_points
+param {*} topk
+return {*}
+'''
+def compute_labeled_points_obj_cls_loss_hard_topk(end_points, topk):
+    #!==============================================================
+    supervised_mask  = end_points['supervised_mask']
+    supervised_inds = torch.nonzero(supervised_mask).squeeze(1).long()
+    #!==============================================================
+
+    box_label_mask = end_points['box_label_mask']
+
+    seed_inds = end_points['seed_inds'][supervised_inds,:].long()  # B, K
+    seed_xyz = end_points['seed_xyz'][supervised_inds,:,:]  # B, K, 3
+    seeds_obj_cls_logits = end_points['seeds_obj_cls_logits'][supervised_inds,:,:]  # B, 1, K
+
+    gt_center = end_points['center_label'][:, :, :3]  # B, G, 3
+    gt_size = end_points['size_gts'][:, :, :3]  # B, G, 3
+    B = gt_center.shape[0]  # batch size
+    K = seed_xyz.shape[1]  # number if points from p++ output
+    G = gt_center.shape[1]  # number of gt boxes (with padding)
+
+    # Assign each point to a GT object
+    point_instance_label = end_points['point_instance_label']  # B, num_points
+    obj_assignment = torch.gather(point_instance_label, 1, seed_inds)  # B, K
+    obj_assignment[obj_assignment < 0] = G - 1  # bg points to last gt
+    obj_assignment_one_hot = torch.zeros((B, K, G)).to(seed_xyz.device)
+    obj_assignment_one_hot.scatter_(2, obj_assignment.unsqueeze(-1), 1)
+
+    # Normalized distances of points and gt centroids
+    delta_xyz = seed_xyz.unsqueeze(2) - gt_center.unsqueeze(1)  # (B, K, G, 3)
+    delta_xyz = delta_xyz / (gt_size.unsqueeze(1) + 1e-6)  # (B, K, G, 3)
+    new_dist = torch.sum(delta_xyz ** 2, dim=-1)
+    euclidean_dist1 = torch.sqrt(new_dist + 1e-6)  # BxKxG
+    euclidean_dist1 = (
+        euclidean_dist1 * obj_assignment_one_hot
+        + 100 * (1 - obj_assignment_one_hot)
+    )  # BxKxG
+    euclidean_dist1 = euclidean_dist1.transpose(1, 2).contiguous()  # BxGxK
+
+    # Find the points that lie closest to each gt centroid
+    topk_inds = (
+        torch.topk(euclidean_dist1, topk, largest=False)[1]
+        * box_label_mask[:, :, None]
+        + (box_label_mask[:, :, None] - 1)
+    )  # BxGxtopk
+    topk_inds = topk_inds.long()  # BxGxtopk
+    topk_inds = topk_inds.view(B, -1).contiguous()  # B, Gxtopk
+    batch_inds = torch.arange(B)[:, None].repeat(1, G*topk).to(seed_xyz.device)
+    batch_topk_inds = torch.stack([
+        batch_inds,
+        topk_inds
+    ], -1).view(-1, 2).contiguous()
+
+    # Topk points closest to each centroid are marked as true objects
+    objectness_label = torch.zeros((B, K + 1)).long().to(seed_xyz.device)
+    objectness_label[batch_topk_inds[:, 0], batch_topk_inds[:, 1]] = 1
+    objectness_label = objectness_label[:, :K]
+    objectness_label_mask = torch.gather(point_instance_label, 1, seed_inds)
+    objectness_label[objectness_label_mask < 0] = 0
+
+    # Compute objectness loss
+    criterion = SigmoidFocalClassificationLoss()
+    cls_weights = (objectness_label >= 0).float()
+    cls_normalizer = cls_weights.sum(dim=1, keepdim=True).float()
+    cls_weights /= torch.clamp(cls_normalizer, min=1.0)
+    cls_loss_src = criterion(
+        seeds_obj_cls_logits.view(B, K, 1),
+        objectness_label.unsqueeze(-1),
+        weights=cls_weights
+    )
+    objectness_loss = cls_loss_src.sum() / B
+
+    return objectness_loss
+
+
+
+
+
 
 
 class HungarianMatcher(nn.Module):
@@ -550,9 +643,11 @@ class SetCriterion(nn.Module):
 def compute_hungarian_loss(end_points, num_decoder_layers, set_criterion,
                            query_points_obj_topk=5):
     """Compute Hungarian matching loss containing CE, bbox and giou."""
+
     #!================================================================
     DEBUG = False
     #!================================================================
+    
     prefixes = ['last_'] + [f'{i}head_' for i in range(num_decoder_layers - 1)]
     prefixes = ['proposal_'] + prefixes #* proposal 是第一个, last 是最后一个 
 
@@ -591,46 +686,9 @@ def compute_hungarian_loss(end_points, num_decoder_layers, set_criterion,
         # Compute all the requested losses
         #!================================================================
         if DEBUG:
-            with open ('vis_results/current_path.txt','r') as f :
-                debug_save_path = f.read().strip()
-            
-            losses, indices = set_criterion(output, target) #* indices : 
-
-            # permute predictions following indices
-            batch_idx = torch.cat([
-                torch.full_like(src, i) for i, (src, _) in enumerate(indices)
-            ])
-            src_idx = torch.cat([src for (src, _) in indices])
-            
-            pred_bb = output['pred_boxes'][batch_idx,src_idx]
-
-            # pred_bb = [output['pred_boxes'][idx ,key.item()]  for idx, (key,key_id)  in enumerate(indices)]
-            # gt_bbox = [x['boxes'][0] for x in target]
-
-            gt_bbox = torch.cat([
-                t['boxes'][i] for t, (_, i) in zip(target, indices)
-            ], dim=0)
-
-            batch_size = len(indices)
-
-            bbox_num_per_batch =int( gt_bbox.shape[0]/batch_size)
-
-            for idx in range(len(indices)):
-                np.savetxt(osp.join(debug_save_path, 
-                                '%s_gt_%sbox.txt'%(end_points['scan_ids'][idx],prefix)),
-                                gt_bbox[idx*bbox_num_per_batch:(idx+1)*bbox_num_per_batch].detach().cpu().numpy(),
-                                fmt='%s',delimiter=' ')
-
-                np.savetxt(osp.join(debug_save_path,'%s_pred_%sbox.txt'%(end_points['scan_ids'][idx],prefix)),
-                            pred_bb[idx*bbox_num_per_batch:(idx+1)*bbox_num_per_batch].detach().cpu().numpy(),
-                            fmt='%s')
+            losses = compute_loss_and_save_match_res_(output, target,set_criterion,end_points['scan_ids'],prefix)
         else :
             losses, _ = set_criterion(output, target)
-
-
-
-
-    
         #!================================================================
 
 
@@ -666,3 +724,160 @@ def compute_hungarian_loss(end_points, num_decoder_layers, set_criterion,
     end_points['loss_constrastive_align'] = loss_contrastive_align
     end_points['loss'] = loss
     return loss, end_points
+
+
+
+
+
+'''
+description:  根据supervised_mask 计算loss , 也就是只对labeled 的数据计算loss 
+return {*}
+'''
+def compute_labeled_hungarian_loss(end_points, num_decoder_layers, set_criterion,
+                           query_points_obj_topk=5):
+    """Compute Hungarian matching loss containing CE, bbox and giou."""
+    #!================================================================
+    DEBUG = False
+    supervised_mask  = end_points['supervised_mask']
+    supervised_inds = torch.nonzero(supervised_mask).squeeze(1).long()
+    #!================================================================
+    
+    
+
+    prefixes = ['last_'] + [f'{i}head_' for i in range(num_decoder_layers - 1)]
+    prefixes = ['proposal_'] + prefixes #* proposal 是第一个, last 是最后一个 
+
+    #* Ground-truth
+    gt_center = end_points['center_label'][:, :, 0:3]  # B, G, 3
+    gt_size = end_points['size_gts']  # (B,G,3)
+    gt_labels = end_points['sem_cls_label']  # (B, G)
+    gt_bbox = torch.cat([gt_center, gt_size], dim=-1)  # cxcyczwhd
+    positive_map = end_points['positive_map']
+    box_label_mask = end_points['box_label_mask']
+    target = [
+        {
+            "labels": gt_labels[b, box_label_mask[b].bool()],
+            "boxes": gt_bbox[b, box_label_mask[b].bool()],#* 
+            "positive_map": positive_map[b, box_label_mask[b].bool()] #* 分布? 用于计算 token 和query 的soft token loss 
+        }#* 每个box 最多对应在 256个token中只能有一个响应的地方,  
+        for b in range(gt_labels.shape[0]) 
+    ]
+
+    loss_ce, loss_bbox, loss_giou, loss_contrastive_align = 0, 0, 0, 0
+    for prefix in prefixes:
+        output = {}
+        #!+==========================================================
+        
+        
+        if 'proj_tokens' in end_points:
+            output['proj_tokens'] = end_points['proj_tokens'][supervised_inds,:,:]
+            output['proj_queries'] = end_points[f'{prefix}proj_queries'][supervised_inds,:,:]
+            # output['tokenized'] = end_points['tokenized'][supervised_inds,:,:]
+            output['tokenized'] = {k:v[supervised_inds,:] for k,v in end_points['tokenized'].items()}
+
+        
+        #* Get predicted boxes and labels, why the K equals to 256,n_class equals to 256, Q equals to 256
+        pred_center = end_points[f'{prefix}center'][supervised_inds,:,:]  # B, K, 3
+        pred_size = end_points[f'{prefix}pred_size'][supervised_inds,:,:]  # (B,K,3) (l,w,h)
+        pred_bbox = torch.cat([pred_center, pred_size], dim=-1)
+        pred_logits = end_points[f'{prefix}sem_cls_scores'][supervised_inds,:,:]  # (B, Q, n_class)
+        output['pred_logits'] = pred_logits
+        output["pred_boxes"] = pred_bbox
+
+        # for k,v in output.items():
+        #     print(v.shape)
+
+        #!+==========================================================
+
+
+
+
+        # Compute all the requested losses
+        #!================================================================
+        if DEBUG:
+            losses = compute_loss_and_save_match_res_(output, target,set_criterion,end_points['scan_ids'],prefix)
+        else :
+            losses, _ = set_criterion(output, target)
+        #!================================================================
+
+
+        for loss_key in losses.keys():
+            end_points[f'{prefix}_{loss_key}'] = losses[loss_key]
+        loss_ce += losses.get('loss_ce', 0)
+        loss_bbox += losses['loss_bbox']
+        loss_giou += losses.get('loss_giou', 0)
+        if 'proj_tokens' in end_points:
+            loss_contrastive_align += losses['loss_contrastive_align']
+
+    if 'seeds_obj_cls_logits' in end_points.keys():
+
+        query_points_generation_loss = compute_labeled_points_obj_cls_loss_hard_topk(
+            end_points, query_points_obj_topk
+        )
+    else:
+        query_points_generation_loss = 0.0
+
+    # loss
+    loss = (
+        8 * query_points_generation_loss
+        + 1.0 / (num_decoder_layers + 1) * (
+            loss_ce
+            + 5 * loss_bbox
+            + loss_giou
+            + loss_contrastive_align
+        )
+    )
+    end_points['loss_ce'] = loss_ce
+    end_points['loss_bbox'] = loss_bbox
+    end_points['loss_giou'] = loss_giou
+    end_points['query_points_generation_loss'] = query_points_generation_loss
+    end_points['loss_constrastive_align'] = loss_contrastive_align
+    end_points['loss'] = loss
+    return loss, end_points
+
+
+''' 
+description:  调用set_criterion 计算loss 并且返回hungariun 匹配结果  ,并存储匹配结果
+param {*} output: pred 
+param {*} target :  gt
+param {*} set_criterion: 计算loss 的网络
+param {*} scan_ids : 数据对应的场景名字用于生成存储结果文件名
+param {*} prefix : 数据对应的前缀用于生成存储结果文件名
+return {*}
+'''
+def compute_loss_and_save_match_res_(output, target,set_criterion,scan_ids,prefix):
+    with open ('vis_results/current_path.txt','r') as f :
+        debug_save_path = f.read().strip()
+    
+    losses, indices = set_criterion(output, target) #* indices : 
+
+    # permute predictions following indices
+    batch_idx = torch.cat([
+        torch.full_like(src, i) for i, (src, _) in enumerate(indices)
+    ])
+    src_idx = torch.cat([src for (src, _) in indices])
+    
+    pred_bb = output['pred_boxes'][batch_idx,src_idx]
+
+    # pred_bb = [output['pred_boxes'][idx ,key.item()]  for idx, (key,key_id)  in enumerate(indices)]
+    # gt_bbox = [x['boxes'][0] for x in target]
+
+    gt_bbox = torch.cat([
+        t['boxes'][i] for t, (_, i) in zip(target, indices)
+    ], dim=0)
+
+    batch_size = len(indices)
+
+    bbox_num_per_batch =int( gt_bbox.shape[0]/batch_size)
+
+    for idx in range(len(indices)):
+        np.savetxt(osp.join(debug_save_path, 
+                        '%s_gt_%sbox.txt'%(scan_ids[idx],prefix)),
+                        gt_bbox[idx*bbox_num_per_batch:(idx+1)*bbox_num_per_batch].detach().cpu().numpy(),
+                        fmt='%s',delimiter=' ')
+
+        np.savetxt(osp.join(debug_save_path,'%s_pred_%sbox.txt'%(scan_ids[idx],prefix)),
+                    pred_bb[idx*bbox_num_per_batch:(idx+1)*bbox_num_per_batch].detach().cpu().numpy(),
+                    fmt='%s')
+
+    return losses
