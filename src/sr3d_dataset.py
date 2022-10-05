@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 21:28:11
-LastEditTime: 2022-10-04 19:55:44
+LastEditTime: 2022-10-05 12:02:22
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/sr3d_dataset.py
@@ -788,7 +788,8 @@ class SR3DDataset(Dataset):
             ),
             "pc_before_aug":origin_pc.astype(np.float32),
             "teacher_box":teacher_box.astype(np.float32),
-            "augmentations":augmentations
+            "augmentations":augmentations,
+            "supervised_mask":np.array(1).astype(np.int64)
 
         })
         return ret_dict
