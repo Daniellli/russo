@@ -1,7 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-08-21 19:15:53
- # @LastEditTime: 2022-10-06 09:07:13
+ # @LastEditTime: 2022-10-06 09:12:42
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/train_test_cls.sh
@@ -33,9 +33,9 @@ DATA_ROOT=datasets/
 # gpu_num=4
 # b_size=44
 
-gpu_ids="0,1,2,3";
+gpu_ids="0,1,2,3"
 gpu_num=4;
-b_size=16;
+b_size=20;
 
 port=29522
 
@@ -47,7 +47,7 @@ port=29522
 #     --use_color \
 #     --weight_decay 0.0005 \
 #     --data_root $DATA_ROOT \
-#     --val_freq 1 --batch_size $b_size --save_freq 1 --print_freq 1 \
+#     --val_freq 5 --batch_size $b_size --save_freq 5 --print_freq 100 \
 #     --lr_backbone=1e-3 --lr=1e-4 \
 #     --dataset $train_data --test_dataset $test_data \
 #     --detect_intermediate --joint_det \
@@ -58,10 +58,8 @@ port=29522
 #     --butd_cls --self_attend \
 #     --max_epoch 400 --consistency_weight 1e-4 \
 #     --upload-wandb \
-#     --labeled_ratio 0.2 \
+#     --labeled_ratio 0.1 \
 #     2>&1 | tee -a logs/train_test_cls.log
-
-
 
 
 #* for  semi supervision architecture  : step2
