@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-04 19:55:17
-LastEditTime: 2022-10-06 09:11:13
+LastEditTime: 2022-10-06 11:48:58
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/train.py
@@ -931,32 +931,49 @@ class TrainTester(BaseTrainTester):
             )
             # save model
             if epoch % args.val_freq == 0:
-                # save_checkpoint(args, epoch, model, optimizer, scheduler)
                 print("Test evaluation.......")
-                #!+==========================================
-                # self.evaluate_one_epoch(
-                #     epoch, test_loader,
-                #     model, criterion, set_criterion, args
-                # )
-                # if dist.get_rank() == 0:
-                #     save_checkpoint(args, epoch, model, optimizer, scheduler) 
+
                 performance = self.evaluate_one_epoch(
                     epoch, test_loader,
                     model, criterion, set_criterion, args
                 )
+                
+                if performance is not None :
+                    logger.info(','.join(['student_%s:%.04f'%(k,round(v,4)) for k,v in performance.items()]))
+                # else :
+                #     embed()
+                
+                
+                ema_performance = self.evaluate_one_epoch(
+                    epoch, test_loader,
+                    ema_model, criterion, set_criterion, args
+                )
+                if ema_performance is not None :
+                    logger.info(','.join(['teacher_%s:%.04f'%(k,round(v,4)) for k,v in ema_performance.items()]))
+                # else :#* check what cause None ?
+                #     embed()
+                
 
-                if dist.get_rank() == 0:
-                    if args.upload_wandb:
-                        wandb.log(performance)
-                        
-                    with open(save_dir, 'a+')as f :
-                        f.write( f"epoch:{epoch},"+','.join(["%s:%.4f"%(k,v) for k,v in performance.items()])+"\n")
-                        
-                    acc_key = list(performance.keys())[0]
-                    if performance is not None and performance[acc_key] > best_performce:
-                        best_performce =  performance[acc_key]
-                        save_checkpoint(args, epoch, model, optimizer, scheduler ,is_best=True)            
-                #!+==========================================
+                #todo 把save as txt 分离出来? 
+                if dist.get_rank() == 0 and args.upload_wandb:
+                    #* model (student model )
+                    
+                    if performance is not None :
+                        wandb.log({'student_%s'%(k):round(v,4) for k,v in performance.items()})
+                        is_best,new_performance = save_res(save_dir,epoch,performance,best_performce)
+                        if is_best:
+                            best_performce =  new_performance
+                            save_checkpoint(args, epoch, model, optimizer, scheduler ,is_best=True,prefix='student_')
+                            wandb.log({'%s'%('student_best_'+k):round(v,4) for k,v in performance.items()})
+
+                    if ema_performance is not None :
+                        wandb.log({'teacher_%s'%(k):round(v,4) for k,v in ema_performance.items()})
+                        is_best,new_performance = save_res(ema_save_dir,epoch,ema_performance,ema_best_performce)
+                        if is_best:
+                            ema_best_performce =  new_performance
+                            save_checkpoint(args, epoch, ema_model, optimizer, scheduler ,is_best=True,prefix='teacher_')     
+                            wandb.log({'%s'%('teacher_best_'+k):round(v,4) for k,v in ema_performance.items()})
+
 
         # Training is over, evaluate
         save_checkpoint(args, 'last', model, optimizer, scheduler, True)
@@ -969,6 +986,19 @@ class TrainTester(BaseTrainTester):
         return saved_path
 
 
+
+def save_res(save_dir,epoch,performance,best_performce):
+    is_best=False
+    with open(save_dir, 'a+') as f :
+        f.write( f"epoch:{epoch},"+','.join(["%s:%.4f"%(k,v) for k,v in performance.items()])+"\n")
+
+    acc_key = list(performance.keys())[0]
+    if performance is not None and performance[acc_key] > best_performce:
+        is_best=True
+    return is_best,performance[acc_key]
+
+
+    
 if __name__ == '__main__':
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
     opt = parse_option()
