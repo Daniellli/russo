@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 19:34:49
-LastEditTime: 2022-10-05 12:19:30
+LastEditTime: 2022-10-06 09:00:36
 LastEditors: xushaocong
 Description:  全监督的mean teacher 
 FilePath: /butd_detr/mean_teacher.py
@@ -606,9 +606,9 @@ class MeanTeacher(BaseTrainTester):
             end_points = get_consistency_loss(end_points, teacher_end_points,batch_data['augmentations'])
             soft_token_consistency_loss = end_points['soft_token_consistency_loss']
             center_consistency_loss = end_points['center_consistency_loss']
-            # soft_token_consistency_loss = end_points['soft_token_consistency_loss']
+            size_consistency_loss = end_points['size_consistency_loss']
 
-            consistent_loss = (soft_token_consistency_loss+center_consistency_loss)* consistency_weight
+            consistent_loss = (soft_token_consistency_loss+center_consistency_loss+size_consistency_loss)* consistency_weight
 
 
             #* total loss
@@ -627,7 +627,7 @@ class MeanTeacher(BaseTrainTester):
                 wandb.log({"student_supervised_loss":loss.clone().detach().item(),
                             "center_consistency_loss":center_consistency_loss.clone().detach().item(),
                             "soft_token_consistency_loss":soft_token_consistency_loss.clone().detach().item(),
-                            # "soft_token_kl_consistency_loss":soft_token_kl_consistency_loss.clone().detach().item(),
+                            "size_consistency_loss":size_consistency_loss.clone().detach().item(),
                             "consistent_loss":consistent_loss.clone().detach().item(),
                             "total_loss":total_loss.clone().detach().item(),
                         })

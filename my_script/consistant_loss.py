@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-09-22 23:13:23
-LastEditTime: 2022-10-05 11:30:05
+LastEditTime: 2022-10-06 08:59:11
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/my_script/consistant_loss.py
@@ -258,7 +258,7 @@ def compute_refer_consistency_loss(end_points, ema_end_points,augmentation, pref
 
     # logger.info(f" center_loss:{center_loss}, soft_token_loss : {soft_token_loss}, size_loss(not included ):{size_loss}")
 
-    return center_loss,soft_token_loss
+    return center_loss,soft_token_loss,size_loss
     
 
 
@@ -287,7 +287,7 @@ def get_consistency_loss(end_points, ema_end_points,augmentation):
     
     soft_token_consistency_loss_sum = torch.tensor(0.).cuda()
     center_consistency_loss_sum = torch.tensor(0.).cuda()
-    # size_consistency_loss_sum = torch.tensor(0.).cuda()
+    size_consistency_loss_sum = torch.tensor(0.).cuda()
 
     
     prefixes = ['last_', 'proposal_'] + [f'{i}head_' for i in range(5)] #* 6 heads + proposal 
@@ -303,17 +303,17 @@ def get_consistency_loss(end_points, ema_end_points,augmentation):
 
 
     for prefix in prefixes:
-        center_loss,soft_token_loss= compute_refer_consistency_loss(end_points, ema_end_points, augmentation,prefix=prefix)
+        center_loss,soft_token_loss,size_loss= compute_refer_consistency_loss(end_points, ema_end_points, augmentation,prefix=prefix)
         
         center_consistency_loss_sum+=center_loss
         soft_token_consistency_loss_sum+=soft_token_loss
 
-        # size_consistency_loss_sum+=size_loss
+        size_consistency_loss_sum+=size_loss
         
         
     end_points['soft_token_consistency_loss'] = soft_token_consistency_loss_sum / len(prefixes)
     end_points['center_consistency_loss'] = center_consistency_loss_sum / len(prefixes)
-    # end_points['size_consistency_loss'] = size_consistency_loss_sum / len(prefixes)
+    end_points['size_consistency_loss'] = size_consistency_loss_sum / len(prefixes)
 
     return end_points
 

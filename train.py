@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-04 19:55:17
-LastEditTime: 2022-10-05 11:45:49
+LastEditTime: 2022-10-06 09:00:08
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/train.py
@@ -763,7 +763,8 @@ class TrainTester(BaseTrainTester):
 
             center_consistency_loss = end_points['center_consistency_loss']
             soft_token_consistency_loss = end_points['soft_token_consistency_loss']
-            consistent_loss = (soft_token_consistency_loss+center_consistency_loss)* consistency_weight
+            size_consistency_loss = end_points['size_consistency_loss']
+            consistent_loss = (soft_token_consistency_loss+center_consistency_loss+size_consistency_loss)* consistency_weight
 
 
             #* total loss
@@ -780,6 +781,7 @@ class TrainTester(BaseTrainTester):
                 wandb.log({"student_supervised_loss":loss.clone().detach().item(),
                             "center_consistency_loss":center_consistency_loss.clone().detach().item(),
                             "soft_token_consistency_loss":soft_token_consistency_loss.clone().detach().item(),
+                            "size_consistency_loss":size_consistency_loss.clone().detach().item(),
                             "consistent_loss":consistent_loss.clone().detach().item(),
                             "total_loss":total_loss.clone().detach().item(),
                         })
