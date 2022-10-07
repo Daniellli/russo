@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-04 19:55:17
-LastEditTime: 2022-10-06 11:48:58
+LastEditTime: 2022-10-08 00:10:02
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/train.py
@@ -181,6 +181,9 @@ def parse_option():
 
     parser.add_argument('--consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
     parser.add_argument('--labeled_ratio', default=0.2, type=float,help=' labeled datasets ratio ')
+    parser.add_argument('--rampup_length', type=float, default=None, help='rampup_length')
+
+    
 
 
     args, _ = parser.parse_known_args()
@@ -212,7 +215,7 @@ class TrainTester(BaseTrainTester):
     param {*} epoch
     return {*}
     '''
-    def get_current_consistency_weight(self,epoch,args):
+    def get_current_consistency_weight(self,weight,epoch,args):
         
         def sigmoid_rampup(current,args):
             # rampup_length =  args.max_epoch - args.start_epoch +1
@@ -223,7 +226,7 @@ class TrainTester(BaseTrainTester):
             return float(np.exp(-5.0 * phase * phase))#* initial : 0.007082523
 
         # Consistency ramp-up from https://arxiv.org/abs/1610.02242
-        return args.consistency_weight * sigmoid_rampup(epoch,args)
+        return weight * sigmoid_rampup(epoch,args)
 
 
     @staticmethod
@@ -694,7 +697,7 @@ class TrainTester(BaseTrainTester):
         total_iteration=max(len(labeled_loader),len(unlabeled_loader))
     
         logger.info(f"total_iteration == {total_iteration}")
-        consistency_weight = self.get_current_consistency_weight(epoch,args)
+        consistency_weight = self.get_current_consistency_weight(args.consistency_weight ,epoch,args)
         logger.info(f"consistency_weight  : {consistency_weight}")
 
         unlabeled_loader_iter=iter(unlabeled_loader)

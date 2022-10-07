@@ -137,7 +137,8 @@ class Joint3DDataset(Dataset):
         }
         annos = loaders[dset]()
         if self.overfit:
-            annos = annos[:128]
+            # annos = annos[:128]
+            annos = annos[:1280]
         return annos
 
     def load_sr3dplus_annos(self):
@@ -225,8 +226,13 @@ class Joint3DDataset(Dataset):
         split = self.split
         if split in ('val', 'test'):
             split = 'val'
+
+
         with open(_path + '_%s.txt' % split) as f:
             scan_ids = [line.rstrip().strip('\n') for line in f.readlines()]
+
+
+            
         with open(_path + '_%s.json' % split) as f:
             reader = json.load(f)
         annos = [
@@ -829,7 +835,8 @@ class Joint3DDataset(Dataset):
                 class_ids[anno['target_id']]
                 if isinstance(anno['target_id'], int)
                 else class_ids[anno['target_id'][0]]
-            )
+            ),
+            "supervised_mask":np.array(1).astype(np.int64)
         })
         return ret_dict
 

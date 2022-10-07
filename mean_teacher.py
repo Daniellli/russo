@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 19:34:49
-LastEditTime: 2022-10-06 09:11:07
+LastEditTime: 2022-10-08 00:00:40
 LastEditors: xushaocong
 Description:  全监督的mean teacher 
 FilePath: /butd_detr/mean_teacher.py
@@ -100,10 +100,12 @@ class MeanTeacher(BaseTrainTester):
             butd=args.butd, #? 
             butd_gt=args.butd_gt,#? 
             butd_cls=args.butd_cls,#? 
-            augment_det=args.augment_det#? 
+            augment_det=args.augment_det,#? 
+            labeled_ratio =None  #* full supervise 
         )
+
+        
         #!+==============================================
-     
         test_dataset = SR3DDataset(
             dataset_dict=dataset_dict,
             test_dataset=args.test_dataset,
@@ -531,18 +533,22 @@ class MeanTeacher(BaseTrainTester):
     param {*} epoch
     return {*}
     '''
-    def get_current_consistency_weight(self,epoch,args):
+    def get_current_consistency_weight(self,weight,epoch,args):
         
         def sigmoid_rampup(current,args):
+            
             # rampup_length =  args.max_epoch - args.start_epoch +1
-            rampup_length = 10
+            if args.rampup_length is None :
+                return 1
+
             current=  current-args.start_epoch
-            current = np.clip(current,0,rampup_length)
-            phase = 1.0 - current / rampup_length
+            current = np.clip(current,0,args.rampup_length)
+            phase = 1.0 - current / args.rampup_length
             return float(np.exp(-5.0 * phase * phase))#* initial : 0.007082523
 
         # Consistency ramp-up from https://arxiv.org/abs/1610.02242
-        return args.consistency_weight * sigmoid_rampup(epoch,args)
+        
+        return  weight* sigmoid_rampup(epoch,args)
 
     
 
@@ -562,7 +568,8 @@ class MeanTeacher(BaseTrainTester):
         # Loop over batches
         total_iteration=train_loader.__len__()/args.batch_size
         logger.info(f"total_iteration == {total_iteration}")
-        consistency_weight = self.get_current_consistency_weight(epoch,args)
+        
+        consistency_weight = self.get_current_consistency_weight(args.consistency_weight,epoch,args)
         logger.info(f"consistency_weight  : {consistency_weight}")
         
         for batch_idx, batch_data in enumerate(train_loader):
@@ -604,12 +611,14 @@ class MeanTeacher(BaseTrainTester):
 
 
             end_points = get_consistency_loss(end_points, teacher_end_points,batch_data['augmentations'])
-            soft_token_consistency_loss = end_points['soft_token_consistency_loss']
+            # soft_token_consistency_loss = end_points['soft_token_consistency_loss']
             center_consistency_loss = end_points['center_consistency_loss']
-            size_consistency_loss = end_points['size_consistency_loss']
+            # size_consistency_loss = end_points['size_consistency_loss']
 
-            consistent_loss = (soft_token_consistency_loss+center_consistency_loss+size_consistency_loss)* consistency_weight
-
+            # consistent_loss = (soft_token_consistency_loss+center_consistency_loss+size_consistency_loss)* consistency_weight
+            # consistent_loss = (size_consistency_loss)* consistency_weight
+            # consistent_loss = (soft_token_consistency_loss)* consistency_weight
+            consistent_loss = (center_consistency_loss)* consistency_weight
 
             #* total loss
             
@@ -626,8 +635,8 @@ class MeanTeacher(BaseTrainTester):
                 
                 wandb.log({"student_supervised_loss":loss.clone().detach().item(),
                             "center_consistency_loss":center_consistency_loss.clone().detach().item(),
-                            "soft_token_consistency_loss":soft_token_consistency_loss.clone().detach().item(),
-                            "size_consistency_loss":size_consistency_loss.clone().detach().item(),
+                            # "soft_token_consistency_loss":soft_token_consistency_loss.clone().detach().item(),
+                            # "size_consistency_loss":size_consistency_loss.clone().detach().item(),
                             "consistent_loss":consistent_loss.clone().detach().item(),
                             "total_loss":total_loss.clone().detach().item(),
                         })
@@ -651,7 +660,8 @@ class MeanTeacher(BaseTrainTester):
             #* update  teacher model 
             #* epoch start from 1 by default , so have to minus one 
             global_step = (batch_idx+1) + (epoch -args.start_epoch) *total_iteration
-            alpha = 0.999
+            # alpha = 0.999
+            alpha = 0.99
             self.update_ema_variables(model,ema_model,alpha,global_step)
             
             #*===================================================

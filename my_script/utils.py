@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 20:04:19
-LastEditTime: 2022-10-05 10:32:37
+LastEditTime: 2022-10-07 15:44:45
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/my_script/utils.py
@@ -276,7 +276,6 @@ def generate_SR3D_labeled_scene_txt(labeled_ratio):
 
 
 
-
 if __name__ == "__main__":
     # read_refer_it_3D_txt()
     # read_refer_it_3D_txt(path="/home/DISCOVER_summer2022/xusc/exp/butd_detr/data/meta_data/sr3d_train_scans.txt")
@@ -284,7 +283,6 @@ if __name__ == "__main__":
     # read_refer_it_3D_txt(path="/home/DISCOVER_summer2022/xusc/exp/butd_detr/data/meta_data/nr3d_train_scans.txt")
     
     #* 生成labeled datasets for SR3D
-    #  
     for x in np.linspace(0.1,0.9,9):
         generate_SR3D_labeled_scene_txt(round(x,1))
 

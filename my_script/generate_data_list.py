@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-08-21 14:35:30
-LastEditTime: 2022-08-21 16:54:55
+LastEditTime: 2022-10-07 15:11:17
 LastEditors: xushaocong
 Description:  下载了mini scannet for test, 生成其txt文件
 FilePath: /butd_detr/my_script/generate_data_list.py
@@ -36,32 +36,6 @@ def generate_demo_data_txt():
         f.write('\n'.join(test))
 
 
-
-#* cls_results
-
-
-src="datasets/scans/mini_scans"
-all_p = sorted(os.listdir(src))
-
-
-src_cls_results = "data/cls_results.json"
-target_cls_results = "data/cls_demo_results.json"
-
-with open(src_cls_results,'r') as f :
-    src_data = json.load(f)
-
-
-print(all_p)
-new_data = {}
-for idx,(k,v) in enumerate(src_data.items()) :
-    if k in all_p:
-        # print(k,idx)
-        new_data[k]= v
-
-
-with open(target_cls_results,'w') as f :
-    json.dump(new_data,f)
-    
 
 
 

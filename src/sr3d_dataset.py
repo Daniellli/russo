@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 21:28:11
-LastEditTime: 2022-10-05 12:02:22
+LastEditTime: 2022-10-07 20:34:07
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/sr3d_dataset.py
@@ -151,6 +151,7 @@ class SR3DDataset(Dataset):
 
         if self.overfit:
             annos = annos[:128]
+            # annos = annos[:1280]
 
         return annos
 
@@ -163,7 +164,8 @@ class SR3DDataset(Dataset):
         split = self.split
         if split == 'val':
             split = 'test'
-            
+        
+        #todo :从 数据中 不同的场景取self.labeled_ratio  的数据
         if split== 'train' and self.labeled_ratio is not None:
             with open(os.path.join('data/meta_data/sr3d_{}_{}.txt'.format(split,self.labeled_ratio)), 'r') as f:
                 labeled_scenes = f.read().split('\n')
@@ -173,8 +175,7 @@ class SR3DDataset(Dataset):
         else :
             with open('data/meta_data/sr3d_%s_scans.txt' % split) as f:
                 scan_ids = set(eval(f.read()))
-
-        # with open(self.data_path + 'refer_it_3d/%s.csv' % dset) as f:
+        #* every scene has 
         with open(self.data_path + '/refer_it_3d/%s.csv' % dset) as f:
             csv_reader = csv.reader(f)
             headers = next(csv_reader)

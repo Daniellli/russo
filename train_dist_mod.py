@@ -19,6 +19,7 @@ import torch.distributed as dist
 from main_utils import parse_option, BaseTrainTester
 from data.model_util_scannet import ScannetDatasetConfig
 from src.joint_det_dataset import Joint3DDataset
+from src.sr3d_dataset import SR3DDataset
 from src.grounding_evaluator import GroundingEvaluator, GroundingGTEvaluator
 from models import BeaUTyDETR
 from models import APCalculator, parse_predictions, parse_groundtruths
@@ -207,7 +208,7 @@ class TrainTester(BaseTrainTester):
                 criterion, set_criterion, args
             )
             #!==== generate result for upload evaluation server , scanrefer ===============================
-            SAVE_RES =  True
+            SAVE_RES =  False
 
             if SAVE_RES: 
                 #* end_points['last_sem_cls_scores']  : [B,query_num,distribution for tokens(256)]  

@@ -158,7 +158,6 @@ pred.json
 
 log
 log/*
-datasets
 datasets/*
 
 vis_results
