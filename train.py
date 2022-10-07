@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-04 19:55:17
-LastEditTime: 2022-10-08 00:10:02
+LastEditTime: 2022-10-08 00:24:22
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/train.py

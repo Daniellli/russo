@@ -1,7 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-08-21 19:15:53
- # @LastEditTime: 2022-10-08 00:13:53
+ # @LastEditTime: 2022-10-08 00:26:27
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/train_test_cls.sh
@@ -25,17 +25,17 @@ DATA_ROOT=datasets/
 # gpu_num=4
 # b_size=12
 
-# gpu_ids="0,1,2,3,4,5,6,7"
-# gpu_num=8
-# b_size=8
+gpu_ids="0,1,2,3,4,5,6,7"
+gpu_num=8
+b_size=8
 
 # gpu_ids="0,1,2,3"
 # gpu_num=4
 # b_size=44
 
-gpu_ids="0,1,2,3"
-gpu_num=4;
-b_size=20;
+# gpu_ids="0,1,2,3"
+# gpu_num=4;
+# b_size=20;
 port=29522
 
 
@@ -62,7 +62,8 @@ port=29522
 
 
 #* for  semi supervision architecture  : step2
-b_size='4,12';
+# b_size='4,12';
+b_size='2,6';
 # resume_mode_path="pretrained/bdetr_sr3d_cls_67.1.pth"
 # resume_mode_path="pretrain/pretrain_ramdom%20anno_41.pth"
 # resume_mode_path="pretrain/pretrain_random%10anno_375.pth"

@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-09-22 23:13:23
-LastEditTime: 2022-10-06 08:59:11
+LastEditTime: 2022-10-08 00:29:56
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/my_script/consistant_loss.py
@@ -118,7 +118,10 @@ def compute_bbox_center_consistency_loss(center, ema_center,mask=None):
 
 
     #* 返回 loss,    teacher center 向student  center 对齐的索引
-    return (dist1.sum(-1)/(mask.sum(-1)+1e-10)).sum(),ind2
+    if mask is not None :
+        return (dist1.sum(-1)/(mask.sum(-1)+1e-10)).sum(),ind2
+    else :
+        return dist1.mean(),ind2
 
 
 
@@ -148,9 +151,12 @@ def compute_token_map_consistency_loss(cls_scores, ema_cls_scores,map_ind,mask=N
     if mask is not None:    
         class_consistency_loss[~mask] =0
 
-    #* class_consistency_loss : [B,Q,T] 
-    #todo does  it need to multiple by 2 according to  SESS? 
-    return (class_consistency_loss.mean(-1).sum(-1)/(mask.sum(-1)+1e-10)).sum()/B
+        #* class_consistency_loss : [B,Q,T] 
+        #todo does  it need to multiple by 2 according to  SESS? 
+        return (class_consistency_loss.mean(-1).sum(-1)/(mask.sum(-1)+1e-10)).sum()/B
+    else :
+        return class_consistency_loss.mean()
+
 
 
     
@@ -220,7 +226,10 @@ def compute_size_consistency_loss(size, ema_size, map_ind, mask):
         size_consistency_loss[~mask] =0
 
     
-    return (size_consistency_loss.sum(-1).sum(-1)/(mask.sum(-1)+1e-10)).sum()/B
+        return (size_consistency_loss.sum(-1).sum(-1)/(mask.sum(-1)+1e-10)).sum()/B
+    else :
+        return size_consistency_loss.mean()
+
     
 
 
@@ -249,8 +258,11 @@ def compute_refer_consistency_loss(end_points, ema_end_points,augmentation, pref
     mask_len = (teacher_out['tokenized']['attention_mask']==1).sum(-1) #* 获取每个description 经过language model 后的token  set 实际长度
     teacher_activated_token_map = get_activated_map(teacher_out['pred_logits'])
     mask =torch.cat([(teacher_activated_token_map[idx]<desc_len).unsqueeze(0) for idx,desc_len in enumerate(mask_len)],dim=0)#* calculate the mask 
+    #!============
+    mask = None
+    #!============
 
-
+    
     center_loss,teacher2student_map_idx = compute_bbox_center_consistency_loss(student_out['pred_boxes'][:,:,:3],teacher_out['pred_boxes'][:,:,:3],mask)
     soft_token_loss=compute_token_map_consistency_loss(student_out['pred_logits'],teacher_out['pred_logits'],teacher2student_map_idx,mask= mask)
 
