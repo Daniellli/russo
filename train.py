@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-04 19:55:17
-LastEditTime: 2022-10-08 00:24:22
+LastEditTime: 2022-10-08 19:08:33
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/train.py
@@ -38,10 +38,10 @@ import torch.distributed as dist
 from main_utils import BaseTrainTester
 from data.model_util_scannet import ScannetDatasetConfig
 # from src.joint_det_dataset import Joint3DDataset
-from src.sr3d_dataset import SR3DDataset
+from src.join_dataset import JointDataset
 
-from src.sr3d_labeled_dataset import SR3DLabeledDataset
-from src.sr3d_unlabeled_dataset import SR3DUnlabeledDataset
+from src.join_labeled_dataset import JointLabeledDataset
+from src.join_unlabeled_dataset import JointUnlabeledDataset
 
 
 
@@ -179,7 +179,9 @@ def parse_option():
     parser.add_argument('--upload-wandb',action='store_true', help="upload to wandb or not ?")
     parser.add_argument('--save-input-output',action='store_true', help="save-input-output")
 
-    parser.add_argument('--consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
+    parser.add_argument('--size_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
+    parser.add_argument('--center_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
+    parser.add_argument('--token_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
     parser.add_argument('--labeled_ratio', default=0.2, type=float,help=' labeled datasets ratio ')
     parser.add_argument('--rampup_length', type=float, default=None, help='rampup_length')
 
@@ -243,7 +245,8 @@ class TrainTester(BaseTrainTester):
         
         logger.info(f"labeled_ratio:{labeled_ratio}")
         print('Loading datasets:', sorted(list(dataset_dict.keys())))
-        labeled_dataset = SR3DLabeledDataset(
+        
+        labeled_dataset = JointLabeledDataset(
             dataset_dict=dataset_dict,
             test_dataset=args.test_dataset, #? only test set need ? 
             split='train' ,
@@ -259,7 +262,8 @@ class TrainTester(BaseTrainTester):
             labeled_ratio=args.labeled_ratio
         )
         
-        unlabeled_dataset = SR3DUnlabeledDataset(
+        
+        unlabeled_dataset = JointUnlabeledDataset(
             dataset_dict=dataset_dict,
             test_dataset=args.test_dataset, #? only test set need ? 
             split='train',
@@ -276,9 +280,9 @@ class TrainTester(BaseTrainTester):
         )
 
 
-
         
-        test_dataset = SR3DDataset(
+        
+        test_dataset = JointDataset(
             dataset_dict=dataset_dict,
             test_dataset=args.test_dataset,
             split='val' if not args.eval_train else 'train',
@@ -697,8 +701,14 @@ class TrainTester(BaseTrainTester):
         total_iteration=max(len(labeled_loader),len(unlabeled_loader))
     
         logger.info(f"total_iteration == {total_iteration}")
-        consistency_weight = self.get_current_consistency_weight(args.consistency_weight ,epoch,args)
-        logger.info(f"consistency_weight  : {consistency_weight}")
+
+        center_consistency_weight = self.get_current_consistency_weight(args.center_consistency_weight ,epoch,args)
+        size_consistency_weight = self.get_current_consistency_weight(args.size_consistency_weight ,epoch,args)
+        token_consistency_weight = self.get_current_consistency_weight(args.token_consistency_weight ,epoch,args)
+
+        logger.info(f"center_consistency_weight  : {center_consistency_weight}")
+        logger.info(f"size_consistency_weight  : {size_consistency_weight}")
+        logger.info(f"token_consistency_weight  : {token_consistency_weight}")
 
         unlabeled_loader_iter=iter(unlabeled_loader)
 
@@ -764,10 +774,11 @@ class TrainTester(BaseTrainTester):
 
             end_points = get_consistency_loss(end_points, teacher_end_points,batch_data['augmentations'])
 
-            center_consistency_loss = end_points['center_consistency_loss']
-            soft_token_consistency_loss = end_points['soft_token_consistency_loss']
-            size_consistency_loss = end_points['size_consistency_loss']
-            consistent_loss = (soft_token_consistency_loss+center_consistency_loss+size_consistency_loss)* consistency_weight
+            center_consistency_loss = end_points['center_consistency_loss'] * center_consistency_weight
+            soft_token_consistency_loss = end_points['soft_token_consistency_loss']* token_consistency_weight
+            size_consistency_loss = end_points['size_consistency_loss'] * size_consistency_weight
+            
+            consistent_loss = soft_token_consistency_loss +center_consistency_loss+size_consistency_loss 
 
 
             #* total loss

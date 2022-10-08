@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 19:34:49
-LastEditTime: 2022-10-08 00:00:40
+LastEditTime: 2022-10-08 18:27:13
 LastEditors: xushaocong
 Description:  全监督的mean teacher 
 FilePath: /butd_detr/mean_teacher.py
@@ -28,7 +28,7 @@ import torch.distributed as dist
 from main_utils import parse_option, BaseTrainTester
 from data.model_util_scannet import ScannetDatasetConfig
 from src.joint_det_dataset import Joint3DDataset
-from src.sr3d_dataset import SR3DDataset
+from src.join_dataset import JointDataset
 
 from src.grounding_evaluator import GroundingEvaluator, GroundingGTEvaluator
 from models import BeaUTyDETR
@@ -88,7 +88,7 @@ class MeanTeacher(BaseTrainTester):
             dataset_dict['scannet'] = 10
 
         print('Loading datasets:', sorted(list(dataset_dict.keys())))
-        train_dataset = SR3DDataset(
+        train_dataset = JointDataset(
             dataset_dict=dataset_dict,
             test_dataset=args.test_dataset, #? only test set need ? 
             split='train' if not args.debug else 'val',
@@ -106,7 +106,7 @@ class MeanTeacher(BaseTrainTester):
 
         
         #!+==============================================
-        test_dataset = SR3DDataset(
+        test_dataset = JointDataset(
             dataset_dict=dataset_dict,
             test_dataset=args.test_dataset,
             split='val' if not args.eval_train else 'train',

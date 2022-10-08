@@ -1,19 +1,10 @@
 '''
 Author: xushaocong
-Date: 2022-10-04 19:55:56
-LastEditTime: 2022-10-04 23:20:19
-LastEditors: xushaocong
-Description: 
-FilePath: /butd_detr/src/sr3d_labeled_dataset.py
-email: xushaocong@stu.xmu.edu.cn
-'''
-'''
-Author: xushaocong
 Date: 2022-10-02 21:28:11
-LastEditTime: 2022-10-04 19:55:44
+LastEditTime: 2022-10-08 18:24:56
 LastEditors: xushaocong
 Description: 
-FilePath: /butd_detr/src/sr3d_dataset.py
+FilePath: /butd_detr/src/join_dataset.py
 email: xushaocong@stu.xmu.edu.cn
 '''
 # ------------------------------------------------------------------------
@@ -58,7 +49,7 @@ import os.path as osp
 from loguru import logger 
 
 
-class SR3DLabeledDataset(Dataset):
+class JointDataset(Dataset):
     """Dataset utilities for ReferIt3D."""
 
     def __init__(self, dataset_dict={'sr3d': 1, 'scannet': 10},
@@ -155,11 +146,14 @@ class SR3DLabeledDataset(Dataset):
             annos  = self.load_sr3dplus_annos()
         elif dset == 'scannet':
             annos  = self.load_scannet_annos()
+        elif dset == 'nr3d': 
+            annos = self.load_nr3d_annos()
         else :
             raise Exception 
 
         if self.overfit:
             annos = annos[:128]
+            # annos = annos[:1280]
 
         return annos
 
@@ -172,7 +166,8 @@ class SR3DLabeledDataset(Dataset):
         split = self.split
         if split == 'val':
             split = 'test'
-            
+        
+        #todo :从 数据中 不同的场景取self.labeled_ratio  的数据
         if split== 'train' and self.labeled_ratio is not None:
             with open(os.path.join('data/meta_data/sr3d_{}_{}.txt'.format(split,self.labeled_ratio)), 'r') as f:
                 labeled_scenes = f.read().split('\n')
@@ -182,8 +177,7 @@ class SR3DLabeledDataset(Dataset):
         else :
             with open('data/meta_data/sr3d_%s_scans.txt' % split) as f:
                 scan_ids = set(eval(f.read()))
-
-        # with open(self.data_path + 'refer_it_3d/%s.csv' % dset) as f:
+        #* every scene has 
         with open(self.data_path + '/refer_it_3d/%s.csv' % dset) as f:
             csv_reader = csv.reader(f)
             headers = next(csv_reader)
@@ -207,6 +201,66 @@ class SR3DLabeledDataset(Dataset):
         
         
         return annos
+
+    
+
+    def load_nr3d_annos(self):
+        """Load annotations of nr3d."""
+        split = self.split
+        if split == 'val':
+            split = 'test'
+            
+
+        if split== 'train' and self.labeled_ratio is not None:
+            with open(os.path.join('data/meta_data/nr3d_{}_{}.txt'.format(split,self.labeled_ratio)), 'r') as f:
+                labeled_scenes = f.read().split('\n')
+            logger.info(f"{len(labeled_scenes) } scenes loaded ")
+            scan_ids = set(labeled_scenes)
+            
+        else:
+            with open('data/meta_data/nr3d_%s_scans.txt' % split) as f:
+                scan_ids = set(eval(f.read()))
+
+
+
+        with open(self.data_path + 'refer_it_3d/nr3d.csv') as f:
+            csv_reader = csv.reader(f)
+            headers = next(csv_reader)
+            headers = {header: h for h, header in enumerate(headers)}
+            annos = [
+                {
+                    'scan_id': line[headers['scan_id']],
+                    'target_id': int(line[headers['target_id']]),
+                    'target': line[headers['instance_type']],
+                    'utterance': line[headers['utterance']],
+                    'anchor_ids': [],
+                    'anchors': [],
+                    'dataset': 'nr3d'
+                }
+                for line in csv_reader
+                if line[headers['scan_id']] in scan_ids
+                and
+                str(line[headers['mentions_target_class']]).lower() == 'true'
+                and
+                (
+                    str(line[headers['correct_guess']]).lower() == 'true'
+                    or split != 'test'
+                )
+            ]
+        # Add distractor info
+        for anno in annos:
+            anno['distractor_ids'] = [
+                ind
+                for ind in
+                range(len(self.scans[anno['scan_id']].three_d_objects))
+                if self.scans[anno['scan_id']].get_object_instance_label(ind)
+                == anno['target']
+                and ind != anno['target_id']
+            ]
+        # Filter out sentences that do not explicitly mention the target class
+        annos = [anno for anno in annos if anno['target'] in anno['utterance']]
+        return annos
+
 
 
 
@@ -480,6 +534,9 @@ class SR3DLabeledDataset(Dataset):
         box_label_mask[:len(tids)] = 1#* mast == 0 的就是 非目标, 是padding , maximun number == 132, 每个场景应该没有132个目标, 所以会有padding
 
         return bboxes, box_label_mask, point_instance_label
+
+
+
 
     def _get_scene_objects(self, scan):
         # Objects to keep

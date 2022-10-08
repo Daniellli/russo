@@ -1,10 +1,10 @@
 '''
 Author: xushaocong
-Date: 2022-10-04 19:55:59
-LastEditTime: 2022-10-04 23:23:31
+Date: 2022-10-04 19:55:56
+LastEditTime: 2022-10-08 18:25:09
 LastEditors: xushaocong
 Description: 
-FilePath: /butd_detr/src/sr3d_unlabeled_dataset.py
+FilePath: /butd_detr/src/join_labeled_dataset.py
 email: xushaocong@stu.xmu.edu.cn
 '''
 '''
@@ -58,7 +58,7 @@ import os.path as osp
 from loguru import logger 
 
 
-class SR3DUnlabeledDataset(Dataset):
+class JointLabeledDataset(Dataset):
     """Dataset utilities for ReferIt3D."""
 
     def __init__(self, dataset_dict={'sr3d': 1, 'scannet': 10},
@@ -155,6 +155,8 @@ class SR3DUnlabeledDataset(Dataset):
             annos  = self.load_sr3dplus_annos()
         elif dset == 'scannet':
             annos  = self.load_scannet_annos()
+        elif dset == 'nr3d':
+            annos  = self.load_nr3d_annos()
         else :
             raise Exception 
 
@@ -162,6 +164,7 @@ class SR3DUnlabeledDataset(Dataset):
             annos = annos[:128]
 
         return annos
+    
 
     def load_sr3dplus_annos(self):
         """Load annotations of sr3d/sr3d+."""
@@ -178,13 +181,7 @@ class SR3DUnlabeledDataset(Dataset):
                 labeled_scenes = f.read().split('\n')
             logger.info(f"{len(labeled_scenes) } scenes loaded ")
             scan_ids = set(labeled_scenes)
-            
-            #!+=============================
-            with open('data/meta_data/sr3d_%s_scans.txt' % split) as f:
-                all_scan_ids = set(eval(f.read()))
 
-            scan_ids = list(all_scan_ids-scan_ids)
-            #!+=============================
         else :
             with open('data/meta_data/sr3d_%s_scans.txt' % split) as f:
                 scan_ids = set(eval(f.read()))
@@ -211,7 +208,68 @@ class SR3DUnlabeledDataset(Dataset):
                 str(line[headers['mentions_target_class']]).lower() == 'true'
             ]
         
+        
         return annos
+
+
+    def load_nr3d_annos(self):
+        """Load annotations of nr3d."""
+        split = self.split
+        if split == 'val':
+            split = 'test'
+            
+
+        if split== 'train' and self.labeled_ratio is not None:
+            with open(os.path.join('data/meta_data/nr3d_{}_{}.txt'.format(split,self.labeled_ratio)), 'r') as f:
+                labeled_scenes = f.read().split('\n')
+            logger.info(f"{len(labeled_scenes) } scenes loaded ")
+            scan_ids = set(labeled_scenes)
+            
+        else:
+            with open('data/meta_data/nr3d_%s_scans.txt' % split) as f:
+                scan_ids = set(eval(f.read()))
+
+
+
+        with open(self.data_path + 'refer_it_3d/nr3d.csv') as f:
+            csv_reader = csv.reader(f)
+            headers = next(csv_reader)
+            headers = {header: h for h, header in enumerate(headers)}
+            annos = [
+                {
+                    'scan_id': line[headers['scan_id']],
+                    'target_id': int(line[headers['target_id']]),
+                    'target': line[headers['instance_type']],
+                    'utterance': line[headers['utterance']],
+                    'anchor_ids': [],
+                    'anchors': [],
+                    'dataset': 'nr3d'
+                }
+                for line in csv_reader
+                if line[headers['scan_id']] in scan_ids
+                and
+                str(line[headers['mentions_target_class']]).lower() == 'true'
+                and
+                (
+                    str(line[headers['correct_guess']]).lower() == 'true'
+                    or split != 'test'
+                )
+            ]
+        # Add distractor info
+        for anno in annos:
+            anno['distractor_ids'] = [
+                ind
+                for ind in
+                range(len(self.scans[anno['scan_id']].three_d_objects))
+                if self.scans[anno['scan_id']].get_object_instance_label(ind)
+                == anno['target']
+                and ind != anno['target_id']
+            ]
+        # Filter out sentences that do not explicitly mention the target class
+        annos = [anno for anno in annos if anno['target'] in anno['utterance']]
+        return annos
+
+
 
 
 
@@ -748,10 +806,10 @@ class SR3DUnlabeledDataset(Dataset):
             ])
 
         ret_dict = {
-            # 'box_label_mask': box_label_mask.astype(np.float32),
-            # 'center_label': gt_bboxes[:, :3].astype(np.float32),
-            # 'sem_cls_label': _labels.astype(np.int64),
-            # 'size_gts': gt_bboxes[:, 3:].astype(np.float32),
+            'box_label_mask': box_label_mask.astype(np.float32),
+            'center_label': gt_bboxes[:, :3].astype(np.float32),
+            'sem_cls_label': _labels.astype(np.int64),
+            'size_gts': gt_bboxes[:, 3:].astype(np.float32),
         }
 
         ret_dict.update({
@@ -761,33 +819,33 @@ class SR3DUnlabeledDataset(Dataset):
                 ' '.join(anno['utterance'].replace(',', ' ,').split())
                 + ' . not mentioned'
             ),
-            # "tokens_positive": tokens_positive.astype(np.int64),
-            # "positive_map": positive_map.astype(np.float32),
-            # "relation": (
-            #     self._find_rel(anno['utterance'])
-            #     if anno['dataset'].startswith('sr3d')
-            #     else "none"
-            # ),
-            # "target_name": scan.get_object_instance_label(
-            #     anno['target_id'] if isinstance(anno['target_id'], int)
-            #     else anno['target_id'][0]
-            # ),
-            # "target_id": (
-            #     anno['target_id'] if isinstance(anno['target_id'], int)
-            #     else anno['target_id'][0]
-            # ),
-            # "point_instance_label": point_instance_label.astype(np.int64),
-            # "all_bboxes": all_bboxes.astype(np.float32),
-            # "all_bbox_label_mask": all_bbox_label_mask.astype(np.bool8),
-            # "all_class_ids": class_ids.astype(np.int64),
-            # "distractor_ids": np.array(
-            #     anno['distractor_ids']
-            #     + [-1] * (32 - len(anno['distractor_ids']))
-            # ).astype(int),
-            # "anchor_ids": np.array(
-            #     anno['anchor_ids']
-            #     + [-1] * (32 - len(anno['anchor_ids']))
-            # ).astype(int),
+            "tokens_positive": tokens_positive.astype(np.int64),
+            "positive_map": positive_map.astype(np.float32),
+            "relation": (
+                self._find_rel(anno['utterance'])
+                if anno['dataset'].startswith('sr3d')
+                else "none"
+            ),
+            "target_name": scan.get_object_instance_label(
+                anno['target_id'] if isinstance(anno['target_id'], int)
+                else anno['target_id'][0]
+            ),
+            "target_id": (
+                anno['target_id'] if isinstance(anno['target_id'], int)
+                else anno['target_id'][0]
+            ),
+            "point_instance_label": point_instance_label.astype(np.int64),
+            "all_bboxes": all_bboxes.astype(np.float32),
+            "all_bbox_label_mask": all_bbox_label_mask.astype(np.bool8),
+            "all_class_ids": class_ids.astype(np.int64),
+            "distractor_ids": np.array(
+                anno['distractor_ids']
+                + [-1] * (32 - len(anno['distractor_ids']))
+            ).astype(int),
+            "anchor_ids": np.array(
+                anno['anchor_ids']
+                + [-1] * (32 - len(anno['anchor_ids']))
+            ).astype(int),
             "all_detected_boxes": all_detected_bboxes.astype(np.float32),
             "all_detected_bbox_label_mask": all_detected_bbox_label_mask.astype(np.bool8),
             "all_detected_class_ids": detected_class_ids.astype(np.int64),
@@ -795,15 +853,16 @@ class SR3DUnlabeledDataset(Dataset):
             "is_view_dep": self._is_view_dep(anno['utterance']),
             "is_hard": len(anno['distractor_ids']) > 1,
             "is_unique": len(anno['distractor_ids']) == 0,
-            # "target_cid": (
-            #     class_ids[anno['target_id']]
-            #     if isinstance(anno['target_id'], int)
-            #     else class_ids[anno['target_id'][0]]
-            # ),
+            "target_cid": (
+                class_ids[anno['target_id']]
+                if isinstance(anno['target_id'], int)
+                else class_ids[anno['target_id'][0]]
+            ),
             "pc_before_aug":origin_pc.astype(np.float32),
             "teacher_box":teacher_box.astype(np.float32),
             "augmentations":augmentations,
-            "supervised_mask":np.array(0).astype(np.int64)
+            "supervised_mask":np.array(1).astype(np.int64)
+
         })
         return ret_dict
 
