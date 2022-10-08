@@ -1,7 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-08-21 19:15:53
- # @LastEditTime: 2022-10-08 19:07:01
+ # @LastEditTime: 2022-10-08 19:32:14
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/train_test_cls.sh
@@ -68,9 +68,16 @@ print_freq=100;
 #* for  semi supervision architecture  : step2
 b_size='4,12';
 resume_mode_path="pretrain/pretrain_ramdom%20anno_41.pth"
+#* for not mask 
 size_consistency_weight=1e-3;
 center_consistency_weight=1e-2;
 token_consistency_weight=1;
+#* for mask , 
+# size_consistency_weight=1e-2;
+# center_consistency_weight=1e-3; 
+# token_consistency_weight=1;
+
+
 rampup_length=30;
 TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
     train.py --num_decoder_layers 6 \
