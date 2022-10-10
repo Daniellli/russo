@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-04 19:55:17
-LastEditTime: 2022-10-08 19:08:33
+LastEditTime: 2022-10-10 21:05:40
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/train.py
@@ -816,7 +816,8 @@ class TrainTester(BaseTrainTester):
             #* update  teacher model 
             #* epoch start from 1 by default , so have to minus one 
             global_step = (batch_idx+1) + (epoch -args.start_epoch) *total_iteration
-            alpha = 0.999
+            # alpha = 0.999
+            alpha = 0.99
             self.update_ema_variables(model,ema_model,alpha,global_step)
             #*===================================================
 

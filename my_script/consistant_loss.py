@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-09-22 23:13:23
-LastEditTime: 2022-10-08 19:33:09
+LastEditTime: 2022-10-10 21:06:34
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/my_script/consistant_loss.py
@@ -116,12 +116,12 @@ def compute_bbox_center_consistency_loss(center, ema_center,mask=None):
 
     #TODO: use both dist1 and dist2 or only use dist1
 
-
+    dist = dist1+ dist2
     #* 返回 loss,    teacher center 向student  center 对齐的索引
     if mask is not None :
-        return (dist1.sum(-1)/(mask.sum(-1)+1e-10)).sum(),ind2
+        return (dist.sum(-1)/(mask.sum(-1)+1e-10)).sum(),ind2
     else :
-        return dist1.mean(),ind2
+        return dist.mean(),ind2
 
 
 
@@ -155,7 +155,7 @@ def compute_token_map_consistency_loss(cls_scores, ema_cls_scores,map_ind,mask=N
         #todo does  it need to multiple by 2 according to  SESS? 
         return (class_consistency_loss.mean(-1).sum(-1)/(mask.sum(-1)+1e-10)).sum()/B
     else :
-        return class_consistency_loss.mean()
+        return class_consistency_loss.mean()*2
 
 
 
@@ -261,7 +261,6 @@ def compute_refer_consistency_loss(end_points, ema_end_points,augmentation, pref
     #!============
     mask = None
     #!============
-
     
     center_loss,teacher2student_map_idx = compute_bbox_center_consistency_loss(student_out['pred_boxes'][:,:,:3],teacher_out['pred_boxes'][:,:,:3],mask)
     soft_token_loss=compute_token_map_consistency_loss(student_out['pred_logits'],teacher_out['pred_logits'],teacher2student_map_idx,mask= mask)
