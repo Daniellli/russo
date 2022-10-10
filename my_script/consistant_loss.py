@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-09-22 23:13:23
-LastEditTime: 2022-10-10 21:06:34
+LastEditTime: 2022-10-10 21:19:21
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/my_script/consistant_loss.py
@@ -255,9 +255,9 @@ def compute_refer_consistency_loss(end_points, ema_end_points,augmentation, pref
     #* teacher_out['tokenized'] ['input_ids'] == student_out['tokenized'] ['input_ids']
     
     #*  只对token span 内的 pred target 计算loss
-    mask_len = (teacher_out['tokenized']['attention_mask']==1).sum(-1) #* 获取每个description 经过language model 后的token  set 实际长度
-    teacher_activated_token_map = get_activated_map(teacher_out['pred_logits'])
-    mask =torch.cat([(teacher_activated_token_map[idx]<desc_len).unsqueeze(0) for idx,desc_len in enumerate(mask_len)],dim=0)#* calculate the mask 
+    # mask_len = (teacher_out['tokenized']['attention_mask']==1).sum(-1) #* 获取每个description 经过language model 后的token  set 实际长度
+    # teacher_activated_token_map = get_activated_map(teacher_out['pred_logits'])
+    # mask =torch.cat([(teacher_activated_token_map[idx]<desc_len).unsqueeze(0) for idx,desc_len in enumerate(mask_len)],dim=0)#* calculate the mask 
     #!============
     mask = None
     #!============
