@@ -32,6 +32,8 @@ from .encoder_decoder_layers import (
 
 from IPython import embed
 
+from models.sample_model import SamplingModule
+
 class BeaUTyDETR(nn.Module):
     """
     3D language grounder.
@@ -109,15 +111,26 @@ class BeaUTyDETR(nn.Module):
             nn.Dropout(0.1)
         )
 
+        #!+===============================================
+        # self.eot_feat_projection = nn.Linear(768, 288) #* do i need to project this feature ? 
+        # Object candidate sampling
+        self.sampling_module = SamplingModule(
+            sampling_method = 'kpsa-lang-filter',
+            num_proposal = 512,
+            feat_dim=288,
+            lang_dim=768, 
+        )
+        #!+===============================================
+
         # Box encoder
         if self.butd:
-            self.butd_class_embeddings = nn.Embedding(num_obj_class, 768)
+            self.butd_class_embeddings = nn.Embedding(num_obj_class, 768)#* 存储 每个类别对应的embedding,   输入index 输出  相应的word embedding 
             saved_embeddings = torch.from_numpy(np.load(
                 'data/class_embeddings3d.npy', allow_pickle=True
             ))
             self.butd_class_embeddings.weight.data.copy_(saved_embeddings)
             self.butd_class_embeddings.requires_grad = False
-            self.class_embeddings = nn.Linear(768, d_model - 128)
+            self.class_embeddings = nn.Linear(768, d_model - 128) #* 线性变换word embedding 
             self.box_embeddings = PositionEmbeddingLearned(6, 128)
 
         # Cross-encoder
@@ -192,14 +205,18 @@ class BeaUTyDETR(nn.Module):
         tokenized = self.tokenizer.batch_encode_plus(
             inputs['text'], padding="longest", return_tensors="pt"
         ).to(inputs['point_clouds'].device)
-        encoded_text = self.text_encoder(**tokenized)
-        text_feats = self.text_projector(encoded_text.last_hidden_state)
+        encoded_text = self.text_encoder(**tokenized)#* tokenized['input_ids']
+        text_feats = self.text_projector(encoded_text.last_hidden_state)#* encoded_text.last_hidden_state: [B,desc_len, lan_channel_num]
         # Invert attention mask that we get from huggingface
         # because its the opposite in pytorch transformer
         text_attention_mask = tokenized.attention_mask.ne(1).bool()
         end_points['text_feats'] = text_feats
         end_points['text_attention_mask'] = text_attention_mask
         end_points['tokenized'] = tokenized
+
+        #!+========================= for keypoint sampling 
+        end_points['lang_hidden'] = encoded_text.pooler_output
+        #!+=========================
         return end_points
 
     def _generate_queries(self, xyz, features, end_points):
@@ -240,13 +257,14 @@ class BeaUTyDETR(nn.Module):
         points_features = end_points['fp2_features']  #* (B, F, points)
         text_feats = end_points['text_feats']  #* (B, L, F)
         text_padding_mask = end_points['text_attention_mask']  #* (B, L)
-
+        # self.sampling_module(points_xyz,points_features,end_points)
+        # end_points['tokenized']['input_ids']
         # Box encoding
-        if self.butd:
+        if self.butd:#* encode  box  and box class 
             # attend on those features
             detected_mask = ~inputs['det_bbox_label_mask']#* 是padding的 box mask 
             detected_feats = torch.cat([
-                self.box_embeddings(inputs['det_boxes']),
+                self.box_embeddings(inputs['det_boxes']), #* 针对box 的MLP , 将channel 从 6 turn to 128  
                 self.class_embeddings(self.butd_class_embeddings(
                     inputs['det_class_ids']
                 )).transpose(1, 2)  # 92.5, 84.9
