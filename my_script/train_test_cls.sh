@@ -1,7 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-08-21 19:15:53
- # @LastEditTime: 2022-10-10 21:09:58
+ # @LastEditTime: 2022-10-12 22:40:16
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/train_test_cls.sh
@@ -10,20 +10,20 @@
 
 
 
-
+export PYTHONWARNINGS='ignore:semaphore_tracker:UserWarning'
 
 # * dataset could be [sr3d, nr3d, scanrefer, scannet, sr3d+]
 #!  NR3D and ScanRefer  need much more epoch for converge 
 #!  To train on multiple datasets, e.g. on SR3D and NR3D simultaneously, set --TRAIN_DATASET sr3d nr3d.
 
 # train_data="sr3d nr3d scanrefer scannet sr3d+"
-train_data=sr3d
-test_data=sr3d
+train_data=nr3d
+test_data=nr3d
 DATA_ROOT=datasets/
 
-# gpu_ids="0,1,2,5"
-# gpu_num=4
-# b_size=12
+gpu_ids="0,2,3,4,6,7,9"
+gpu_num=7
+b_size=12
 
 # gpu_ids="0,1,2,3,4,5,6,7"
 # gpu_num=8
@@ -33,9 +33,9 @@ DATA_ROOT=datasets/
 # gpu_num=4
 # b_size=44
 
-gpu_ids="0,1,2,3"
-gpu_num=4;
-b_size=20;
+# gpu_ids="0,1,2,3"
+# gpu_num=4;
+# b_size=20;
 port=29522
 
 
@@ -67,7 +67,9 @@ print_freq=100;
 
 #* for  semi supervision architecture  : step2
 b_size='2,14';
-resume_mode_path="pretrain/pretrain_ramdom%20anno_41.pth"
+# resume_mode_path="pretrain/pretrain_ramdom%20anno_41.pth"
+resume_mode_path="pretrain/pretrain_random%20anno_3384_nr3d.pth"
+
 #* for not mask 
 size_consistency_weight=1e-3;
 center_consistency_weight=1e-2;
