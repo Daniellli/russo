@@ -1,7 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-08-21 19:15:53
- # @LastEditTime: 2022-10-12 22:40:16
+ # @LastEditTime: 2022-10-12 22:41:29
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/train_test_cls.sh
@@ -66,7 +66,8 @@ print_freq=100;
 
 
 #* for  semi supervision architecture  : step2
-b_size='2,14';
+# b_size='2,14';
+b_size='8,4';
 # resume_mode_path="pretrain/pretrain_ramdom%20anno_41.pth"
 resume_mode_path="pretrain/pretrain_random%20anno_3384_nr3d.pth"
 
@@ -92,7 +93,6 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --detect_intermediate --joint_det \
     --use_soft_token_loss --use_contrastive_align \
     --log_dir ./logs/bdetr \
-    --lr_decay_epochs 25 26 \
     --pp_checkpoint $DATA_ROOT/gf_detector_l6o256.pth \
     --butd_cls --self_attend \
     --max_epoch 400 \
@@ -106,7 +106,7 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     2>&1 | tee -a logs/train_test_cls.log
 
 
-
+# --lr_decay_epochs 25 26 \
 
 
 
