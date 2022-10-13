@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-09-22 23:13:23
-LastEditTime: 2022-10-10 21:19:21
+LastEditTime: 2022-10-13 21:19:33
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/my_script/consistant_loss.py
@@ -267,10 +267,52 @@ def compute_refer_consistency_loss(end_points, ema_end_points,augmentation, pref
 
     size_loss = compute_size_consistency_loss(student_out['pred_boxes'][:,:,3:],teacher_out['pred_boxes'][:,:,3:],teacher2student_map_idx,mask)
 
+
+    query_consistent_loss=compute_query_consistency_loss(student_out['proj_queries'],teacher_out['proj_queries'],teacher2student_map_idx)
+    text_consistent_loss=compute_text_consistency_loss(student_out['proj_tokens'],teacher_out['proj_tokens'],teacher2student_map_idx)
+
     # logger.info(f" center_loss:{center_loss}, soft_token_loss : {soft_token_loss}, size_loss(not included ):{size_loss}")
 
-    return center_loss,soft_token_loss,size_loss
+    return center_loss,soft_token_loss,size_loss,query_consistent_loss,text_consistent_loss
     
+
+
+
+'''
+description: 计算queries 之间的 距离
+param {*} student_query
+param {*} teacher_query
+param {*} map_idx
+return {*}
+'''
+def compute_query_consistency_loss(student_query,teacher_query,map_idx):
+       
+    __student_log_query = F.log_softmax(student_query, dim=2) #(B, num_proposal, num_class)
+    __teacher_query = F.softmax(teacher_query, dim=2) #(B, num_proposal, num_class)
+
+    
+    student_query_aligned = torch.cat([torch.index_select(a, 0, i).unsqueeze(0) for a, i in zip(__student_log_query, map_idx)])#* 根据map_ind 重新组织cls_log_prob (student out)
+    return F.kl_div(student_query_aligned, __teacher_query, reduction='mean')*2
+
+
+
+'''
+description: 计算queries 之间的 距离
+param {*} student_query
+param {*} teacher_query
+param {*} map_idx
+return {*}
+'''
+def compute_text_consistency_loss(student_text,teacher_text,map_idx):
+
+    return F.kl_div( F.log_softmax(student_text, dim=2) , F.softmax(teacher_text, dim=2), reduction='mean')*2
+
+
+
+
+
+
+
 
 
 
@@ -299,6 +341,9 @@ def get_consistency_loss(end_points, ema_end_points,augmentation):
     soft_token_consistency_loss_sum = torch.tensor(0.).cuda()
     center_consistency_loss_sum = torch.tensor(0.).cuda()
     size_consistency_loss_sum = torch.tensor(0.).cuda()
+    
+    query_consistency_loss_sum = torch.tensor(0.).cuda()
+    text_consistency_loss_sum = torch.tensor(0.).cuda()
 
     
     prefixes = ['last_', 'proposal_'] + [f'{i}head_' for i in range(5)] #* 6 heads + proposal 
@@ -314,17 +359,24 @@ def get_consistency_loss(end_points, ema_end_points,augmentation):
 
 
     for prefix in prefixes:
-        center_loss,soft_token_loss,size_loss= compute_refer_consistency_loss(end_points, ema_end_points, augmentation,prefix=prefix)
+        center_loss,soft_token_loss,size_loss,query_consistent_loss,text_consistent_loss = compute_refer_consistency_loss(end_points, ema_end_points, augmentation,prefix=prefix)
+
+
         
         center_consistency_loss_sum+=center_loss
         soft_token_consistency_loss_sum+=soft_token_loss
-
         size_consistency_loss_sum+=size_loss
+
+        query_consistency_loss_sum+=query_consistent_loss
+        text_consistency_loss_sum+=text_consistent_loss
         
         
     end_points['soft_token_consistency_loss'] = soft_token_consistency_loss_sum / len(prefixes)
     end_points['center_consistency_loss'] = center_consistency_loss_sum / len(prefixes)
     end_points['size_consistency_loss'] = size_consistency_loss_sum / len(prefixes)
+
+    end_points['query_consistent_loss'] = query_consistency_loss_sum / len(prefixes)
+    end_points['text_consistent_loss'] = text_consistency_loss_sum / len(prefixes)
 
     return end_points
 
