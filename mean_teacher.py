@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 19:34:49
-LastEditTime: 2022-10-08 18:27:13
+LastEditTime: 2022-10-13 21:30:06
 LastEditors: xushaocong
 Description:  全监督的mean teacher 
 FilePath: /butd_detr/mean_teacher.py
@@ -569,8 +569,22 @@ class MeanTeacher(BaseTrainTester):
         total_iteration=train_loader.__len__()/args.batch_size
         logger.info(f"total_iteration == {total_iteration}")
         
-        consistency_weight = self.get_current_consistency_weight(args.consistency_weight,epoch,args)
-        logger.info(f"consistency_weight  : {consistency_weight}")
+        
+        center_consistency_weight = self.get_current_consistency_weight(args.center_consistency_weight ,epoch,args)
+        size_consistency_weight = self.get_current_consistency_weight(args.size_consistency_weight ,epoch,args)
+        token_consistency_weight = self.get_current_consistency_weight(args.token_consistency_weight ,epoch,args)
+
+        query_consistency_weight = self.get_current_consistency_weight(args.query_consistency_weight ,epoch,args)
+        text_consistency_weight = self.get_current_consistency_weight(args.text_consistency_weight ,epoch,args)
+
+        logger.info(f"center_consistency_weight  : {center_consistency_weight}")
+        logger.info(f"size_consistency_weight  : {size_consistency_weight}")
+        logger.info(f"token_consistency_weight  : {token_consistency_weight}")
+        logger.info(f"query_consistency_weight  : {query_consistency_weight}")
+        logger.info(f"text_consistency_weight  : {text_consistency_weight}")
+
+
+
         
         for batch_idx, batch_data in enumerate(train_loader):
             # Move to GPU
@@ -610,23 +624,46 @@ class MeanTeacher(BaseTrainTester):
             )
 
 
-            end_points = get_consistency_loss(end_points, teacher_end_points,batch_data['augmentations'])
-            # soft_token_consistency_loss = end_points['soft_token_consistency_loss']
-            center_consistency_loss = end_points['center_consistency_loss']
-            # size_consistency_loss = end_points['size_consistency_loss']
 
-            # consistent_loss = (soft_token_consistency_loss+center_consistency_loss+size_consistency_loss)* consistency_weight
-            # consistent_loss = (size_consistency_loss)* consistency_weight
-            # consistent_loss = (soft_token_consistency_loss)* consistency_weight
-            consistent_loss = (center_consistency_loss)* consistency_weight
+
+            end_points = get_consistency_loss(end_points, teacher_end_points,batch_data['augmentations'])
+
+            consistent_loss =center_consistency_loss=soft_token_consistency_loss=size_consistency_loss=query_consistency_loss=text_consistency_loss=None
+            
+
+            center_consistency_loss = end_points['center_consistency_loss'] * center_consistency_weight
+            soft_token_consistency_loss = end_points['soft_token_consistency_loss']* token_consistency_weight
+            size_consistency_loss = end_points['size_consistency_loss'] * size_consistency_weight
+
+            query_consistency_loss = end_points['query_consistency_loss'] * query_consistency_weight
+            text_consistency_loss = end_points['text_consistency_loss'] * text_consistency_weight
+
+            
+            
+            consistent_loss = soft_token_consistency_loss +center_consistency_loss+size_consistency_loss+query_consistency_loss+text_consistency_loss
+
 
             #* total loss
-            
             if consistent_loss is not None:
-                # loss  += consistent_loss
                 total_loss = loss+consistent_loss
             else:
                 total_loss = loss
+
+            
+
+            #!===================
+            if args.upload_wandb and args.local_rank==0:
+                
+               wandb.log({"student_supervised_loss":loss.clone().detach().item(),
+                            "center_consistency_loss":center_consistency_loss.clone().detach().item() if center_consistency_loss is not None else None,
+                            "soft_token_consistency_loss":soft_token_consistency_loss.clone().detach().item() if soft_token_consistency_loss is not None else None,
+                            "size_consistency_loss":size_consistency_loss.clone().detach().item() if size_consistency_loss is not None else None,
+                            "query_consistency_loss":query_consistency_loss.clone().detach().item() if query_consistency_loss is not None else None,
+                            "text_consistency_loss":text_consistency_loss.clone().detach().item() if text_consistency_loss is not None else None,
+                            "consistent_loss":consistent_loss.clone().detach().item() if consistent_loss is not None else None ,
+                            "total_loss":total_loss.clone().detach().item(),
+                        })
+            
 
             
 
@@ -641,6 +678,8 @@ class MeanTeacher(BaseTrainTester):
                             "total_loss":total_loss.clone().detach().item(),
                         })
             
+
+
             optimizer.zero_grad()
 
             
@@ -660,7 +699,6 @@ class MeanTeacher(BaseTrainTester):
             #* update  teacher model 
             #* epoch start from 1 by default , so have to minus one 
             global_step = (batch_idx+1) + (epoch -args.start_epoch) *total_iteration
-            # alpha = 0.999
             alpha = 0.99
             self.update_ema_variables(model,ema_model,alpha,global_step)
             

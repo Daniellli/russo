@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-09-22 23:13:23
-LastEditTime: 2022-10-13 21:19:33
+LastEditTime: 2022-10-13 21:30:53
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/my_script/consistant_loss.py
@@ -307,18 +307,6 @@ def compute_text_consistency_loss(student_text,teacher_text,map_idx):
 
     return F.kl_div( F.log_softmax(student_text, dim=2) , F.softmax(teacher_text, dim=2), reduction='mean')*2
 
-
-
-
-
-
-
-
-
-
-
-
-    
 
 
 def get_consistency_loss(end_points, ema_end_points,augmentation):

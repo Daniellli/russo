@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-04 19:55:17
-LastEditTime: 2022-10-10 21:05:40
+LastEditTime: 2022-10-13 21:30:28
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/train.py
@@ -182,8 +182,15 @@ def parse_option():
     parser.add_argument('--size_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
     parser.add_argument('--center_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
     parser.add_argument('--token_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
+
+    parser.add_argument('--query_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
+    parser.add_argument('--text_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
+
     parser.add_argument('--labeled_ratio', default=0.2, type=float,help=' labeled datasets ratio ')
     parser.add_argument('--rampup_length', type=float, default=None, help='rampup_length')
+
+
+    
 
     
 
@@ -706,9 +713,15 @@ class TrainTester(BaseTrainTester):
         size_consistency_weight = self.get_current_consistency_weight(args.size_consistency_weight ,epoch,args)
         token_consistency_weight = self.get_current_consistency_weight(args.token_consistency_weight ,epoch,args)
 
+        query_consistency_weight = self.get_current_consistency_weight(args.query_consistency_weight ,epoch,args)
+        text_consistency_weight = self.get_current_consistency_weight(args.text_consistency_weight ,epoch,args)
+
+
         logger.info(f"center_consistency_weight  : {center_consistency_weight}")
         logger.info(f"size_consistency_weight  : {size_consistency_weight}")
         logger.info(f"token_consistency_weight  : {token_consistency_weight}")
+        logger.info(f"query_consistency_weight  : {query_consistency_weight}")
+        logger.info(f"text_consistency_weight  : {text_consistency_weight}")
 
         unlabeled_loader_iter=iter(unlabeled_loader)
 
@@ -772,13 +785,23 @@ class TrainTester(BaseTrainTester):
             )
 
 
+
+
             end_points = get_consistency_loss(end_points, teacher_end_points,batch_data['augmentations'])
+
+            consistent_loss =center_consistency_loss=soft_token_consistency_loss=size_consistency_loss=query_consistency_loss=text_consistency_loss=None
+
 
             center_consistency_loss = end_points['center_consistency_loss'] * center_consistency_weight
             soft_token_consistency_loss = end_points['soft_token_consistency_loss']* token_consistency_weight
             size_consistency_loss = end_points['size_consistency_loss'] * size_consistency_weight
+
+            query_consistency_loss = end_points['query_consistency_loss'] * query_consistency_weight
+            text_consistency_loss = end_points['text_consistency_loss'] * text_consistency_weight
+
             
-            consistent_loss = soft_token_consistency_loss +center_consistency_loss+size_consistency_loss 
+            
+            consistent_loss = soft_token_consistency_loss +center_consistency_loss+size_consistency_loss+query_consistency_loss+text_consistency_loss
 
 
             #* total loss
@@ -793,10 +816,12 @@ class TrainTester(BaseTrainTester):
             if args.upload_wandb and args.local_rank==0:
                 
                 wandb.log({"student_supervised_loss":loss.clone().detach().item(),
-                            "center_consistency_loss":center_consistency_loss.clone().detach().item(),
-                            "soft_token_consistency_loss":soft_token_consistency_loss.clone().detach().item(),
-                            "size_consistency_loss":size_consistency_loss.clone().detach().item(),
-                            "consistent_loss":consistent_loss.clone().detach().item(),
+                            "center_consistency_loss":center_consistency_loss.clone().detach().item() if center_consistency_loss is not None else None,
+                            "soft_token_consistency_loss":soft_token_consistency_loss.clone().detach().item() if soft_token_consistency_loss is not None else None,
+                            "size_consistency_loss":size_consistency_loss.clone().detach().item() if size_consistency_loss is not None else None,
+                            "query_consistency_loss":query_consistency_loss.clone().detach().item() if query_consistency_loss is not None else None,
+                            "text_consistency_loss":text_consistency_loss.clone().detach().item() if text_consistency_loss is not None else None,
+                            "consistent_loss":consistent_loss.clone().detach().item() if consistent_loss is not None else None ,
                             "total_loss":total_loss.clone().detach().item(),
                         })
             
