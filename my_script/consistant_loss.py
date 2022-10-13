@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-09-22 23:13:23
-LastEditTime: 2022-10-13 21:30:53
+LastEditTime: 2022-10-13 21:32:18
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/my_script/consistant_loss.py
@@ -363,8 +363,9 @@ def get_consistency_loss(end_points, ema_end_points,augmentation):
     end_points['center_consistency_loss'] = center_consistency_loss_sum / len(prefixes)
     end_points['size_consistency_loss'] = size_consistency_loss_sum / len(prefixes)
 
-    end_points['query_consistent_loss'] = query_consistency_loss_sum / len(prefixes)
-    end_points['text_consistent_loss'] = text_consistency_loss_sum / len(prefixes)
+    end_points['query_consistency_loss'] = query_consistency_loss_sum / len(prefixes)
+    end_points['text_consistency_loss'] = text_consistency_loss_sum / len(prefixes)
+
 
     return end_points
 
