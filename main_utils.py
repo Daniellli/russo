@@ -45,6 +45,12 @@ from IPython import embed
 
 from collections import OrderedDict
 
+
+#*=====================================
+from signal import signal, SIGPIPE, SIG_DFL, SIG_IGN
+signal(SIGPIPE, SIG_IGN)
+#*=====================================
+
 '''
 description:  将分布式存储的模型转正常model
 param {*} model

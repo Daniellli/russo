@@ -18,6 +18,11 @@ import torch.distributed as dist
 import os.path as osp
 import numpy as np
 
+from IPython import embed
+
+from loguru import logger
+
+
 def is_dist_avail_and_initialized():
     if not dist.is_available():
         return False
@@ -306,8 +311,22 @@ def compute_kps_loss(data_dict, topk):
     objectness_loss += cls_loss_src.sum() / B
 
     if 'kps_ref_score' in data_dict.keys() and use_ref_score_loss:
-        point_ref_mask = data_dict['point_ref_mask']
+        #*====================================
+        #* data_dict['point_instance_label'] : 不太一样, 这个point_instance_label 有多个 target 
+        #*BUTD DETR :  Assign each point to a GT object, 
+        # point_instance_label = data_dict['point_instance_label']  # B, num_points
+        # obj_assignment = torch.gather(point_instance_label, 1, seed_inds)  # B, K
+        # obj_assignment[obj_assignment < 0] = G - 1  # bg points to last gt
+        # obj_assignment_one_hot = torch.zeros((B, K, G)).to(seed_xyz.device)
+        # obj_assignment_one_hot.scatter_(2, obj_assignment.unsqueeze(-1), 1)
+        #*====================================
+
+        # point_ref_mask = data_dict['point_ref_mask'] #* 每个sample 默认只有一个目标
+
+        point_ref_mask = data_dict['point_instance_label'] #! error
+        point_ref_mask = (point_ref_mask!=-1)*1 #* -1 表示背景, 其他都表示referred target
         point_ref_mask = torch.gather(point_ref_mask, 1, seed_inds)
+
         if 'ref_query_points_sample_inds' in data_dict.keys():
             query_points_sample_inds = data_dict['query_points_sample_inds'].long()
             point_ref_mask = torch.gather(point_ref_mask, 1, query_points_sample_inds)
@@ -322,8 +341,15 @@ def compute_kps_loss(data_dict, topk):
         cls_weights /= torch.clamp(cls_normalizer, min=1.0)
         kps_ref_loss = criterion(kps_ref_score.view(kps_ref_score.shape[0], kps_ref_score.shape[2], 1),
                                  point_ref_mask.unsqueeze(-1), weights=cls_weights)
-        objectness_loss += kps_ref_loss.sum() / B
 
+        objectness_loss += kps_ref_loss.sum() / B
+        #!====================
+        # tmp = kps_ref_loss.sum() / B
+        # logger.info(f"objectness_loss:{objectness_loss},\t kps_ref_loss:{tmp}")
+        # objectness_loss += tmp
+        #!====================
+
+    
     #* Compute recall upper bound
     padding_array = torch.arange(0, B).to(point_instance_label.device) * 10000
     padding_array = padding_array.unsqueeze(1)  # B,1
@@ -788,6 +814,8 @@ def compute_hungarian_loss(end_points, num_decoder_layers, set_criterion,
         output['pred_logits'] = pred_logits
         output["pred_boxes"] = pred_bbox
 
+        
+
         # Compute all the requested losses
         #!================================================================
         if DEBUG:
@@ -804,13 +832,17 @@ def compute_hungarian_loss(end_points, num_decoder_layers, set_criterion,
         loss_giou += losses.get('loss_giou', 0)
         if 'proj_tokens' in end_points:
             loss_contrastive_align += losses['loss_contrastive_align']
+    #!================================================================
+    # if 'seeds_obj_cls_logits' in end_points.keys():
+    #     query_points_generation_loss = compute_points_obj_cls_loss_hard_topk(
+    #         end_points, query_points_obj_topk
+    #     )
+    # else:
+    #     query_points_generation_loss = 0.0
 
-    if 'seeds_obj_cls_logits' in end_points.keys():
-        query_points_generation_loss = compute_points_obj_cls_loss_hard_topk(
-            end_points, query_points_obj_topk
-        )
-    else:
-        query_points_generation_loss = 0.0
+    query_points_generation_loss, end_points =compute_kps_loss(end_points, query_points_obj_topk)
+    #!================================================================
+
 
     # loss
     loss = (

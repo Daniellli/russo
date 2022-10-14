@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-13 23:08:56
-LastEditTime: 2022-10-14 16:15:25
+LastEditTime: 2022-10-14 17:05:57
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/models/bdetr_kps.py
@@ -145,8 +145,11 @@ class BeaUTyDETRTKPS(nn.Module):
 
         
         # Query initialization
-        self.points_obj_cls = PointsObjClsModule(d_model)
-        self.gsample_module = GeneralSamplingModule()
+        #!=====================================================
+        #* replaced by text-guided keypoints sampling 
+        # self.points_obj_cls = PointsObjClsModule(d_model)
+        # self.gsample_module = GeneralSamplingModule()
+        #!=====================================================
         self.decoder_query_proj = nn.Conv1d(d_model, d_model, kernel_size=1)
 
         # Proposal (layer for size and center)

@@ -61,6 +61,10 @@ class SamplingModule(nn.Module):
             data_dict['query_points_feature'] = features  # (batch_size, C, num_proposal)
             data_dict['query_points_sample_inds'] = sample_inds  # (bsz, num_proposal) # should be 0,1,...,num_proposal
         elif self.sampling_method == 'kpsa-lang-filter':
+
+
+
+
             points_obj_cls_logits = self.points_obj_cls(features)  #* (batch_size, 1, num_seed) , 分类每个点是否在near the object center ? 
             data_dict['seeds_obj_cls_logits'] = points_obj_cls_logits
             points_obj_cls_scores = torch.sigmoid(points_obj_cls_logits).squeeze(1)

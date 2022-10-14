@@ -111,17 +111,6 @@ class BeaUTyDETR(nn.Module):
             nn.Dropout(0.1)
         )
 
-        #!+===============================================
-        # self.eot_feat_projection = nn.Linear(768, 288) #* do i need to project this feature ? 
-        # Object candidate sampling
-        self.sampling_module = SamplingModule(
-            sampling_method = 'kpsa-lang-filter',
-            num_proposal = 512,
-            feat_dim=288,
-            lang_dim=768, 
-        )
-        #!+===============================================
-
         # Box encoder
         if self.butd:
             self.butd_class_embeddings = nn.Embedding(num_obj_class, 768)#* 存储 每个类别对应的embedding,   输入index 输出  相应的word embedding 
@@ -213,10 +202,6 @@ class BeaUTyDETR(nn.Module):
         end_points['text_feats'] = text_feats
         end_points['text_attention_mask'] = text_attention_mask
         end_points['tokenized'] = tokenized
-
-        #!+========================= for keypoint sampling 
-        end_points['lang_hidden'] = encoded_text.pooler_output
-        #!+=========================
         return end_points
 
     def _generate_queries(self, xyz, features, end_points):
@@ -257,8 +242,7 @@ class BeaUTyDETR(nn.Module):
         points_features = end_points['fp2_features']  #* (B, F, points)
         text_feats = end_points['text_feats']  #* (B, L, F)
         text_padding_mask = end_points['text_attention_mask']  #* (B, L)
-        # self.sampling_module(points_xyz,points_features,end_points)
-        # end_points['tokenized']['input_ids']
+        
         # Box encoding
         if self.butd:#* encode  box  and box class 
             # attend on those features
