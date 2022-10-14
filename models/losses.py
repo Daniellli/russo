@@ -335,11 +335,13 @@ def compute_kps_loss(data_dict, topk):
         kps_ref_loss = criterion(kps_ref_score.view(kps_ref_score.shape[0], kps_ref_score.shape[2], 1),
                                  point_ref_mask.unsqueeze(-1), weights=cls_weights)
 
-        objectness_loss += kps_ref_loss.sum() / B
+        # objectness_loss += kps_ref_loss.sum() / B
         #!====================
-        # tmp = kps_ref_loss.sum() / B
-        # logger.info(f"objectness_loss:{objectness_loss},\t kps_ref_loss:{tmp}")
-        # objectness_loss += tmp
+        
+        data_dict['kps_ref_loss'] = kps_ref_loss.sum() / B
+        data_dict['query_kp_loss'] = objectness_loss.clone()
+
+        objectness_loss += data_dict['kps_ref_loss']
         #!====================
 
     
