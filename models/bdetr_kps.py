@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-13 23:08:56
-LastEditTime: 2022-10-13 23:27:06
+LastEditTime: 2022-10-14 16:15:25
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/models/bdetr_kps.py
@@ -113,12 +113,12 @@ class BeaUTyDETRTKPS(nn.Module):
 
         #!+===============================================
         # self.eot_feat_projection = nn.Linear(768, 288) #* do i need to project this feature ? 
-        # Object candidate sampling
+        sampling_method = 'kpsa-lang-filter'
         self.sampling_module = SamplingModule(
-            sampling_method = 'kpsa-lang-filter',
-            num_proposal = 512,
-            feat_dim=288,
-            lang_dim=768, 
+            sampling_method = sampling_method,
+            num_proposal = num_queries,#* 256
+            feat_dim=d_model,#* 288 
+            lang_dim=self.text_encoder.config.hidden_size, 
         )
         #!+===============================================
 
@@ -220,16 +220,15 @@ class BeaUTyDETRTKPS(nn.Module):
 
         #* Visual encoder2 
         
-        # end_points['seed_inds'] = end_points['fp2_inds']
-        # end_points['seed_xyz'] = end_points['fp2_xyz']
-        # end_points['seed_features'] = end_points['fp2_features']
+        end_points['seed_inds'] = end_points['fp2_inds']
+        end_points['seed_xyz'] = end_points['fp2_xyz']
+        end_points['seed_features'] = end_points['fp2_features']
         #* xyz : [B,512,3], 
         #*  features:[B,C,512]
-        end_points, points_xyz, points_features  = self.sampling_module(end_points['fp2_xyz'],end_points['fp2_features'],end_points)
-
-        end_points['seed_inds'] = end_points['fp2_inds']
-        end_points['seed_xyz'] = points_xyz
-        end_points['seed_features'] = points_features
+        # end_points, points_xyz, points_features  = self.sampling_module(end_points['fp2_xyz'],end_points['fp2_features'],end_points)
+        # end_points['seed_inds'] = end_points['fp2_inds']
+        # end_points['seed_xyz'] = points_xyz
+        # end_points['seed_features'] = points_features
         #!+====================
 
 
@@ -250,6 +249,7 @@ class BeaUTyDETRTKPS(nn.Module):
         end_points['query_points_xyz'] = xyz  # (B, V, 3)
         end_points['query_points_feature'] = features  # (B, F, V)
         end_points['query_points_sample_inds'] = sample_inds  # (B, V)
+       
         return end_points
 
     def forward(self, inputs):
@@ -278,17 +278,13 @@ class BeaUTyDETRTKPS(nn.Module):
         # Box encoding
         if self.butd:#* encode  box  and box class 
             # attend on those features
-            # detected_mask = ~inputs['det_bbox_label_mask']#* 是padding的 box mask 
-            # detected_feats = torch.cat([
-            #     self.box_embeddings(inputs['det_boxes']), #* 针对box 的MLP , 将channel 从 6 turn to 128  
-            #     self.class_embeddings(self.butd_class_embeddings(
-            #         inputs['det_class_ids']
-            #     )).transpose(1, 2)  # 92.5, 84.9
-            # ], 1).transpose(1, 2).contiguous()
-            # xyz, features
-            # detected_feats 
-            detected_mask = None
-            detected_feats = None
+            detected_mask = ~inputs['det_bbox_label_mask']#* 是padding的 box mask 
+            detected_feats = torch.cat([
+                self.box_embeddings(inputs['det_boxes']), #* 针对box 的MLP , 将channel 从 6 turn to 128  
+                self.class_embeddings(self.butd_class_embeddings(
+                    inputs['det_class_ids']
+                )).transpose(1, 2)  # 92.5, 84.9
+            ], 1).transpose(1, 2).contiguous()            
         else:
             detected_mask = None
             detected_feats = None
@@ -307,10 +303,7 @@ class BeaUTyDETRTKPS(nn.Module):
             detected_mask=detected_mask #*   box mask 
         )
 
-        
-
-        points_features = points_features.transpose(1, 2)
-        points_features = points_features.contiguous()  # (B, F, points) #* 只提取了 bbox 区域的feature?  
+        points_features = points_features.transpose(1, 2).contiguous()  # (B, F, points) #* 只提取了 bbox 区域的feature?  
         end_points["text_memory"] = text_feats
         end_points['seed_features'] = points_features 
         if self.contrastive_align_loss: #* 提取token表征,    为了和后面的query 计算 constrastive loss , 也就是拉近配对的token and query distance 
@@ -320,17 +313,29 @@ class BeaUTyDETRTKPS(nn.Module):
             end_points['proj_tokens'] = proj_tokens
 
         #* Query Points Generation,  一个sentence 最有有256 个query与之对应, 所以这个的query是 256, B = 2 
-        end_points = self._generate_queries(
+        #!==============================================================
+        # end_points = self._generate_queries(
+        #     points_xyz, points_features, end_points
+        # )
+        # cluster_feature = end_points['query_points_feature']  #* (B, F, V) == (batch_size, feature_channel_num,  query_vector_len)
+        # cluster_xyz = end_points['query_points_xyz']  # (B, V, 3)
+
+        
+        end_points, cluster_xyz, cluster_feature  = self.sampling_module(
             points_xyz, points_features, end_points
         )
-        cluster_feature = end_points['query_points_feature']  #* (B, F, V) == (batch_size, feature_channel_num,  query_vector_len)
-        cluster_xyz = end_points['query_points_xyz']  # (B, V, 3)
-        query = self.decoder_query_proj(cluster_feature)
-        query = query.transpose(1, 2).contiguous()  # (B, V, F)
+        #!==============================================================
+
+
+
+        query = self.decoder_query_proj(cluster_feature).transpose(1, 2).contiguous()  # (B, V, F)
+
         if self.contrastive_align_loss:
             end_points['proposal_proj_queries'] = F.normalize(
                 self.contrastive_align_projection_image(query), p=2, dim=-1
             )
+
+
         #*  query 数量是固定256 , token 数量是根据utterence 来定的 ,可能几十可能上百
         #* Proposals (one for each query) , 这些是proposed box ,  就是该utterence 下指定的 目标bbox proposal , 在过一个Hunagrian match 就能得到 配对后的 真的proposal 了
         proposal_center, proposal_size = self.proposal_head(
@@ -339,6 +344,7 @@ class BeaUTyDETRTKPS(nn.Module):
             end_points=end_points,
             prefix='proposal_'
         )
+        
         base_xyz = proposal_center.detach().clone()  # (B, V, 3) 
         base_size = proposal_size.detach().clone()  # (B, V, 3)
         query_mask = None#? 这是做什么用的? 
