@@ -367,7 +367,7 @@ class GroundingGTEvaluator:
         # Highest scoring box -> iou
         for bid in range(len(positive_map)):
             all_gt_boxes = box_cxcyczwhd_to_xyzxyz(
-                        end_points['all_detected_boxes'][bid][
+                        end_points['all_detected_boxes'][bid][#* 在这个setting下, all_detected_boxes == all scene box 
                             end_points['all_detected_bbox_label_mask'][bid]
                         ]
                     )
@@ -378,7 +378,7 @@ class GroundingGTEvaluator:
             )  # (gt, Q)
             is_correct = (ious.max(0)[0] > 0.25) * 1.0
 
-            # Keep scores for annotated objects only
+            #* Keep scores for annotated objects only
             num_obj = int(end_points['box_label_mask'][bid].sum())
             pmap = positive_map[bid, :num_obj]
             scores = (
@@ -387,7 +387,7 @@ class GroundingGTEvaluator:
             ).sum(-1)  # (obj, Q)
             scores = scores * is_correct[None]
             top = scores.argsort(1, True)[:, 0]  # (obj)
-            pbox = pred_bbox[bid, top.reshape(-1)]
+            pbox = pred_bbox[bid, top.reshape(-1)]#* 响应到最后一个就是没有找到 
 
             # new pbox is the gt box with highest overlap with old pbox
             ious, _ = _iou3d_par(all_gt_boxes,  # (gt, 6)
@@ -396,7 +396,9 @@ class GroundingGTEvaluator:
             pbox = end_points['all_detected_boxes'][bid][
                             end_points['all_detected_bbox_label_mask'][bid]
                         ][ious.argmax()]
+            #!+=================
             found = int((pbox == gt_bboxes[bid]).all())
+            #!+=================
             self.dets[(prefix, 'bbs')] += found
             self.gts[(prefix, 'bbs')] += 1
 

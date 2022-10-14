@@ -340,7 +340,7 @@ class TrainTester(BaseTrainTester):
                 batch_idx, batch_data, test_loader, model, stat_dict,
                 criterion, set_criterion, args
             )
-            #* contrast
+            #* contrast : 计算text token and queries 之间的相似度
             proj_tokens = end_points['proj_tokens']  #* (B, tokens, 64)
             proj_queries = end_points['last_proj_queries']  #* (B, Q, 64)
             sem_scores = torch.matmul(proj_queries, proj_tokens.transpose(-1, -2))
@@ -349,6 +349,7 @@ class TrainTester(BaseTrainTester):
             sem_scores = sem_scores.to(sem_scores_.device)
             sem_scores[:, :sem_scores_.size(1), :sem_scores_.size(2)] = sem_scores_
             end_points['last_sem_cls_scores'] = sem_scores
+
             #* end contrast
             sem_cls = torch.zeros_like(end_points['last_sem_cls_scores'])[..., :19]
             for w, t in zip(wordidx, tokenidx):
@@ -358,6 +359,7 @@ class TrainTester(BaseTrainTester):
             #* Parse predictions
             #* for prefix in prefixes:
             #* 最后一部分是 6个decoder layer, 最后一个的输出是前缀是last_ 
+            #* 一般最后一个layer的输出是最好的,  取最后一个结果作为预测结果
             prefix = 'last_'
             batch_pred_map_cls = parse_predictions(
                 end_points, CONFIG_DICT, prefix,
@@ -365,6 +367,7 @@ class TrainTester(BaseTrainTester):
             batch_gt_map_cls = parse_groundtruths(
                 end_points, CONFIG_DICT,
                 size_cls_agnostic=True)
+                
             batch_pred_map_cls_dict[prefix].append(batch_pred_map_cls)
             batch_gt_map_cls_dict[prefix].append(batch_gt_map_cls)
             

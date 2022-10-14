@@ -203,7 +203,7 @@ class BeaUTyDETR(nn.Module):
         return end_points
 
     '''
-    description:  跟3DSPS相比, 少了与文本计算相似度 然后再进一步sampliing的步骤
+    description:  跟3DSPS相比, 少了与文本计算相似度 然后再进一步sampliing的步骤, 但是这里统统有一个loss 与之对应. 
     param {*} self
     param {*} xyz
     param {*} features
@@ -212,7 +212,7 @@ class BeaUTyDETR(nn.Module):
     '''
     def _generate_queries(self, xyz, features, end_points):
         # kps sampling
-        points_obj_cls_logits = self.points_obj_cls(features)
+        points_obj_cls_logits = self.points_obj_cls(features)#* features:[B,288,1024]; points_obj_cls_logits:[B,1,1024]
         end_points['seeds_obj_cls_logits'] = points_obj_cls_logits
         sample_inds = torch.topk(
             torch.sigmoid(points_obj_cls_logits).squeeze(1),
@@ -263,7 +263,7 @@ class BeaUTyDETR(nn.Module):
             detected_mask = None
             detected_feats = None
 
-        #* Cross-modality encoding
+        #* Cross-modality encoding  #*text_feats: [B,15,288] ; points_features: [B, 288,1024]
         points_features, text_feats = self.cross_encoder(
             vis_feats=points_features.transpose(1, 2).contiguous(), #* point cloud feature
             pos_feats=self.pos_embed(points_xyz).transpose(1, 2).contiguous(), #* point cloud feature
@@ -290,11 +290,20 @@ class BeaUTyDETR(nn.Module):
             end_points['proj_tokens'] = proj_tokens
 
         #* Query Points Generation,  一个sentence 最有有256 个query与之对应, 所以这个的query是 256, B = 2 
-        end_points = self._generate_queries( 
+        end_points = self._generate_queries(
             points_xyz, points_features, end_points
         )
+
+
+
         cluster_feature = end_points['query_points_feature']  #* (B, F, V) == (batch_size, feature_channel_num,  query_vector_len)
         cluster_xyz = end_points['query_points_xyz']  # (B, V, 3)
+
+
+
+
+
+
         query = self.decoder_query_proj(cluster_feature) #*  1 X 1 convolution filter 
         query = query.transpose(1, 2).contiguous()  # (B, V, F)
         if self.contrastive_align_loss:
