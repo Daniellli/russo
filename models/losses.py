@@ -18,6 +18,11 @@ import torch.distributed as dist
 import os.path as osp
 import numpy as np
 
+from IPython import embed
+
+from loguru import logger
+
+
 def is_dist_avail_and_initialized():
     if not dist.is_available():
         return False
@@ -160,10 +165,16 @@ class SigmoidFocalClassificationLoss(nn.Module):
         return loss * weights
 
 
+'''
+description:  计算生成query 的loss 
+param {*} end_points
+param {*} topk
+return {*}
+'''
 def compute_points_obj_cls_loss_hard_topk(end_points, topk):
     #!==============================================================
-    supervised_mask  = end_points['supervised_mask']
-    supervised_inds = torch.nonzero(supervised_mask).squeeze(1).long()
+    # supervised_mask  = end_points['supervised_mask']
+    # supervised_inds = torch.nonzero(supervised_mask).squeeze(1).long()
     #!==============================================================
 
     box_label_mask = end_points['box_label_mask']
@@ -233,6 +244,119 @@ def compute_points_obj_cls_loss_hard_topk(end_points, topk):
 
 
 
+
+
+
+'''
+description:  text-guided keypoint sampling loss
+param {*} data_dict
+param {*} topk
+param {*} args
+return {*}
+'''
+def compute_kps_loss(data_dict, topk):
+    #!===============
+    # supervised_mask  = data_dict['supervised_mask']
+    # supervised_inds = torch.nonzero(supervised_mask).squeeze(1).long()
+    use_ref_score_loss = True
+    ref_use_obj_mask= True
+    #!===============
+
+    box_label_mask = data_dict['box_label_mask']
+    seed_inds = data_dict['seed_inds'].long()  # B, K
+    seed_xyz = data_dict['seed_xyz']  # B, K, 3
+    seeds_obj_cls_logits = data_dict['seeds_obj_cls_logits']  # B, 1, K
+    gt_center = data_dict['center_label'][:, :, 0:3]  # B, K2, 3
+    gt_size = data_dict['size_gts'][:, :, 0:3]  # B, K2, 3
+    B = gt_center.shape[0]
+    K = seed_xyz.shape[1]
+    K2 = gt_center.shape[1]
+
+    point_instance_label = data_dict['point_instance_label']  # B, num_points
+    object_assignment = torch.gather(point_instance_label, 1, seed_inds)  # B, num_seed
+    object_assignment[object_assignment < 0] = K2 - 1  # set background points to the last gt bbox
+    object_assignment_one_hot = torch.zeros((B, K, K2)).to(seed_xyz.device)
+    object_assignment_one_hot.scatter_(2, object_assignment.unsqueeze(-1), 1)  # (B, K, K2)
+    delta_xyz = seed_xyz.unsqueeze(2) - gt_center.unsqueeze(1)  # (B, K, K2, 3)
+    delta_xyz = delta_xyz / (gt_size.unsqueeze(1) + 1e-6)  # (B, K, K2, 3)
+    new_dist = torch.sum(delta_xyz ** 2, dim=-1)
+    euclidean_dist1 = torch.sqrt(new_dist + 1e-6)  # BxKxK2
+    euclidean_dist1 = euclidean_dist1 * object_assignment_one_hot + 100 * (1 - object_assignment_one_hot)  # BxKxK2
+    euclidean_dist1 = euclidean_dist1.transpose(1, 2).contiguous()  # BxK2xK
+    topk_inds = torch.topk(euclidean_dist1, topk, largest=False)[1] * box_label_mask[:, :, None] + \
+                (box_label_mask[:, :, None] - 1)  # BxK2xtopk
+    topk_inds = topk_inds.long()  # BxK2xtopk
+    topk_inds = topk_inds.view(B, -1).contiguous()  # B, K2xtopk
+    batch_inds = torch.arange(B).unsqueeze(1).repeat(1, K2 * topk).to(seed_xyz.device)
+    batch_topk_inds = torch.stack([batch_inds, topk_inds], -1).view(-1, 2).contiguous()
+
+    objectness_label = torch.zeros((B, K + 1), dtype=torch.long).to(seed_xyz.device)
+    objectness_label[batch_topk_inds[:, 0], batch_topk_inds[:, 1]] = 1
+    objectness_label = objectness_label[:, :K]
+    objectness_label_mask = torch.gather(point_instance_label, 1, seed_inds)  # B, num_seed
+    objectness_label[objectness_label_mask < 0] = 0
+
+    total_num_points = B * K
+    data_dict[f'points_hard_topk{topk}_pos_ratio'] = \
+        torch.sum(objectness_label.float()) / float(total_num_points)
+    data_dict[f'points_hard_topk{topk}_neg_ratio'] = 1 - data_dict[f'points_hard_topk{topk}_pos_ratio']
+
+    #* Compute objectness loss
+    objectness_loss = 0
+    criterion = SigmoidFocalClassificationLoss()
+    cls_weights = (objectness_label >= 0).float()
+    cls_normalizer = cls_weights.sum(dim=1, keepdim=True).float()
+    cls_weights /= torch.clamp(cls_normalizer, min=1.0)
+    cls_loss_src = criterion(seeds_obj_cls_logits.view(B, K, 1), objectness_label.unsqueeze(-1), weights=cls_weights)
+    objectness_loss += cls_loss_src.sum() / B
+
+    if 'kps_ref_score' in data_dict.keys() and use_ref_score_loss:
+        #*====================================
+        #* data_dict['point_instance_label'] : 不太一样, 这个point_instance_label 有多个 target 
+        #*====================================
+        # point_ref_mask = data_dict['point_ref_mask'] #* 3D SPS 每个sample 默认只有一个目标 by default
+
+        point_ref_mask = data_dict['point_instance_label'] #! error
+        point_ref_mask = (point_ref_mask!=-1)*1 #* -1 表示背景, 其他都表示referred target
+        point_ref_mask = torch.gather(point_ref_mask, 1, seed_inds)
+
+        if 'ref_query_points_sample_inds' in data_dict.keys():
+            query_points_sample_inds = data_dict['query_points_sample_inds'].long()
+            point_ref_mask = torch.gather(point_ref_mask, 1, query_points_sample_inds)
+
+            if ref_use_obj_mask:
+
+                obj_mask = torch.gather(objectness_label, 1, query_points_sample_inds)
+                point_ref_mask = point_ref_mask * obj_mask
+        kps_ref_score = data_dict['kps_ref_score']      # [B, 1, N]
+        cls_weights = torch.ones((B, kps_ref_score.shape[-1])).cuda().float()
+        cls_normalizer = cls_weights.sum(dim=1, keepdim=True).float()
+        cls_weights /= torch.clamp(cls_normalizer, min=1.0)
+        kps_ref_loss = criterion(kps_ref_score.view(kps_ref_score.shape[0], kps_ref_score.shape[2], 1),
+                                 point_ref_mask.unsqueeze(-1), weights=cls_weights)
+
+        objectness_loss += kps_ref_loss.sum() / B
+        #!====================
+        # tmp = kps_ref_loss.sum() / B
+        # logger.info(f"objectness_loss:{objectness_loss},\t kps_ref_loss:{tmp}")
+        # objectness_loss += tmp
+        #!====================
+
+    
+    #* Compute recall upper bound
+    padding_array = torch.arange(0, B).to(point_instance_label.device) * 10000
+    padding_array = padding_array.unsqueeze(1)  # B,1
+    point_instance_label_mask = (point_instance_label < 0)  # B,num_points
+    point_instance_label = point_instance_label + padding_array  # B,num_points
+    point_instance_label[point_instance_label_mask] = -1
+    num_gt_bboxes = torch.unique(point_instance_label).shape[0] - 1
+    seed_instance_label = torch.gather(point_instance_label, 1, seed_inds)  # B,num_seed
+    pos_points_instance_label = seed_instance_label * objectness_label + (objectness_label - 1)
+    num_query_bboxes = torch.unique(pos_points_instance_label).shape[0] - 1
+    if num_gt_bboxes > 0:
+        data_dict[f'points_hard_topk{topk}_upper_recall_ratio'] = num_query_bboxes / num_gt_bboxes
+
+    return objectness_loss, data_dict
 
 
 '''
@@ -683,13 +807,14 @@ def compute_hungarian_loss(end_points, num_decoder_layers, set_criterion,
         output['pred_logits'] = pred_logits
         output["pred_boxes"] = pred_bbox
 
+        
+
         # Compute all the requested losses
-        #!================================================================
         if DEBUG:
             losses = compute_loss_and_save_match_res_(output, target,set_criterion,end_points['scan_ids'],prefix)
         else :
             losses, _ = set_criterion(output, target)
-        #!================================================================
+        
 
 
         for loss_key in losses.keys():
@@ -700,12 +825,21 @@ def compute_hungarian_loss(end_points, num_decoder_layers, set_criterion,
         if 'proj_tokens' in end_points:
             loss_contrastive_align += losses['loss_contrastive_align']
 
-    if 'seeds_obj_cls_logits' in end_points.keys():
+
+    #!================================================================
+    if "ref_query_points_sample_inds" in end_points.keys():
+        query_points_generation_loss, end_points =compute_kps_loss(end_points, query_points_obj_topk)
+
+    elif 'seeds_obj_cls_logits' in end_points.keys():
         query_points_generation_loss = compute_points_obj_cls_loss_hard_topk(
             end_points, query_points_obj_topk
         )
     else:
-        query_points_generation_loss = 0.0
+        query_points_generation_loss = 0.0    
+
+    #!================================================================
+
+
 
     # loss
     loss = (

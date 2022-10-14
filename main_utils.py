@@ -45,6 +45,12 @@ from IPython import embed
 
 from collections import OrderedDict
 
+
+#*=====================================
+from signal import signal, SIGPIPE, SIG_DFL, SIG_IGN
+signal(SIGPIPE, SIG_IGN)
+#*=====================================
+
 '''
 description:  将分布式存储的模型转正常model
 param {*} model
@@ -165,6 +171,11 @@ def parse_option():
 
     parser.add_argument('--labeled_ratio', default=0.2, type=float,help=' labeled datasets ratio ')
     parser.add_argument('--rampup_length', type=float, default=None, help='rampup_length')
+    
+
+
+    parser.add_argument('--use-tkps',action='store_true', help="use-tkps")
+
 
 
     args, _ = parser.parse_known_args()

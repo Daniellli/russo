@@ -1,7 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-08-21 19:15:53
- # @LastEditTime: 2022-10-13 21:50:08
+ # @LastEditTime: 2022-10-14 10:39:41
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/train_test_cls.sh
@@ -17,25 +17,25 @@ export PYTHONWARNINGS='ignore:semaphore_tracker:UserWarning'
 #!  To train on multiple datasets, e.g. on SR3D and NR3D simultaneously, set --TRAIN_DATASET sr3d nr3d.
 
 # train_data="sr3d nr3d scanrefer scannet sr3d+"
-train_data=sr3d
-test_data=sr3d
+train_data=nr3d
+test_data=nr3d
 DATA_ROOT=datasets/
 
 # gpu_ids="0,2,3,4,6,7,9"
 # gpu_num=7
 # b_size=12
 
-# gpu_ids="0,1,2,3,4,5,6,7"
-# gpu_num=8
-# b_size=8
+gpu_ids="1,2,3,4,5,6,7"
+gpu_num=7
+b_size=8
 
 # gpu_ids="0,1,2,3"
 # gpu_num=4
 # b_size=44
 
-gpu_ids="1,2,3"
-gpu_num=3;
-b_size=20;
+# gpu_ids="1,2,3"
+# gpu_num=3;
+# b_size=20;
 port=29522
 
 
@@ -73,22 +73,22 @@ save_freq=100;
 #* for  semi supervision architecture  : step2
 # b_size='2,14';
 b_size='8,4';
-resume_mode_path="pretrain/pretrain_ramdom%20anno_41.pth"
-# resume_mode_path="pretrain/pretrain_random%20anno_3384_nr3d.pth"
+# resume_mode_path="pretrain/pretrain_ramdom%20anno_41.pth"
+resume_mode_path="pretrain/pretrain_random%20anno_3384_nr3d.pth"
 
 #* for not mask 
-size_consistency_weight=1e-3;
-center_consistency_weight=1e-2;
-token_consistency_weight=1;
-query_consistency_weight=1;
-text_consistency_weight=1;
+size_consistency_weight=1e-5;
+center_consistency_weight=1e-4;
+token_consistency_weight=1e-2;
+query_consistency_weight=1e-2;
+text_consistency_weight=1e-2;
 
 #* for mask , 
 # size_consistency_weight=1e-2;
 # center_consistency_weight=1e-3; 
 # token_consistency_weight=1;
 
-rampup_length=30;
+rampup_length=200;
 
 
 TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \

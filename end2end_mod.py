@@ -1,3 +1,12 @@
+'''
+Author: xushaocong
+Date: 2022-10-13 22:50:36
+LastEditTime: 2022-10-14 18:18:13
+LastEditors: xushaocong
+Description: 
+FilePath: /butd_detr/end2end_mod.py
+email: xushaocong@stu.xmu.edu.cn
+'''
 # ------------------------------------------------------------------------
 # BEAUTY DETR
 # Copyright (c) 2022 Ayush Jain & Nikolaos Gkanatsios
@@ -19,8 +28,10 @@ import torch.distributed as dist
 from main_utils import parse_option, BaseTrainTester
 from data.model_util_scannet import ScannetDatasetConfig
 from src.joint_det_dataset import Joint3DDataset
+from src.join_dataset import JointDataset
 from src.grounding_evaluator import GroundingEvaluator, GroundingGTEvaluator
 from models import BeaUTyDETR
+from models import BeaUTyDETRTKPS
 from models import APCalculator, parse_predictions, parse_groundtruths
 
 
@@ -132,7 +143,7 @@ class TrainTester(BaseTrainTester):
             num_class = 19
 
 
-        model = BeaUTyDETR(
+        model = BeaUTyDETRTKPS(
             num_class=num_class,
             num_obj_class=485,
             input_feature_dim=num_input_channel,
@@ -142,8 +153,11 @@ class TrainTester(BaseTrainTester):
             contrastive_align_loss=args.use_contrastive_align,
             butd=args.butd or args.butd_gt or args.butd_cls, #* 是否使用gt来负责这个visual grounding 而不是 detected bbox 
             pointnet_ckpt=args.pp_checkpoint,  #* pretrained model
-            self_attend=args.self_attend
+            self_attend=args.self_attend,
+            use_tkps=args.use_tkps,
         )
+
+        
 
         return model
 

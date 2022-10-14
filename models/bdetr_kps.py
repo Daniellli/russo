@@ -1,3 +1,12 @@
+'''
+Author: xushaocong
+Date: 2022-10-13 23:08:56
+LastEditTime: 2022-10-14 18:17:32
+LastEditors: xushaocong
+Description: 
+FilePath: /butd_detr/models/bdetr_kps.py
+email: xushaocong@stu.xmu.edu.cn
+'''
 # ------------------------------------------------------------------------
 # BEAUTY DETR
 # Copyright (c) 2022 Ayush Jain & Nikolaos Gkanatsios
@@ -34,7 +43,7 @@ from IPython import embed
 
 from models.sample_model import SamplingModule
 
-class BeaUTyDETR(nn.Module):
+class BeaUTyDETRTKPS(nn.Module):
     """
     3D language grounder.
 
@@ -58,7 +67,7 @@ class BeaUTyDETR(nn.Module):
                  num_decoder_layers=6, self_position_embedding='loc_learned',
                  contrastive_align_loss=True,
                  d_model=288, butd=True, pointnet_ckpt=None,
-                 self_attend=True):
+                 self_attend=True,use_tkps=True):
         """Initialize layers."""
         super().__init__()
 
@@ -79,27 +88,18 @@ class BeaUTyDETR(nn.Module):
         
         
         if input_feature_dim == 3 and pointnet_ckpt is not None:
-            #!================================= 
-            #* 显存垃圾
-            # self.backbone_net.load_state_dict(torch.load(
-            #     pointnet_ckpt
-            # ), strict=False)
             self.backbone_net.load_state_dict(torch.load(
                 pointnet_ckpt,map_location=torch.device('cpu')
             ), strict=False)
-            #!=================================
+            
         
 
 
 
         # Text Encoder
-        #*!=============================
         model_path=osp.join(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__))))),'.cache/huggingface/transformers/roberta')
-        # model_path = "/data/xusc/.cache/huggingface/transformers/roberta"
         self.tokenizer = RobertaTokenizerFast.from_pretrained(model_path)
-        # self.tokenizer = AutoTokenizer.from_pretrained(model_path)
         self.text_encoder = RobertaModel.from_pretrained(model_path)
-        #*!=============================
         
         
         for param in self.text_encoder.parameters():
@@ -110,6 +110,8 @@ class BeaUTyDETR(nn.Module):
             nn.LayerNorm(d_model, eps=1e-12),
             nn.Dropout(0.1)
         )
+
+ 
 
         # Box encoder
         if self.butd:
@@ -132,12 +134,26 @@ class BeaUTyDETR(nn.Module):
         )
         self.cross_encoder = BiEncoder(bi_layer, 3)
 
-        
-        # Query initialization
-        self.points_obj_cls = PointsObjClsModule(d_model)
-        self.gsample_module = GeneralSamplingModule()
-        self.decoder_query_proj = nn.Conv1d(d_model, d_model, kernel_size=1)
 
+        #!+===============================================
+        #* Query initialization
+        self.use_tkps = use_tkps
+        if use_tkps:
+            sampling_method = 'kpsa-lang-filter'
+            self.sampling_module = SamplingModule(
+                sampling_method = sampling_method,
+                num_proposal = num_queries,#* 256
+                feat_dim=d_model,#* 288 
+                lang_dim=self.text_encoder.config.hidden_size, 
+            )
+        else:
+            self.points_obj_cls = PointsObjClsModule(d_model)
+            self.gsample_module = GeneralSamplingModule()
+
+        #!=====================================================
+
+
+        self.decoder_query_proj = nn.Conv1d(d_model, d_model, kernel_size=1)
         # Proposal (layer for size and center)
         self.proposal_head = ClsAgnosticPredictHead(
             num_class, 1, num_queries, d_model,
@@ -185,12 +201,13 @@ class BeaUTyDETR(nn.Module):
 
     def _run_backbones(self, inputs):
         """Run visual and text backbones."""
-        # Visual encoder
+        #* Visual encoder
         end_points = self.backbone_net(inputs['point_clouds'], end_points={})
-        end_points['seed_inds'] = end_points['fp2_inds']
-        end_points['seed_xyz'] = end_points['fp2_xyz']
-        end_points['seed_features'] = end_points['fp2_features']
-        # Text encoder
+        
+
+
+        
+        #* Text encoder
         tokenized = self.tokenizer.batch_encode_plus(
             inputs['text'], padding="longest", return_tensors="pt"
         ).to(inputs['point_clouds'].device)
@@ -202,6 +219,23 @@ class BeaUTyDETR(nn.Module):
         end_points['text_feats'] = text_feats
         end_points['text_attention_mask'] = text_attention_mask
         end_points['tokenized'] = tokenized
+
+        #!+========================= for keypoint sampling 
+        end_points['lang_hidden'] = encoded_text.pooler_output
+
+        #* Visual encoder2 
+        
+        end_points['seed_inds'] = end_points['fp2_inds']
+        end_points['seed_xyz'] = end_points['fp2_xyz']
+        end_points['seed_features'] = end_points['fp2_features']
+        #* xyz : [B,512,3], 
+        #*  features:[B,C,512]
+        # end_points, points_xyz, points_features  = self.sampling_module(end_points['fp2_xyz'],end_points['fp2_features'],end_points)
+        # end_points['seed_inds'] = end_points['fp2_inds']
+        # end_points['seed_xyz'] = points_xyz
+        # end_points['seed_features'] = points_features
+        #!+====================
+
         return end_points
 
     def _generate_queries(self, xyz, features, end_points):
@@ -218,6 +252,7 @@ class BeaUTyDETR(nn.Module):
         end_points['query_points_xyz'] = xyz  # (B, V, 3)
         end_points['query_points_feature'] = features  # (B, F, V)
         end_points['query_points_sample_inds'] = sample_inds  # (B, V)
+       
         return end_points
 
     def forward(self, inputs):
@@ -237,12 +272,12 @@ class BeaUTyDETR(nn.Module):
             end_points: dict
         """
         # Within-modality encoding
-        end_points = self._run_backbones(inputs)#* 点云, text feature, bbox feature pass through backbone 
+        end_points = self._run_backbones(inputs)#* pc 过pointnet2 , utterance 过 roberta 
         points_xyz = end_points['fp2_xyz']  #* (B, points, 3)
         points_features = end_points['fp2_features']  #* (B, F, points)
         text_feats = end_points['text_feats']  #* (B, L, F)
         text_padding_mask = end_points['text_attention_mask']  #* (B, L)
-        
+        # end_points['tokenized']['input_ids']
         # Box encoding
         if self.butd:#* encode  box  and box class 
             # attend on those features
@@ -252,7 +287,7 @@ class BeaUTyDETR(nn.Module):
                 self.class_embeddings(self.butd_class_embeddings(
                     inputs['det_class_ids']
                 )).transpose(1, 2)  # 92.5, 84.9
-            ], 1).transpose(1, 2).contiguous()
+            ], 1).transpose(1, 2).contiguous()            
         else:
             detected_mask = None
             detected_feats = None
@@ -271,10 +306,7 @@ class BeaUTyDETR(nn.Module):
             detected_mask=detected_mask #*   box mask 
         )
 
-        
-
-        points_features = points_features.transpose(1, 2)
-        points_features = points_features.contiguous()  # (B, F, points) #* 只提取了 bbox 区域的feature?  
+        points_features = points_features.transpose(1, 2).contiguous()  # (B, F, points) #* 只提取了 bbox 区域的feature?  
         end_points["text_memory"] = text_feats
         end_points['seed_features'] = points_features 
         if self.contrastive_align_loss: #* 提取token表征,    为了和后面的query 计算 constrastive loss , 也就是拉近配对的token and query distance 
@@ -284,17 +316,29 @@ class BeaUTyDETR(nn.Module):
             end_points['proj_tokens'] = proj_tokens
 
         #* Query Points Generation,  一个sentence 最有有256 个query与之对应, 所以这个的query是 256, B = 2 
-        end_points = self._generate_queries(
-            points_xyz, points_features, end_points
-        )
-        cluster_feature = end_points['query_points_feature']  #* (B, F, V) == (batch_size, feature_channel_num,  query_vector_len)
-        cluster_xyz = end_points['query_points_xyz']  # (B, V, 3)
-        query = self.decoder_query_proj(cluster_feature)
-        query = query.transpose(1, 2).contiguous()  # (B, V, F)
+        #!==============================================================
+        if self.use_tkps:
+            end_points, cluster_xyz, cluster_feature  = self.sampling_module(
+                points_xyz, points_features, end_points
+            )
+        else :
+            end_points = self._generate_queries(
+                points_xyz, points_features, end_points
+            )
+            cluster_feature = end_points['query_points_feature']  #* (B, F, V) == (batch_size, feature_channel_num,  query_vector_len)
+            cluster_xyz = end_points['query_points_xyz']  # (B, V, 3)
+        #!==============================================================
+
+
+
+        query = self.decoder_query_proj(cluster_feature).transpose(1, 2).contiguous()  # (B, V, F)
+
         if self.contrastive_align_loss:
             end_points['proposal_proj_queries'] = F.normalize(
                 self.contrastive_align_projection_image(query), p=2, dim=-1
             )
+
+
         #*  query 数量是固定256 , token 数量是根据utterence 来定的 ,可能几十可能上百
         #* Proposals (one for each query) , 这些是proposed box ,  就是该utterence 下指定的 目标bbox proposal , 在过一个Hunagrian match 就能得到 配对后的 真的proposal 了
         proposal_center, proposal_size = self.proposal_head(
@@ -303,6 +347,7 @@ class BeaUTyDETR(nn.Module):
             end_points=end_points,
             prefix='proposal_'
         )
+        
         base_xyz = proposal_center.detach().clone()  # (B, V, 3) 
         base_size = proposal_size.detach().clone()  # (B, V, 3)
         query_mask = None#? 这是做什么用的? 
