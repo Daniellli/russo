@@ -1,7 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-14 16:25:42
- # @LastEditTime: 2022-10-14 17:31:48
+ # @LastEditTime: 2022-10-14 18:10:42
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/end2end_train.sh
@@ -29,14 +29,14 @@ DATA_ROOT=datasets/
 
 gpu_ids="1,2,3"
 gpu_num=3;
-b_size=16;
+b_size=8;
 
 
 port=29526
-labeled_ratio=0.2;
+# labeled_ratio=0.2;
 save_freq=5;
 val_freq=5;
-print_freq=1;
+print_freq=100;
 
 # train_dist_mod.py
 #* for  semi supervision architecture  : step1 
@@ -55,11 +55,13 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --pp_checkpoint $DATA_ROOT/gf_detector_l6o256.pth \
     --butd_cls --self_attend \
     --max_epoch 400 \
-    --dbeug \
+    --use-tkps \
     2>&1 | tee -a logs/train_test_cls.log
-
+    
+# --dbeug \
 # --consistency_weight 1e-4 \
 # --upload-wandb \
+
 
 
    

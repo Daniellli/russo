@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-13 22:50:36
-LastEditTime: 2022-10-13 23:17:07
+LastEditTime: 2022-10-14 18:18:13
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/end2end_mod.py
@@ -153,8 +153,11 @@ class TrainTester(BaseTrainTester):
             contrastive_align_loss=args.use_contrastive_align,
             butd=args.butd or args.butd_gt or args.butd_cls, #* 是否使用gt来负责这个visual grounding 而不是 detected bbox 
             pointnet_ckpt=args.pp_checkpoint,  #* pretrained model
-            self_attend=args.self_attend
+            self_attend=args.self_attend,
+            use_tkps=args.use_tkps,
         )
+
+        
 
         return model
 

@@ -164,9 +164,10 @@ def parse_option():
 
     parser.add_argument('--consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
     parser.add_argument('--rampup_length', type=float, default=None, help='rampup_length')
-
-
     parser.add_argument('--labeled_ratio', default=0.2, type=float,help=' labeled datasets ratio ')
+
+
+    parser.add_argument('--use-tkps',action='store_true', help="use-tkps")
 
 
 

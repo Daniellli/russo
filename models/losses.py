@@ -313,15 +313,8 @@ def compute_kps_loss(data_dict, topk):
     if 'kps_ref_score' in data_dict.keys() and use_ref_score_loss:
         #*====================================
         #* data_dict['point_instance_label'] : 不太一样, 这个point_instance_label 有多个 target 
-        #*BUTD DETR :  Assign each point to a GT object, 
-        # point_instance_label = data_dict['point_instance_label']  # B, num_points
-        # obj_assignment = torch.gather(point_instance_label, 1, seed_inds)  # B, K
-        # obj_assignment[obj_assignment < 0] = G - 1  # bg points to last gt
-        # obj_assignment_one_hot = torch.zeros((B, K, G)).to(seed_xyz.device)
-        # obj_assignment_one_hot.scatter_(2, obj_assignment.unsqueeze(-1), 1)
         #*====================================
-
-        # point_ref_mask = data_dict['point_ref_mask'] #* 每个sample 默认只有一个目标
+        # point_ref_mask = data_dict['point_ref_mask'] #* 3D SPS 每个sample 默认只有一个目标 by default
 
         point_ref_mask = data_dict['point_instance_label'] #! error
         point_ref_mask = (point_ref_mask!=-1)*1 #* -1 表示背景, 其他都表示referred target
@@ -817,12 +810,11 @@ def compute_hungarian_loss(end_points, num_decoder_layers, set_criterion,
         
 
         # Compute all the requested losses
-        #!================================================================
         if DEBUG:
             losses = compute_loss_and_save_match_res_(output, target,set_criterion,end_points['scan_ids'],prefix)
         else :
             losses, _ = set_criterion(output, target)
-        #!================================================================
+        
 
 
         for loss_key in losses.keys():
@@ -832,16 +824,21 @@ def compute_hungarian_loss(end_points, num_decoder_layers, set_criterion,
         loss_giou += losses.get('loss_giou', 0)
         if 'proj_tokens' in end_points:
             loss_contrastive_align += losses['loss_contrastive_align']
-    #!================================================================
-    # if 'seeds_obj_cls_logits' in end_points.keys():
-    #     query_points_generation_loss = compute_points_obj_cls_loss_hard_topk(
-    #         end_points, query_points_obj_topk
-    #     )
-    # else:
-    #     query_points_generation_loss = 0.0
 
-    query_points_generation_loss, end_points =compute_kps_loss(end_points, query_points_obj_topk)
+
     #!================================================================
+    if "ref_query_points_sample_inds" in end_points.keys():
+        query_points_generation_loss, end_points =compute_kps_loss(end_points, query_points_obj_topk)
+
+    elif 'seeds_obj_cls_logits' in end_points.keys():
+        query_points_generation_loss = compute_points_obj_cls_loss_hard_topk(
+            end_points, query_points_obj_topk
+        )
+    else:
+        query_points_generation_loss = 0.0    
+
+    #!================================================================
+
 
 
     # loss

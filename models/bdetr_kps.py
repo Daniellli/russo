@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-13 23:08:56
-LastEditTime: 2022-10-14 17:05:57
+LastEditTime: 2022-10-14 18:17:32
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/models/bdetr_kps.py
@@ -67,7 +67,7 @@ class BeaUTyDETRTKPS(nn.Module):
                  num_decoder_layers=6, self_position_embedding='loc_learned',
                  contrastive_align_loss=True,
                  d_model=288, butd=True, pointnet_ckpt=None,
-                 self_attend=True):
+                 self_attend=True,use_tkps=True):
         """Initialize layers."""
         super().__init__()
 
@@ -111,16 +111,7 @@ class BeaUTyDETRTKPS(nn.Module):
             nn.Dropout(0.1)
         )
 
-        #!+===============================================
-        # self.eot_feat_projection = nn.Linear(768, 288) #* do i need to project this feature ? 
-        sampling_method = 'kpsa-lang-filter'
-        self.sampling_module = SamplingModule(
-            sampling_method = sampling_method,
-            num_proposal = num_queries,#* 256
-            feat_dim=d_model,#* 288 
-            lang_dim=self.text_encoder.config.hidden_size, 
-        )
-        #!+===============================================
+ 
 
         # Box encoder
         if self.butd:
@@ -143,15 +134,26 @@ class BeaUTyDETRTKPS(nn.Module):
         )
         self.cross_encoder = BiEncoder(bi_layer, 3)
 
-        
-        # Query initialization
-        #!=====================================================
-        #* replaced by text-guided keypoints sampling 
-        # self.points_obj_cls = PointsObjClsModule(d_model)
-        # self.gsample_module = GeneralSamplingModule()
-        #!=====================================================
-        self.decoder_query_proj = nn.Conv1d(d_model, d_model, kernel_size=1)
 
+        #!+===============================================
+        #* Query initialization
+        self.use_tkps = use_tkps
+        if use_tkps:
+            sampling_method = 'kpsa-lang-filter'
+            self.sampling_module = SamplingModule(
+                sampling_method = sampling_method,
+                num_proposal = num_queries,#* 256
+                feat_dim=d_model,#* 288 
+                lang_dim=self.text_encoder.config.hidden_size, 
+            )
+        else:
+            self.points_obj_cls = PointsObjClsModule(d_model)
+            self.gsample_module = GeneralSamplingModule()
+
+        #!=====================================================
+
+
+        self.decoder_query_proj = nn.Conv1d(d_model, d_model, kernel_size=1)
         # Proposal (layer for size and center)
         self.proposal_head = ClsAgnosticPredictHead(
             num_class, 1, num_queries, d_model,
@@ -234,8 +236,6 @@ class BeaUTyDETRTKPS(nn.Module):
         # end_points['seed_features'] = points_features
         #!+====================
 
-
-
         return end_points
 
     def _generate_queries(self, xyz, features, end_points):
@@ -317,16 +317,16 @@ class BeaUTyDETRTKPS(nn.Module):
 
         #* Query Points Generation,  一个sentence 最有有256 个query与之对应, 所以这个的query是 256, B = 2 
         #!==============================================================
-        # end_points = self._generate_queries(
-        #     points_xyz, points_features, end_points
-        # )
-        # cluster_feature = end_points['query_points_feature']  #* (B, F, V) == (batch_size, feature_channel_num,  query_vector_len)
-        # cluster_xyz = end_points['query_points_xyz']  # (B, V, 3)
-
-        
-        end_points, cluster_xyz, cluster_feature  = self.sampling_module(
-            points_xyz, points_features, end_points
-        )
+        if self.use_tkps:
+            end_points, cluster_xyz, cluster_feature  = self.sampling_module(
+                points_xyz, points_features, end_points
+            )
+        else :
+            end_points = self._generate_queries(
+                points_xyz, points_features, end_points
+            )
+            cluster_feature = end_points['query_points_feature']  #* (B, F, V) == (batch_size, feature_channel_num,  query_vector_len)
+            cluster_xyz = end_points['query_points_xyz']  # (B, V, 3)
         #!==============================================================
 
 
