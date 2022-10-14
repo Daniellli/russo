@@ -128,7 +128,7 @@ class BeaUTyDETR(nn.Module):
             self_attend_lang=self_attend, self_attend_vis=self_attend,
             use_butd_enc_attn=butd
         )
-        self.cross_encoder = BiEncoder(bi_layer, 3)
+        self.cross_encoder = BiEncoder(bi_layer, 3)#* why 3?
 
         
         # Query initialization
@@ -137,7 +137,7 @@ class BeaUTyDETR(nn.Module):
         self.decoder_query_proj = nn.Conv1d(d_model, d_model, kernel_size=1)
 
         # Proposal (layer for size and center)
-        self.proposal_head = ClsAgnosticPredictHead(
+        self.proposal_head = ClsAgnosticPredictHead( #* 3D SPS 也有
             num_class, 1, num_queries, d_model,
             objectness=False, heading=False,
             compute_sem_scores=True
@@ -185,7 +185,7 @@ class BeaUTyDETR(nn.Module):
         """Run visual and text backbones."""
         # Visual encoder
         end_points = self.backbone_net(inputs['point_clouds'], end_points={})
-        end_points['seed_inds'] = end_points['fp2_inds']
+        end_points['seed_inds'] = end_points['fp2_inds'] #? index 干嘛用
         end_points['seed_xyz'] = end_points['fp2_xyz']
         end_points['seed_features'] = end_points['fp2_features']
         # Text encoder
@@ -202,6 +202,14 @@ class BeaUTyDETR(nn.Module):
         end_points['tokenized'] = tokenized
         return end_points
 
+    '''
+    description:  跟3DSPS相比, 少了与文本计算相似度 然后再进一步sampliing的步骤
+    param {*} self
+    param {*} xyz
+    param {*} features
+    param {*} end_points
+    return {*}
+    '''
     def _generate_queries(self, xyz, features, end_points):
         # kps sampling
         points_obj_cls_logits = self.points_obj_cls(features)
@@ -282,18 +290,18 @@ class BeaUTyDETR(nn.Module):
             end_points['proj_tokens'] = proj_tokens
 
         #* Query Points Generation,  一个sentence 最有有256 个query与之对应, 所以这个的query是 256, B = 2 
-        end_points = self._generate_queries(
+        end_points = self._generate_queries( 
             points_xyz, points_features, end_points
         )
         cluster_feature = end_points['query_points_feature']  #* (B, F, V) == (batch_size, feature_channel_num,  query_vector_len)
         cluster_xyz = end_points['query_points_xyz']  # (B, V, 3)
-        query = self.decoder_query_proj(cluster_feature)
+        query = self.decoder_query_proj(cluster_feature) #*  1 X 1 convolution filter 
         query = query.transpose(1, 2).contiguous()  # (B, V, F)
         if self.contrastive_align_loss:
             end_points['proposal_proj_queries'] = F.normalize(
                 self.contrastive_align_projection_image(query), p=2, dim=-1
             )
-        #*  query 数量是固定256 , token 数量是根据utterence 来定的 ,可能几十可能上百
+        
         #* Proposals (one for each query) , 这些是proposed box ,  就是该utterence 下指定的 目标bbox proposal , 在过一个Hunagrian match 就能得到 配对后的 真的proposal 了
         proposal_center, proposal_size = self.proposal_head(
             cluster_feature,

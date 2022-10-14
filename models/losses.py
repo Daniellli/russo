@@ -160,32 +160,37 @@ class SigmoidFocalClassificationLoss(nn.Module):
         return loss * weights
 
 
+'''
+description:   
+param {*} end_points
+param {*} topk
+return {*}
+'''
 def compute_points_obj_cls_loss_hard_topk(end_points, topk):
     #!==============================================================
     supervised_mask  = end_points['supervised_mask']
     supervised_inds = torch.nonzero(supervised_mask).squeeze(1).long()
     #!==============================================================
 
-    box_label_mask = end_points['box_label_mask']
-
-    seed_inds = end_points['seed_inds'].long()  # B, K
-    seed_xyz = end_points['seed_xyz']  # B, K, 3
-    seeds_obj_cls_logits = end_points['seeds_obj_cls_logits']  # B, 1, K
+    box_label_mask = end_points['box_label_mask']#* referred target  box  mask ,or the set of anchor object and target object 
+    seed_inds = end_points['seed_inds'].long()  #* B, K
+    seed_xyz = end_points['seed_xyz']  #* B, K, 3
+    seeds_obj_cls_logits = end_points['seeds_obj_cls_logits']  #* B, 1, K, 
 
     gt_center = end_points['center_label'][:, :, :3]  # B, G, 3
     gt_size = end_points['size_gts'][:, :, :3]  # B, G, 3
-    B = gt_center.shape[0]  # batch size
-    K = seed_xyz.shape[1]  # number if points from p++ output
-    G = gt_center.shape[1]  # number of gt boxes (with padding)
+    B = gt_center.shape[0]  #* batch size
+    K = seed_xyz.shape[1]  #* number if points from p++ output
+    G = gt_center.shape[1]  #* number of gt boxes (with padding)
 
-    # Assign each point to a GT object
-    point_instance_label = end_points['point_instance_label']  # B, num_points
-    obj_assignment = torch.gather(point_instance_label, 1, seed_inds)  # B, K
-    obj_assignment[obj_assignment < 0] = G - 1  # bg points to last gt
-    obj_assignment_one_hot = torch.zeros((B, K, G)).to(seed_xyz.device)
-    obj_assignment_one_hot.scatter_(2, obj_assignment.unsqueeze(-1), 1)
+    #* Assign each point to a GT object, GT object mean referred gt object  
+    point_instance_label = end_points['point_instance_label']  #* B, num_points, for referred target  box  mask  or the set of anchor object and target object ,不是目标点的会被赋予-1 ,  如果是目标的会被赋予对应目标的index
+    obj_assignment = torch.gather(point_instance_label, 1, seed_inds)  #* B, K; 根据pointnet++输出的point index 将对应的点取出来 ,     
+    obj_assignment[obj_assignment < 0] = G - 1  #* bg points to last gt #* bg 赋予 G-1 的值, 也就是 box index range的最后一个值
+    obj_assignment_one_hot = torch.zeros((B, K, G)).to(seed_xyz.device) 
+    obj_assignment_one_hot.scatter_(2, obj_assignment.unsqueeze(-1), 1) #* 将与obj_assignment对应位置的元素对应的 obj_assignment_one_hot位置赋予1 
 
-    # Normalized distances of points and gt centroids
+    # *Normalized distances of points and gt centroids;计算 pointnet++ 输出的点的xyz 与gt center之间的欧式距离,   
     delta_xyz = seed_xyz.unsqueeze(2) - gt_center.unsqueeze(1)  # (B, K, G, 3)
     delta_xyz = delta_xyz / (gt_size.unsqueeze(1) + 1e-6)  # (B, K, G, 3)
     new_dist = torch.sum(delta_xyz ** 2, dim=-1)
@@ -196,7 +201,7 @@ def compute_points_obj_cls_loss_hard_topk(end_points, topk):
     )  # BxKxG
     euclidean_dist1 = euclidean_dist1.transpose(1, 2).contiguous()  # BxGxK
 
-    # Find the points that lie closest to each gt centroid
+    #* Find the points that lie closest to each gt centroid
     topk_inds = (
         torch.topk(euclidean_dist1, topk, largest=False)[1]
         * box_label_mask[:, :, None]
@@ -210,14 +215,14 @@ def compute_points_obj_cls_loss_hard_topk(end_points, topk):
         topk_inds
     ], -1).view(-1, 2).contiguous()
 
-    # Topk points closest to each centroid are marked as true objects
+    #* Topk points closest to each centroid are marked as true objects, 与质心最近的topk个目标标记为true object 
     objectness_label = torch.zeros((B, K + 1)).long().to(seed_xyz.device)
     objectness_label[batch_topk_inds[:, 0], batch_topk_inds[:, 1]] = 1
     objectness_label = objectness_label[:, :K]
     objectness_label_mask = torch.gather(point_instance_label, 1, seed_inds)
     objectness_label[objectness_label_mask < 0] = 0
 
-    # Compute objectness loss
+    #* Compute objectness loss,  计算seeds_obj_cls_logits 和true object 之间的focal loss
     criterion = SigmoidFocalClassificationLoss()
     cls_weights = (objectness_label >= 0).float()
     cls_normalizer = cls_weights.sum(dim=1, keepdim=True).float()
@@ -700,7 +705,7 @@ def compute_hungarian_loss(end_points, num_decoder_layers, set_criterion,
         if 'proj_tokens' in end_points:
             loss_contrastive_align += losses['loss_contrastive_align']
 
-    if 'seeds_obj_cls_logits' in end_points.keys():
+    if 'seeds_obj_cls_logits' in end_points.keys(): #? 就是 最初的proposal 的 类别loss ?  这个需要换成3D SPS 的loss
         query_points_generation_loss = compute_points_obj_cls_loss_hard_topk(
             end_points, query_points_obj_topk
         )

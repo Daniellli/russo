@@ -83,7 +83,7 @@ class CrossAttentionLayer(nn.Module):
         # produce key, query, value for text
         qt = kt = vt = text_feats
 
-        # cross attend language to vision
+        #* cross attend language to vision
         text_feats2 = self.cross_lv(
             query=qt.transpose(0, 1),
             key=kv.transpose(0, 1),
@@ -95,7 +95,7 @@ class CrossAttentionLayer(nn.Module):
         text_feats = self.norm_lv(text_feats)
         text_feats = self.norm_lv2(text_feats + self.ffn_lv(text_feats))
 
-        # cross attend vision to language
+        #* cross attend vision to language
         vis_feats2 = self.cross_vl(
             query=qv.transpose(0, 1),
             key=kt.transpose(0, 1),
@@ -106,7 +106,7 @@ class CrossAttentionLayer(nn.Module):
         vis_feats = vis_feats + self.dropout_vl(vis_feats2)
         vis_feats = self.norm_vl(vis_feats)
 
-        # cross attend vision to boxes
+        #* cross attend vision to boxes,用box feature 重构visual feature 
         if detected_feats is not None and self.use_butd_enc_attn:
             vis_feats2 = self.cross_d(
                 query=vis_feats.transpose(0, 1),
@@ -198,7 +198,7 @@ class BiEncoderLayer(nn.Module):
 
         # self attention in language
         if self_attend_lang:
-            self.self_attention_lang = TransformerEncoderLayerNoFFN(
+            self.self_attention_lang = TransformerEncoderLayerNoFFN(#* 只有self attention, 没有FFN, 
                 d_model=d_model,
                 nhead=n_heads,
                 dropout=dropout
@@ -208,7 +208,7 @@ class BiEncoderLayer(nn.Module):
 
         # self attention in vision
         if self_attend_vis:
-            self.self_attention_visual = PosTransformerEncoderLayerNoFFN(
+            self.self_attention_visual = PosTransformerEncoderLayerNoFFN(#* 只有self attention, 没有FFN, 但query 带有position embedding 
                 d_model=d_model,
                 nhead=n_heads,
                 dropout=dropout
@@ -228,7 +228,7 @@ class BiEncoderLayer(nn.Module):
         """Forward pass, feats (B, N, F), masks (B, N), diff N for V/L."""
         # Self attention for image
         if self.self_attention_visual is not None:
-            vis_feats = self.self_attention_visual(
+            vis_feats = self.self_attention_visual( 
                 vis_feats.transpose(0, 1),
                 pos_feats.transpose(0, 1),
                 src_key_padding_mask=padding_mask
