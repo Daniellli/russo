@@ -164,13 +164,6 @@ def parse_option():
 
 
 
-
-
-    
-    
-
-    
-
     args, _ = parser.parse_known_args()
 
     args.eval = args.eval or args.eval_train
