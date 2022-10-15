@@ -45,6 +45,12 @@ from IPython import embed
 
 from collections import OrderedDict
 
+
+#*=====================================
+from signal import signal, SIGPIPE, SIG_DFL, SIG_IGN
+signal(SIGPIPE, SIG_IGN)
+#*=====================================
+
 '''
 description:  将分布式存储的模型转正常model
 param {*} model
@@ -165,6 +171,11 @@ def parse_option():
 
     parser.add_argument('--labeled_ratio', default=0.2, type=float,help=' labeled datasets ratio ')
     parser.add_argument('--rampup_length', type=float, default=None, help='rampup_length')
+    
+
+
+    parser.add_argument('--use-tkps',action='store_true', help="use-tkps")
+
 
 
     args, _ = parser.parse_known_args()
@@ -402,6 +413,7 @@ class BaseTrainTester:
 
         # Get scheduler
         scheduler = get_scheduler(optimizer, len(train_loader), args)
+        
 
         # Move model to devices
         if torch.cuda.is_available():
@@ -419,6 +431,14 @@ class BaseTrainTester:
         if args.checkpoint_path:
             assert os.path.isfile(args.checkpoint_path)
             load_checkpoint(args, model, optimizer, scheduler)
+
+            #!=========================================
+            #* 将milestone的第一个元素 也就是lr decay 提前到之后的第一个epoch
+            
+            tmp = {(args.start_epoch+1 ) * len(train_loader):1 }
+            tmp.update({ k:v for  idx, (k,v) in enumerate(scheduler.milestones.items()) if idx != 0})
+            scheduler.milestones = tmp
+            #!=========================================
 
         # Just eval and end execution
         if args.eval:
@@ -579,6 +599,9 @@ class BaseTrainTester:
             optimizer.step()
             scheduler.step()
 
+             
+            
+
             # Accumulate statistics and print out
             stat_dict = self._accumulate_stats(stat_dict, end_points)
 
@@ -596,6 +619,10 @@ class BaseTrainTester:
 
                 for key in sorted(stat_dict.keys()):
                     stat_dict[key] = 0
+
+                #!==============================================
+                logger.warning(f"epoch : {epoch} ,  lr : {scheduler.get_lr()[0]}")
+                #!==============================================
 
     
 
