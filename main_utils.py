@@ -618,8 +618,10 @@ class BaseTrainTester:
                 logger.warning(f"epoch : {epoch} ,  lr : {scheduler.get_lr()[0]}")
 
                 if args.upload_wandb and args.local_rank==0:
+                    
                     tmp = { f'{key}': round(stat_dict[key] / args.print_freq,4)  for key in sorted(stat_dict.keys()) if 'loss' in key and 'proposal_' not in key and 'last_' not in key and 'head_' not in key }
-                    tmp.update({"lr": {scheduler.get_lr()[0]}})
+                    tmp.update({"lr": scheduler.get_lr()[0]})
+                    
 
                     wandb.log(tmp)
                 
