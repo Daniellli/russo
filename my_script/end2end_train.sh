@@ -1,7 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-14 16:25:42
- # @LastEditTime: 2022-10-16 00:27:27
+ # @LastEditTime: 2022-10-16 00:29:00
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/end2end_train.sh
@@ -36,8 +36,8 @@ port=29526
 # labeled_ratio=0.2;
 save_freq=5;
 val_freq=5;
-# print_freq=100;
-print_freq=1;
+print_freq=100;
+# print_freq=1;
 
 # train_dist_mod.py
 #* for  semi supervision architecture  : step1 
