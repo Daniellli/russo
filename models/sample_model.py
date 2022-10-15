@@ -76,6 +76,10 @@ class SamplingModule(nn.Module):
             data_dict['query_points_feature'] = features  # (batch_size, C, num_proposal)
             data_dict['query_points_sample_inds'] = sample_inds  # (bsz, num_proposal) # should be 0,1,...,num_proposal
             ref_scores = self.match_module(features, data_dict['lang_hidden'], data_dict)#* data_dict['lang_hidden'] : [B, lang_feature_dim]
+
+            
+
+
             ref_scores = torch.sigmoid(ref_scores).squeeze(1)   # [B, N]
             sample_inds = torch.topk(ref_scores, self.num_proposal)[1].int()
             xyz, features, sample_inds = self.gsample_module(xyz, features, sample_inds)
@@ -113,6 +117,7 @@ class MatchModule(nn.Module):
         num_proposal = object_feat.shape[-1]
         lang_feat = lang_feat.unsqueeze(-1).repeat(1, 1, num_proposal)   # [B, C, N]
         features = torch.cat([object_feat, lang_feat], dim=1) #* [B, C, N] , concat along the feature dimension  
+        
         #todo: 直接concat 然后若干个卷机得到 是否是与文本相关的 similarity , 这个可以改进成计算相似度???
         # match 
         confidences = self.match(features)          # [B, 1, N]
