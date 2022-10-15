@@ -584,10 +584,6 @@ class BaseTrainTester:
                 end_points, criterion, set_criterion, args
             )
 
-            #!===================
-            if args.upload_wandb and args.local_rank==0:
-                wandb.log({"loss":loss.clone().detach().item()})
-            #!===================
 
             optimizer.zero_grad()
             loss.backward()
@@ -599,8 +595,6 @@ class BaseTrainTester:
             optimizer.step()
             scheduler.step()
 
-             
-            
 
             # Accumulate statistics and print out
             stat_dict = self._accumulate_stats(stat_dict, end_points)
@@ -620,8 +614,15 @@ class BaseTrainTester:
                 for key in sorted(stat_dict.keys()):
                     stat_dict[key] = 0
 
-                #!==============================================
+                #!===================
                 logger.warning(f"epoch : {epoch} ,  lr : {scheduler.get_lr()[0]}")
+
+                if args.upload_wandb and args.local_rank==0:
+                    tmp = { f'{key}': round(stat_dict[key] / args.print_freq,4)  for key in sorted(stat_dict.keys()) if 'loss' in key and 'proposal_' not in key and 'last_' not in key and 'head_' not in key }
+                    tmp.update({"lr": {scheduler.get_lr()[0]}})
+
+                    wandb.log(tmp)
+                
                 #!==============================================
 
     

@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-13 22:50:36
-LastEditTime: 2022-10-14 18:18:13
+LastEditTime: 2022-10-16 00:10:28
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/end2end_mod.py
@@ -151,7 +151,10 @@ class TrainTester(BaseTrainTester):
             num_decoder_layers=args.num_decoder_layers,
             self_position_embedding=args.self_position_embedding,
             contrastive_align_loss=args.use_contrastive_align,
-            butd=args.butd or args.butd_gt or args.butd_cls, #* 是否使用gt来负责这个visual grounding 而不是 detected bbox 
+            #!+===========
+            # butd=args.butd or args.butd_gt or args.butd_cls, #* 是否使用gt来负责这个visual grounding 而不是 detected bbox 
+            butd=False,#* 不要box stream 
+            #!+===========
             pointnet_ckpt=args.pp_checkpoint,  #* pretrained model
             self_attend=args.self_attend,
             use_tkps=args.use_tkps,

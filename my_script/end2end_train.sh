@@ -1,7 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-14 16:25:42
- # @LastEditTime: 2022-10-14 19:18:12
+ # @LastEditTime: 2022-10-16 00:10:40
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/end2end_train.sh
@@ -19,9 +19,9 @@ DATA_ROOT=datasets/
 # gpu_num=4
 # b_size=12
 
-gpu_ids="1,2,3,4,5,6,7"
-gpu_num=7
-b_size=12
+gpu_ids="0,1,2,3,4,5,6,7"
+gpu_num=8
+b_size=8
 
 # gpu_ids="0,1,2,3"
 # gpu_num=4
