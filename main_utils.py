@@ -611,12 +611,8 @@ class BaseTrainTester:
                     and 'last_' not in key and 'head_' not in key
                 ]))
 
-                for key in sorted(stat_dict.keys()):
-                    stat_dict[key] = 0
-
-                #!===================
+                #!==============================================
                 # logger.warning(f"epoch : {epoch} ,  lr : {scheduler.get_lr()[0]}")
-
                 if args.upload_wandb and args.local_rank==0:
                     
                     tmp = { f'{key}':stat_dict[key] / args.print_freq  for key in sorted(stat_dict.keys()) if 'loss' in key and 'proposal_' not in key and 'last_' not in key and 'head_' not in key }
@@ -624,8 +620,17 @@ class BaseTrainTester:
                     
 
                     wandb.log(tmp)
-                
+
                 #!==============================================
+
+                for key in sorted(stat_dict.keys()):
+                    stat_dict[key] = 0
+
+                
+                
+
+            
+                
 
     
 
