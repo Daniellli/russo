@@ -434,10 +434,9 @@ class BaseTrainTester:
 
             #!=========================================
             #* 将milestone的第一个元素 也就是lr decay 提前到之后的第一个epoch
-            
-            tmp = {(args.start_epoch+1 ) * len(train_loader):1 }
-            tmp.update({ k:v for  idx, (k,v) in enumerate(scheduler.milestones.items()) if idx != 0})
-            scheduler.milestones = tmp
+            # tmp = {(args.start_epoch+1 ) * len(train_loader):1 }
+            # tmp.update({ k:v for  idx, (k,v) in enumerate(scheduler.milestones.items()) if idx != 0})
+            # scheduler.milestones = tmp
             #!=========================================
 
         # Just eval and end execution

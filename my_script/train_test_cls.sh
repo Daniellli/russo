@@ -1,7 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-08-21 19:15:53
- # @LastEditTime: 2022-10-17 12:27:30
+ # @LastEditTime: 2022-10-17 12:35:31
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/train_test_cls.sh
@@ -25,9 +25,9 @@ DATA_ROOT=datasets/
 # gpu_num=7
 # b_size=12
 
-gpu_ids="0,1,2,3,4,5,6,7"
-gpu_num=8
-b_size=8
+gpu_ids="3,4,5,6,7"
+gpu_num=5
+b_size=12
 
 # gpu_ids="0,1,2,3"
 # gpu_num=4
@@ -39,7 +39,7 @@ b_size=8
 port=29522
 
 
-labeled_ratio=0.4;
+labeled_ratio=0.5;
 val_freq=5;
 print_freq=100;
 save_freq=$val_freq;
