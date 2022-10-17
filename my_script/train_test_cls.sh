@@ -1,7 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-08-21 19:15:53
- # @LastEditTime: 2022-10-17 12:35:31
+ # @LastEditTime: 2022-10-17 20:23:58
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/train_test_cls.sh
@@ -61,13 +61,14 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --detect_intermediate --joint_det \
     --use_soft_token_loss --use_contrastive_align \
     --log_dir ./logs/bdetr \
-    --lr_decay_epochs 25 26 \
     --pp_checkpoint $DATA_ROOT/gf_detector_l6o256.pth \
     --butd_cls --self_attend \
     --max_epoch 400 --consistency_weight 1e-4 \
     --upload-wandb \
     --labeled_ratio $labeled_ratio \
     2>&1 | tee -a logs/train_test_cls.log
+
+# --lr_decay_epochs 25 26 \
 
 
 #* for  semi supervision architecture  : step2
