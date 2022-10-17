@@ -1,7 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-14 16:25:42
- # @LastEditTime: 2022-10-16 00:29:00
+ # @LastEditTime: 2022-10-16 10:01:29
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/end2end_train.sh
@@ -19,9 +19,9 @@ DATA_ROOT=datasets/
 # gpu_num=4
 # b_size=12
 
-gpu_ids="0,1,2,3,4,5,6,7"
-gpu_num=8
-b_size=8
+gpu_ids="3,4,5,6,7"
+gpu_num=5
+b_size=12
 
 # gpu_ids="0,1,2,3"
 # gpu_num=4
@@ -55,10 +55,10 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --pp_checkpoint $DATA_ROOT/gf_detector_l6o256.pth \
     --butd_cls --self_attend \
     --max_epoch 400 \
-    --use-tkps \
     --upload-wandb \
     2>&1 | tee -a logs/train_test_cls.log
-
+    
+# --use-tkps \
 
 
 
