@@ -1,7 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-14 16:25:42
- # @LastEditTime: 2022-10-18 22:25:38
+ # @LastEditTime: 2022-10-18 22:28:15
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/end2end_train.sh
@@ -57,12 +57,12 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --butd --self_attend --augment_det \
     --max_epoch 400 \
     --upload-wandb \
+    --use-tkps \
     --checkpoint_path $resume_model \
     --lr_decay_intermediate \
     2>&1 | tee -a logs/train_test_cls.log
 
-# --butd --self_attend --augment_det \
-# --use-tkps \
+
 # --butd_cls --self_attend \
 # --lr_decay_epochs 25 26 \
 # --dbeug \
