@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 21:28:11
-LastEditTime: 2022-10-08 18:24:56
+LastEditTime: 2022-10-17 12:17:07
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/join_dataset.py
@@ -147,14 +147,17 @@ class JointDataset(Dataset):
         elif dset == 'scannet':
             annos  = self.load_scannet_annos()
         elif dset == 'nr3d': 
-            annos = self.load_nr3d_annos()
+            # annos = self.load_nr3d_annos()
+            annos = self.load_nr3d_annos_v2()
+            
         else :
             raise Exception 
 
         if self.overfit:
             annos = annos[:128]
             # annos = annos[:1280]
-
+        logger.info(f"{len(annos) }  annotations   loaded ")
+        
         return annos
 
     def load_sr3dplus_annos(self):
@@ -257,6 +260,97 @@ class JointDataset(Dataset):
                 == anno['target']
                 and ind != anno['target_id']
             ]
+        # Filter out sentences that do not explicitly mention the target class
+        annos = [anno for anno in annos if anno['target'] in anno['utterance']]
+        return annos
+
+    
+    '''
+    description:  根据assignment id 来加载数据集
+    param {*} self
+    return {*}
+    '''
+    def load_nr3d_annos_v2(self):
+        """Load annotations of nr3d."""
+        split = self.split
+        if split == 'val':
+            split = 'test'
+            
+
+        if split== 'train' and self.labeled_ratio is not None:
+            with open(os.path.join('data/meta_data/nr3d_{}_{}.txt'.format(split,self.labeled_ratio)), 'r') as f:
+                assignment_ids = f.read().split('\n')
+            logger.info(f"{len(assignment_ids) } assignments ids  loaded ")
+            assignment_ids = set(assignment_ids)
+
+            with open(self.data_path + 'refer_it_3d/nr3d.csv') as f:
+                csv_reader = csv.reader(f)
+                headers = next(csv_reader)
+                headers = {header: h for h, header in enumerate(headers)}
+                annos = [
+                    {
+                        'scan_id': line[headers['scan_id']],
+                        'target_id': int(line[headers['target_id']]),
+                        'target': line[headers['instance_type']],
+                        'utterance': line[headers['utterance']],
+                        'anchor_ids': [],
+                        'anchors': [],
+                        'dataset': 'nr3d'
+                    }
+                    for line in csv_reader
+                    #!+==================
+                    # if line[headers['scan_id']] in scan_ids
+                    if line[headers['assignmentid']] in assignment_ids
+                    #!+==================
+                    and
+                    str(line[headers['mentions_target_class']]).lower() == 'true'
+                    and
+                    (
+                        str(line[headers['correct_guess']]).lower() == 'true'
+                        or split != 'test'
+                    )
+                ]
+
+        else:
+            with open('data/meta_data/nr3d_%s_scans.txt' % split) as f:
+                scan_ids = set(eval(f.read()))
+
+            with open(self.data_path + 'refer_it_3d/nr3d.csv') as f:
+                csv_reader = csv.reader(f)
+                headers = next(csv_reader)
+                headers = {header: h for h, header in enumerate(headers)}
+                annos = [
+                    {
+                        'scan_id': line[headers['scan_id']],
+                        'target_id': int(line[headers['target_id']]),
+                        'target': line[headers['instance_type']],
+                        'utterance': line[headers['utterance']],
+                        'anchor_ids': [],
+                        'anchors': [],
+                        'dataset': 'nr3d'
+                    }
+                    for line in csv_reader
+                    if line[headers['scan_id']] in scan_ids
+                    and
+                    str(line[headers['mentions_target_class']]).lower() == 'true'
+                    and
+                    (
+                        str(line[headers['correct_guess']]).lower() == 'true'
+                        or split != 'test'
+                    )
+                ]
+
+        # Add distractor info
+        for anno in annos:
+            anno['distractor_ids'] = [
+                ind
+                for ind in
+                range(len(self.scans[anno['scan_id']].three_d_objects))
+                if self.scans[anno['scan_id']].get_object_instance_label(ind)
+                == anno['target']
+                and ind != anno['target_id']
+            ]
+
         # Filter out sentences that do not explicitly mention the target class
         annos = [anno for anno in annos if anno['target'] in anno['utterance']]
         return annos

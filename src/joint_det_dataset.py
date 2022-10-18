@@ -29,7 +29,7 @@ from data.model_util_scannet import ScannetDatasetConfig
 from data.scannet_utils import read_label_mapping
 from src.visual_data_handlers import Scan
 from .scannet_classes import REL_ALIASES, VIEW_DEP_RELS
-
+from loguru import logger 
 NUM_CLASSES = 485
 DC = ScannetDatasetConfig(NUM_CLASSES)
 DC18 = ScannetDatasetConfig(18)
@@ -683,6 +683,10 @@ class Joint3DDataset(Dataset):
         scan = self.scans[anno['scan_id']]
         scan.pc = np.copy(scan.orig_pc)
 
+        #!=================
+        # logger.info(anno['dataset'])
+        #!=================
+
         # Populate anno (used only for scannet)
         self.random_utt = False
         if anno['dataset'] == 'scannet':
@@ -691,6 +695,7 @@ class Joint3DDataset(Dataset):
             utterance = self._create_scannet_utterance(sampled_classes)
             
             # Target ids
+            #? 看不懂??? 
             if not self.random_utt:  # detection18 phrase
                 anno['target_id'] = np.where(np.array([
                     self.label_map18[

@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-13 22:50:36
-LastEditTime: 2022-10-16 00:10:28
+LastEditTime: 2022-10-17 21:45:19
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/end2end_mod.py
@@ -73,7 +73,7 @@ class TrainTester(BaseTrainTester):
     def get_datasets(args):
         """Initialize datasets."""
         dataset_dict = {}  # dict to use multiple datasets
-        for dset in args.dataset:
+        for dset in args.dataset: #* dataset  参数用于指定所有参与训练的集合
             dataset_dict[dset] = 1
 
         if args.joint_det:
@@ -82,7 +82,7 @@ class TrainTester(BaseTrainTester):
         print('Loading datasets:', sorted(list(dataset_dict.keys())))
         train_dataset = Joint3DDataset(
             dataset_dict=dataset_dict,
-            test_dataset=args.test_dataset, #? only test set need ? 
+            test_dataset=args.test_dataset, #* test_datasets  参数用于指定测试集合 
             split='train' if not args.debug else 'val',
             use_color=args.use_color, use_height=args.use_height,
             overfit=args.debug,
@@ -98,7 +98,7 @@ class TrainTester(BaseTrainTester):
         if args.scanrefer_test:
             test_dataset = Joint3DDataset(
                 dataset_dict=dataset_dict,
-                test_dataset=args.test_dataset,
+                test_dataset=args.test_dataset, 
                 split='test', #* load test data 
                 use_color=args.use_color, use_height=args.use_height,
                 overfit=args.debug,

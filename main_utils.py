@@ -464,6 +464,8 @@ class BaseTrainTester:
             os.remove(save_dir)
         #!===============================
         
+
+        logger.info(scheduler.milestones)
         for epoch in range(args.start_epoch, args.max_epoch + 1):
             train_loader.sampler.set_epoch(epoch)
             tic = time.time()
@@ -482,6 +484,7 @@ class BaseTrainTester:
             )
             # save model
             if epoch % args.val_freq == 0:
+                
                 # save_checkpoint(args, epoch, model, optimizer, scheduler)
                 print("Test evaluation.......")
                 #!+==========================================
