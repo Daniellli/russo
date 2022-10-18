@@ -88,6 +88,8 @@ def parse_option():
     parser.add_argument('--detect_intermediate', action='store_true')
     parser.add_argument('--joint_det', action='store_true')
 
+    
+
     # Data
     parser.add_argument('--batch_size', type=int, default=8,
                         help='Batch Size during training')
@@ -175,6 +177,8 @@ def parse_option():
 
 
     parser.add_argument('--use-tkps',action='store_true', help="use-tkps")
+
+    parser.add_argument('--lr_decay_intermediate',action='store_true')
 
 
 
@@ -434,10 +438,13 @@ class BaseTrainTester:
 
             #!=========================================
             #* 将milestone的第一个元素 也就是lr decay 提前到之后的第一个epoch
+            if args.lr_decay_intermediate:    
+                
+                # tmp = {(args.start_epoch+1 ) * len(train_loader):1 }
+                tmp = {scheduler._step_count+len(train_loader):1 } #* 一个epoch 后decay learning rate 
+                tmp.update({ k:v for  idx, (k,v) in enumerate(scheduler.milestones.items()) if idx != 0})
+                scheduler.milestones = tmp
             
-            tmp = {(args.start_epoch+1 ) * len(train_loader):1 }
-            tmp.update({ k:v for  idx, (k,v) in enumerate(scheduler.milestones.items()) if idx != 0})
-            scheduler.milestones = tmp
             #!=========================================
 
         # Just eval and end execution
