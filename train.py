@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-04 19:55:17
-LastEditTime: 2022-10-13 21:30:28
+LastEditTime: 2022-10-19 00:09:38
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/train.py
@@ -248,9 +248,8 @@ class TrainTester(BaseTrainTester):
         if args.joint_det:
             dataset_dict['scannet'] = 10
 
-        labeled_ratio = 0.2
-        
-        logger.info(f"labeled_ratio:{labeled_ratio}")
+        # labeled_ratio = 0.2
+        # logger.info(f"labeled_ratio:{labeled_ratio}")
         print('Loading datasets:', sorted(list(dataset_dict.keys())))
         
         labeled_dataset = JointLabeledDataset(

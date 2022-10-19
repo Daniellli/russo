@@ -138,7 +138,7 @@ class Joint3DDataset(Dataset):
         annos = loaders[dset]()
         if self.overfit:
             # annos = annos[:128]
-            annos = annos[:1280]
+            annos = annos[:128]
         return annos
 
     def load_sr3dplus_annos(self):

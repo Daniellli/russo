@@ -91,16 +91,19 @@ class ARKitSceneDataset(Dataset):
 
         scan_name = self.scan_names[idx]
         scan_dir = os.path.join(self.data_path, scan_name, f"{scan_name}_offline_prepared_data")
+
         mesh_vertices = np.load(os.path.join(scan_dir, f"{scan_name}_pc.npy"))
+        mesh_color = np.load(os.path.join(scan_dir, f"{scan_name}_color.npy"))
+        mesh_vertices= np.concatenate([mesh_vertices,mesh_color],axis=-1)
+
+        
+
         instance_bboxes = np.load(os.path.join(scan_dir, f"{scan_name}_bbox.npy"), allow_pickle=True).item()
     
         # Prepare label containers
         target_bboxes = np.zeros((MAX_NUM_OBJ, 6))
         target_bboxes_mask = np.zeros((MAX_NUM_OBJ))    
         target_bboxes_semcls = np.zeros((MAX_NUM_OBJ))
-        
-        
-            
         
         # TODO: OBB-Guided Scene Axis-Alignment
         angle = np.percentile(instance_bboxes['bboxes'][..., -1] % (np.pi / 2), 50)
@@ -184,10 +187,11 @@ class ARKitSceneDataset(Dataset):
             target_bboxes[:, 0:3] *= scale_ratio
             target_bboxes[:, 3:6] *= scale_ratio
 
+
         
         ret_dict = {
             # Basic
-            "scan_name": scan_name,
+            "scan_ids": scan_name,
             "point_clouds": point_cloud.astype(np.float32),
 
             # Data augmentation
@@ -197,9 +201,18 @@ class ARKitSceneDataset(Dataset):
             "rot_mat": rot_mat.astype(np.float32),
             "scale": np.array(scale_ratio).astype(np.float32),
             # Label
-            "center_label": target_bboxes.astype(np.float32)[:,0:3],
-            "size_label": target_bboxes.astype(np.float32)[:,3:6],
-            "num_gt_boxes": num_gt_boxes.astype(np.int64)
+            "all_bboxes": target_bboxes.astype(np.float32),
+
+            "all_bbox_label_mask":target_bboxes_mask.astype(np.bool8),
+            "all_class_ids": target_bboxes_semcls.astype(np.int64),
+            #!===================
+            "is_view_dep": False,
+            "is_hard": False,
+            "is_unique": False,
+            #!===================
+
+            "num_gt_boxes": num_gt_boxes.astype(np.int64),
+            "supervised_mask":np.array(0).astype(np.int64)
         }
 
 

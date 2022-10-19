@@ -249,7 +249,7 @@ def compute_points_obj_cls_loss_hard_topk(end_points, topk):
 '''
 description:  text-guided keypoint sampling loss
 param {*} data_dict
-param {*} topk
+param {*} topk: 3D SPS: 4 
 param {*} args
 return {*}
 '''
