@@ -1,7 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-08-21 19:15:53
- # @LastEditTime: 2022-10-19 00:07:56
+ # @LastEditTime: 2022-10-19 16:10:27
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/train_test_cls.sh
@@ -73,22 +73,22 @@ save_freq=$val_freq;
 
 #* for  semi supervision architecture  : step2
 # b_size='2,14';
-b_size='8,4';
+b_size='4,8';
 resume_mode_path="pretrain/pretrain_random%50_4814_nr3d_340_step1.pth"
 
 #* for not mask 
-size_consistency_weight=1e-3;
-center_consistency_weight=1e-2;
-token_consistency_weight=1;
-query_consistency_weight=1;
-text_consistency_weight=1e-1;
+size_consistency_weight=1e-5;
+center_consistency_weight=1e-3;
+token_consistency_weight=1e-2;
+query_consistency_weight=1e-2;
+text_consistency_weight=1e-2;
 
 #* for mask , 
 # size_consistency_weight=1e-2;
 # center_consistency_weight=1e-3; 
 # token_consistency_weight=1;
 
-rampup_length=100;
+rampup_length=200;
 epoch=800;
 
 TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
@@ -114,6 +114,7 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --checkpoint_path $resume_mode_path \
     --labeled_ratio $labeled_ratio \
     --rampup_length $rampup_length \
+    --lr_decay_intermediate \
     2>&1 | tee -a logs/train_test_cls.log
 
 

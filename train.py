@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-04 19:55:17
-LastEditTime: 2022-10-19 00:09:38
+LastEditTime: 2022-10-19 16:15:59
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/train.py
@@ -188,6 +188,8 @@ def parse_option():
 
     parser.add_argument('--labeled_ratio', default=0.2, type=float,help=' labeled datasets ratio ')
     parser.add_argument('--rampup_length', type=float, default=None, help='rampup_length')
+
+    parser.add_argument('--lr_decay_intermediate',action='store_true')
 
 
     
@@ -811,22 +813,12 @@ class TrainTester(BaseTrainTester):
 
             
 
-            #!===================
-            if args.upload_wandb and args.local_rank==0:
-                
-                wandb.log({"student_supervised_loss":loss.clone().detach().item(),
-                            "center_consistency_loss":center_consistency_loss.clone().detach().item() if center_consistency_loss is not None else None,
-                            "soft_token_consistency_loss":soft_token_consistency_loss.clone().detach().item() if soft_token_consistency_loss is not None else None,
-                            "size_consistency_loss":size_consistency_loss.clone().detach().item() if size_consistency_loss is not None else None,
-                            "query_consistency_loss":query_consistency_loss.clone().detach().item() if query_consistency_loss is not None else None,
-                            "text_consistency_loss":text_consistency_loss.clone().detach().item() if text_consistency_loss is not None else None,
-                            "consistent_loss":consistent_loss.clone().detach().item() if consistent_loss is not None else None ,
-                            "total_loss":total_loss.clone().detach().item(),
-                        })
+            
+       
             
             optimizer.zero_grad()
             total_loss.backward()
-            #!===================
+            
             if args.clip_norm > 0:
                 grad_total_norm = torch.nn.utils.clip_grad_norm_(
                     model.parameters(), args.clip_norm
@@ -859,6 +851,23 @@ class TrainTester(BaseTrainTester):
                     if 'loss' in key and 'proposal_' not in key
                     and 'last_' not in key and 'head_' not in key
                 ]))
+
+
+                if args.upload_wandb and args.local_rank==0:
+                    #!===================
+                    tmp = { f'{key}':stat_dict[key] / args.print_freq  for key in sorted(stat_dict.keys()) if 'loss' in key and 'proposal_' not in key and 'last_' not in key and 'head_' not in key }
+                    tmp.update({"student_supervised_loss":loss.clone().detach().item(),
+                                "center_consistency_loss":center_consistency_loss.clone().detach().item() if center_consistency_loss is not None else None,
+                                "soft_token_consistency_loss":soft_token_consistency_loss.clone().detach().item() if soft_token_consistency_loss is not None else None,
+                                "size_consistency_loss":size_consistency_loss.clone().detach().item() if size_consistency_loss is not None else None,
+                                "query_consistency_loss":query_consistency_loss.clone().detach().item() if query_consistency_loss is not None else None,
+                                "text_consistency_loss":text_consistency_loss.clone().detach().item() if text_consistency_loss is not None else None,
+                                "consistent_loss":consistent_loss.clone().detach().item() if consistent_loss is not None else None ,
+                                "total_loss":total_loss.clone().detach().item(),
+                                "lr": scheduler.get_last_lr()[0]
+                            })
+                    wandb.log(tmp)
+                    #!===================
 
                 for key in sorted(stat_dict.keys()):
                     stat_dict[key] = 0
@@ -910,13 +919,12 @@ class TrainTester(BaseTrainTester):
 
 
         # Get scheduler
-        scheduler = get_scheduler(optimizer, len(labeled_loader)+len(unlabeled_loader), args)#* 第二个参数是一个epoch需要iteration 多少次 
+        scheduler = get_scheduler(optimizer, len(labeled_loader), args)#* 第二个参数是一个epoch需要iteration 多少次 
 
         # Move model to devices
         if torch.cuda.is_available():
             model = model.cuda(args.local_rank)
             ema_model = ema_model.cuda(args.local_rank)
-
 
         model = DistributedDataParallel(
             model, device_ids=[args.local_rank],
@@ -930,6 +938,11 @@ class TrainTester(BaseTrainTester):
             assert os.path.isfile(args.checkpoint_path)
             load_checkpoint(args, model, optimizer, scheduler)
             load_checkpoint(args, ema_model, optimizer, scheduler,distributed2common=True)
+
+            if args.lr_decay_intermediate:    
+                tmp = {scheduler._step_count+len(labeled_loader):1 } #* 一个epoch 后decay learning rate 
+                tmp.update({ k:v for  idx, (k,v) in enumerate(scheduler.milestones.items()) if idx != 0})
+                scheduler.milestones = tmp
 
 
         # Training loop
