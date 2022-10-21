@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 21:28:11
-LastEditTime: 2022-10-17 12:17:07
+LastEditTime: 2022-10-22 01:55:24
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/join_dataset.py
@@ -149,17 +149,98 @@ class JointDataset(Dataset):
         elif dset == 'nr3d': 
             # annos = self.load_nr3d_annos()
             annos = self.load_nr3d_annos_v2()
-            
+        elif dset == 'scanrefer': 
+            annos= self.load_scanrefer_annos()
+
         else :
             raise Exception 
 
         if self.overfit:
             annos = annos[:128]
             # annos = annos[:1280]
-        logger.info(f"{len(annos) }  annotations   loaded ")
+        logger.info(f" {dset} : {len(annos) }  annotations   loaded ")
         
         return annos
 
+
+
+    def load_scanrefer_annos(self):
+        """Load annotations of ScanRefer."""
+        _path = self.data_path + 'scanrefer/ScanRefer_filtered'
+        split = self.split
+        if split in ('val', 'test'):
+            split = 'val'
+
+
+        with open(_path + '_%s.txt' % split) as f:
+            scan_ids = [line.rstrip().strip('\n') for line in f.readlines()]
+
+
+            
+        with open(_path + '_%s.json' % split) as f:
+            reader = json.load(f)
+        annos = [
+            {
+                'scan_id': anno['scene_id'],
+                'target_id': int(anno['object_id']),
+                'distractor_ids': [],
+                'utterance': ' '.join(anno['token']),
+                'target': ' '.join(str(anno['object_name']).split('_')),
+                'anchors': [],
+                'anchor_ids': [],
+                'dataset': 'scanrefer'
+            }
+            for anno in reader
+            if anno['scene_id'] in scan_ids
+        ]
+        # Fix missing target reference
+        for anno in annos:
+            if anno['target'] not in anno['utterance']:
+                anno['utterance'] = (
+                    ' '.join(anno['utterance'].split(' . ')[0].split()[:-1])
+                    + ' ' + anno['target'] + ' . '
+                    + ' . '.join(anno['utterance'].split(' . ')[1:])
+                )
+        # Add distractor info
+        scene2obj = defaultdict(list)
+        sceneobj2used = defaultdict(list)
+        for anno in annos:
+            nyu_labels = [
+                self.label_mapclass[
+                    self.scans[anno['scan_id']].get_object_instance_label(ind)
+                ]
+                for ind in
+                range(len(self.scans[anno['scan_id']].three_d_objects))
+            ]
+            labels = [DC18.type2class.get(lbl, 17) for lbl in nyu_labels]
+            anno['distractor_ids'] = [
+                ind
+                for ind in
+                range(len(self.scans[anno['scan_id']].three_d_objects))
+                if labels[ind] == labels[anno['target_id']]
+                and ind != anno['target_id']
+            ][:32]
+            if anno['target_id'] not in sceneobj2used[anno['scan_id']]:
+                sceneobj2used[anno['scan_id']].append(anno['target_id'])
+                scene2obj[anno['scan_id']].append(labels[anno['target_id']])
+        # Add unique-multi
+        for anno in annos:
+            nyu_labels = [
+                self.label_mapclass[
+                    self.scans[anno['scan_id']].get_object_instance_label(ind)
+                ]
+                for ind in
+                range(len(self.scans[anno['scan_id']].three_d_objects))
+            ]
+            labels = [DC18.type2class.get(lbl, 17) for lbl in nyu_labels]
+            anno['unique'] = (
+                np.array(scene2obj[anno['scan_id']])
+                == labels[anno['target_id']]
+            ).sum() == 1
+        return annos
+
+
+        
     def load_sr3dplus_annos(self):
         """Load annotations of sr3d/sr3d+."""
         return self.load_sr3d_annos(dset='sr3d+')

@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-21 09:41:47
-LastEditTime: 2022-10-22 01:18:34
+LastEditTime: 2022-10-22 02:01:51
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/arkitscenes_dataset.py
@@ -203,6 +203,10 @@ class ARKitSceneDataset(Dataset):
         #* load  language model  
         model_path=osp.join(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__))))),'.cache/huggingface/transformers/roberta')
         self.tokenizer = RobertaTokenizerFast.from_pretrained(model_path)
+
+        logger.info(f"ARKitSceneDataset : {len(self.scan_names  )} sample loaded ")
+        
+        
         
 
     
@@ -628,10 +632,10 @@ class ARKitSceneDataset(Dataset):
 
         #* sem_cls_label 没有用! 
         ret_dict = {
-            'box_label_mask': box_label_mask.astype(np.float32),
-            'center_label': gt_bboxes[:, :3].astype(np.float32),
-            'sem_cls_label': np.zeros(MAX_NUM_OBJ).astype(np.int64),
-            'size_gts': gt_bboxes[:, 3:].astype(np.float32),
+            # 'box_label_mask': box_label_mask.astype(np.float32),
+            # 'center_label': gt_bboxes[:, :3].astype(np.float32),
+            # 'sem_cls_label': np.zeros(MAX_NUM_OBJ).astype(np.int64),
+            # 'size_gts': gt_bboxes[:, 3:].astype(np.float32),
         }
 
         
@@ -643,39 +647,35 @@ class ARKitSceneDataset(Dataset):
                 ' '.join(anno['utterance'].replace(',', ' ,').split())
                 + ' . not mentioned'
             ),
-            "tokens_positive": tokens_positive.astype(np.int64),
-            "positive_map": positive_map.astype(np.float32),
-            # Label
-            "relation": ("none"),
-            "target_name": anno['target'][anno['target_id'][0]],
-            "target_id": (anno['target_id'][0]),
+            # "tokens_positive": tokens_positive.astype(np.int64),
+            # "positive_map": positive_map.astype(np.float32),
+            # "relation": ("none"),
+            # "target_name": anno['target'][anno['target_id'][0]],
+            # "target_id": (anno['target_id'][0]),
 
-            "all_bboxes": all_bboxes.astype(np.float32),
-            "all_bbox_label_mask":all_bbox_label_mask.astype(np.bool8),
-            "all_class_ids": class_ids.astype(np.int64),
+            # "all_bboxes": all_bboxes.astype(np.float32),
+            # "all_bbox_label_mask":all_bbox_label_mask.astype(np.bool8),
+            # "all_class_ids": class_ids.astype(np.int64),
 
             #! no detected results
             #*! no point_instance_label  , namely sematic results
 
-            "distractor_ids": np.array(
-                anno['distractor_ids'] + [-1] * (32 - len(anno['distractor_ids']))
-            ).astype(int),
-            "anchor_ids": np.array(
-                anno['anchor_ids'] + [-1] * (32 - len(anno['anchor_ids']))
-            ).astype(int),
+            # "distractor_ids": np.array(
+            #     anno['distractor_ids'] + [-1] * (32 - len(anno['distractor_ids']))
+            # ).astype(int),
+            # "anchor_ids": np.array(
+            #     anno['anchor_ids'] + [-1] * (32 - len(anno['anchor_ids']))
+            # ).astype(int),
             
-            # "all_class_ids": target_bboxes_semcls.astype(np.int64),#? 这是什么? 
             "is_view_dep": self._is_view_dep(anno['utterance']),
             "is_hard": len(anno['distractor_ids']) > 1,
             "is_unique": len(anno['distractor_ids']) == 0,
             #?  对应scennet calss set 的class ID
-            "target_cid": (anno['bbox_class_ids_in_scannet'][anno['target_id'][0]]),
+            # "target_cid": (anno['bbox_class_ids_in_scannet'][anno['target_id'][0]]),
             "pc_before_aug":ema_point_clouds.astype(np.float32),
             #! no teacher box because no  detected results, so we can only test on det setting 
             "augmentations":augmentations,
             "supervised_mask":np.array(0).astype(np.int64),
-            
-
         })
 
 

@@ -1,7 +1,16 @@
 '''
 Author: xushaocong
+Date: 2022-10-22 01:38:43
+LastEditTime: 2022-10-22 01:45:31
+LastEditors: xushaocong
+Description: 
+FilePath: /butd_detr/omni_train.py
+email: xushaocong@stu.xmu.edu.cn
+'''
+'''
+Author: xushaocong
 Date: 2022-10-04 19:55:17
-LastEditTime: 2022-10-22 01:39:22
+LastEditTime: 2022-10-22 01:37:27
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/train.py
@@ -42,6 +51,7 @@ from src.join_dataset import JointDataset
 
 from src.join_labeled_dataset import JointLabeledDataset
 from src.join_unlabeled_dataset import JointUnlabeledDataset
+from src.arkitscenes_dataset import ARKitSceneDataset
 
 
 
@@ -113,7 +123,9 @@ def parse_option():
                         help='Batch Size during training')
     parser.add_argument('--dataset', type=str, default=['sr3d'],
                         nargs='+', help='list of datasets to train on')
-    
+    parser.add_argument('--unlabeled_dataset', type=str, default=['arkitscenes'],
+                        nargs='+', help='list of datasets to train on')
+
     parser.add_argument('--test_dataset', default='sr3d')
     parser.add_argument('--data_root', default='./')
     parser.add_argument('--use_height', action='store_true',
@@ -253,38 +265,38 @@ class TrainTester(BaseTrainTester):
         # logger.info(f"labeled_ratio:{labeled_ratio}")
         print('Loading datasets:', sorted(list(dataset_dict.keys())))
         
-        labeled_dataset = JointLabeledDataset(
+        labeled_dataset = JointDataset(
             dataset_dict=dataset_dict,
-            test_dataset=args.test_dataset, #? only test set need ? 
-            split='train' ,
-            use_color=args.use_color, use_height=args.use_height,
-            overfit=args.debug,
-            data_path=args.data_root,
-            detect_intermediate=args.detect_intermediate,#? 
-            use_multiview=args.use_multiview, #? 
-            butd=args.butd, #? 
-            butd_gt=args.butd_gt,#? 
-            butd_cls=args.butd_cls,#? 
-            augment_det=args.augment_det,#? 
-            labeled_ratio=args.labeled_ratio
-        )
-        
-        
-        unlabeled_dataset = JointUnlabeledDataset(
-            dataset_dict=dataset_dict,
-            test_dataset=args.test_dataset, #? only test set need ? 
+            test_dataset=args.test_dataset,
             split='train',
             use_color=args.use_color, use_height=args.use_height,
             overfit=args.debug,
             data_path=args.data_root,
-            detect_intermediate=args.detect_intermediate,#? 
-            use_multiview=args.use_multiview, #? 
-            butd=args.butd, #? 
-            butd_gt=args.butd_gt,#? 
-            butd_cls=args.butd_cls,#? 
-            augment_det=args.augment_det,#? 
-            labeled_ratio=args.labeled_ratio
+            detect_intermediate=args.detect_intermediate,
+            use_multiview=args.use_multiview,
+            butd=args.butd,
+            butd_gt=args.butd_gt,
+            butd_cls=args.butd_cls
         )
+
+        unlabeled_dataset = ARKitSceneDataset(split_set="train", 
+            augment=True,data_root='datasets/arkitscenes')
+
+        # unlabeled_dataset = JointUnlabeledDataset(
+        #     dataset_dict=dataset_dict,
+        #     test_dataset=args.test_dataset, #? only test set need ? 
+        #     split='train',
+        #     use_color=args.use_color, use_height=args.use_height,
+        #     overfit=args.debug,
+        #     data_path=args.data_root,
+        #     detect_intermediate=args.detect_intermediate,#? 
+        #     use_multiview=args.use_multiview, #? 
+        #     butd=args.butd, #? 
+        #     butd_gt=args.butd_gt,#? 
+        #     butd_cls=args.butd_cls,#? 
+        #     augment_det=args.augment_det,#? 
+        #     labeled_ratio=args.labeled_ratio
+        # )
 
 
         
