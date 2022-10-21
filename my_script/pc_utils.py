@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-08-22 15:05:23
-LastEditTime: 2022-08-25 13:04:11
+LastEditTime: 2022-10-21 10:33:48
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/my_script/pc_utils.py
@@ -215,15 +215,11 @@ def read_ply(filename):
 def write_ply(points, filename, text=True):
     """ input: Nx3, write points to filename as PLY format. """
     
-    
     vertex = np.array([(x,y,z) for x,y,z in points[:,:3]], dtype=[('x', 'f4'), ('y', 'f4'),('z', 'f4')])
 
-    el = PlyElement.describe(vertex, 'vertex', comments=['vertices'])
+    PlyData([PlyElement.describe(vertex, 'vertex', comments=['vertices'])], text=text).write(filename)
 
-    color =  np.array([(x,y,z) for x,y,z in  points[:,3:].astype(np.float64)*255], dtype=[('red', 'u1'), ('green', 'u1'),('blue', 'u1')])
-    color2 = PlyElement.describe(color,'color')
-
-    PlyData([el,color2], text=text).write(filename)
+    
 
 '''
 description:  保存带颜色的点云 
@@ -578,10 +574,31 @@ param {*} dump_name :导出的文件名
 param {*} normal : 发现数据, 就是点的朝向
 return {*}
 '''
-def dump_pc(point_clouds, dump_name="./dump/tmp.txt"):
-    with open(dump_name, "w") as f: 
-        f.write('\n'.join([' '.join(x) for x in point_clouds]))
+# def dump_pc(point_clouds, dump_name="./dump/tmp.txt"):
+#     with open(dump_name, "w") as f: 
+#         f.write('\n'.join([' '.join(x) for x in point_clouds]))
 
+
+
+def dump_pc(point_clouds, dump_name="./dump/tmp.txt", normal=None):
+    """Dump point clouds
+
+    Args:
+        point_clouds (_type_): _description_
+        dump_dir (str, optional): _description_. Defaults to "./dump/".
+        normal (_type_, optional): _description_. Defaults to None.
+    """
+    OUT = ""
+    with open(dump_name, "w+") as f:
+        if normal is None:
+            for i in range(point_clouds.shape[0]):
+                OUT += f"{point_clouds[i][0]} {point_clouds[i][1]} {point_clouds[i][2]} 0.0 0.0 0.0 0.2 0.2 0.2 1.0\n"
+
+        else:
+            for i in range(point_clouds.shape[0]):
+                OUT += f"{point_clouds[i][0]} {point_clouds[i][1]} {point_clouds[i][2]} {normal[i][0]} {normal[i][1]} {normal[i][2]} 0.2 0.2 0.2 1.0\n"
+
+        f.write(OUT)
 
 def save_txt(string_,name):
     if type(string_) == str:
@@ -641,3 +658,34 @@ if __name__ == '__main__':
     print('tests PASSED')
     
     
+
+
+def numpy2pcd(np_points):
+    pcd = o3d.geometry.PointCloud()
+    # From numpy to o3d
+    pcd.points = o3d.utility.Vector3dVector(np_points[:,:3])
+    pcd.colors = o3d.utility.Vector3dVector(np_points[:,3:])
+
+    return pcd
+
+
+
+'''
+description:  ARKitScene downsampling 
+param {*} point_cloud
+param {*} voxel_sz
+return {*}
+'''
+def down_sample(point_cloud, voxel_sz):
+    """Quantize point cloud by voxel_size
+    Returns kept indices
+
+    Args:
+        all_points: np.array (n, 3) float
+        voxel_sz: float
+    Returns:
+        indices: (m, ) int
+    """
+    coordinates = np.round(point_cloud / voxel_sz).astype(np.int32)
+    _, indices = np.unique(coordinates, axis=0, return_index=True)
+    return indices

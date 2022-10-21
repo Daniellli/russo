@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-04 19:55:59
-LastEditTime: 2022-10-17 12:25:24
+LastEditTime: 2022-10-21 15:01:00
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/join_unlabeled_dataset.py
@@ -958,6 +958,7 @@ class JointUnlabeledDataset(Dataset):
             #     anno['anchor_ids']
             #     + [-1] * (32 - len(anno['anchor_ids']))
             # ).astype(int),
+            #* detector output =================================================
             "all_detected_boxes": all_detected_bboxes.astype(np.float32),
             "all_detected_bbox_label_mask": all_detected_bbox_label_mask.astype(np.bool8),
             "all_detected_class_ids": detected_class_ids.astype(np.int64),
@@ -965,6 +966,8 @@ class JointUnlabeledDataset(Dataset):
             "is_view_dep": self._is_view_dep(anno['utterance']),
             "is_hard": len(anno['distractor_ids']) > 1,
             "is_unique": len(anno['distractor_ids']) == 0,
+            #*  ================================================================
+            
             # "target_cid": (
             #     class_ids[anno['target_id']]
             #     if isinstance(anno['target_id'], int)
