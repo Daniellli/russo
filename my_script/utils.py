@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 20:04:19
-LastEditTime: 2022-10-22 00:22:26
+LastEditTime: 2022-10-22 11:41:22
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/my_script/utils.py
@@ -309,8 +309,11 @@ def print_attr_shape(data):
                     logger.info(f"{kk} : {vv.shape}")
             logger.info(f"\n==========================================================================")
                 
-        else :
+        elif v is not None:
             logger.info(f"{k} : {v.shape}")
+        else :
+            logger.info(f"{k} some thing wrong ")
+            
    
 
 

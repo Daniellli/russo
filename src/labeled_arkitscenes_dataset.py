@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-22 10:41:31
-LastEditTime: 2022-10-22 10:59:02
+LastEditTime: 2022-10-22 14:20:39
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/labeled_arkitscenes_dataset.py
@@ -58,8 +58,9 @@ sys.path.append(BASE_DIR)
 
 DC = ScannetDatasetConfig()
 DC18 = ScannetDatasetConfig(18)
-# import utils.taxonomy import ARKitDatasetConfig
-# ARKit_DC=ARKitDatasetConfig()
+
+from utils.taxonomy import ARKitDatasetConfig
+ARKit_DC=ARKitDatasetConfig()
 
 # MAX_NUM_OBJ = 64
 # NUM_PROPOSAL = 256
@@ -165,7 +166,9 @@ def dump_pc_colored(point_clouds, dump_name="./dump/tmp.txt", colors=None):
 
 
 class ARKitSceneDataset(Dataset):
-    def __init__(self, split_set='train', num_points=50000,data_root='datasets/ARKitScenes',
+
+
+    def __init__(self, num_points=50000,data_root='datasets/ARKitScenes',
         augment=False,debug=False,butd_cls = False ):
         
         #* set some parameters
@@ -177,64 +180,85 @@ class ARKitSceneDataset(Dataset):
         self.butd_cls = butd_cls
         self.debug =debug
 
-        #* load split datasets         
-        assert split_set in ['train', 'valid']
-        self.split_set = split_set
+        #* load split datasets   
+        #*       scan_names 是用来过滤数据的variables
+        #todo load both of train and valid as one set 
+        split_list = ['train', 'valid']
+        all_scene_name = []
+        self.annos= {}
+        for split in split_list:
 
-        with open(os.path.join(self.data_path, f"{split_set}_filtered.txt"), 'r') as f:
-            split_filenames = f.read().strip().split('\n')
+            scene_name_list,data_split_path = self.__get_scene_name(split)
+
+            #* filter according to the scannet clss label 
+            #* cache annotation 
+            filename = osp.join(osp.dirname(self.data_root),f"{split}._arkitscenes.pkl")
             
-        if split_set == "train":
-            self.data_path = os.path.join(self.data_path, "3dod/Training")
-        else:
-            self.data_path = os.path.join(self.data_path, "3dod/Validation")
-
-            self.valid_mapping = {line.split(",")[0]: line.split(",")[1] \
-                                  for line in open(os.path.join(data_root, 'data', "file.txt")).read().strip().split("\n")}
-
-        self.scan_names = sorted(split_filenames)
-        #* filter out unlabelled layout in valid set
-        if self.split_set == "valid":
-            self.scan_names = [scan_name for scan_name in self.scan_names if is_valid_mapping_name(self.data_root,self.valid_mapping[scan_name])]
-        
-
-
-        #* filter according to the scannet clss label 
-        filename = osp.join(osp.dirname(self.data_root),f"{self.split_set}._arkitscenes.pkl")
-        #* cache annotation 
-        if not osp.exists(filename):
-            self.annos = self.filter_bad_scene_and_cache(filename)
-        else:
-            self.annos = list(unpickle_data(filename))[0]
+            if not osp.exists(filename):
+                annos= self.filter_bad_scene_and_cache(filename,scene_name_list,data_split_path)
+            else:
+                annos = list(unpickle_data(filename))[0]
+            self.annos.update(annos)
+            all_scene_name += list(annos.keys())
             
-        self.scan_names  = list(self.annos.keys())
+            logger.info(f"split {split } : {len(annos)} loaded")
 
+        logger.info(f" total length  : {len(self.annos)} loaded")
         #* load  language model  
         model_path=osp.join(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__))))),'.cache/huggingface/transformers/roberta')
         self.tokenizer = RobertaTokenizerFast.from_pretrained(model_path)
 
-        logger.info(f"ARKitSceneDataset : {len(self.scan_names  )} sample loaded ")
+        logger.info(f"ARKitSceneDataset : {len(self.annos)} sample loaded, scene_name number : {len(all_scene_name)} ")
         
-        
+    def __get_scene_name(self,split):
+        data_split_path = None
+        if split == "train":
+            data_split_path = os.path.join(self.data_path, "3dod/Training")
+        else:
+            data_split_path = os.path.join(self.data_path, "3dod/Validation")
+
+
+        scan_names = None
+        with open(os.path.join(self.data_path, f"{split}_filtered.txt"), 'r') as f:
+            scan_names = sorted(f.read().strip().split('\n'))
+
+        assert scan_names is not None 
+
+
+        #* filter out unlabelled layout in valid set
+        if split == "valid":
+            valid_mapping = {line.split(",")[0]: line.split(",")[1] for line in open(os.path.join(self.data_root, 'data', "file.txt")).read().strip().split("\n")}
+            scan_names = [scan_name for scan_name in scan_names if is_valid_mapping_name(self.data_root,valid_mapping[scan_name])]
+
+            
+        return scan_names,data_split_path
         
 
-    
     '''
-    description:  将一些 存在的label都不是scannet的数据给过滤掉
+    description: 将一些 存在的label都不是scannet的数据给过滤掉
     param {*} self
+    param {*} file_nam
+    param {*} scene_names
+    param {*} data_path
     return {*}
     '''
-    def filter_bad_scene_and_cache(self,file_name):
+    def filter_bad_scene_and_cache(self,file_name,scene_names,data_path):
         anns = {}
         scan_box = []
-        logger.info(f" before filter_bad_scene, length of scan_names :  {len(self.scan_names)}")
-        for idx, scan_name in enumerate(tqdm(self.scan_names)):
-            scan_dir = os.path.join(self.data_path, scan_name, f"{scan_name}_offline_prepared_data_2")
+        logger.info(f" before filter_bad_scene, length of scan_names :  {len(scene_names)}")
+        
+        for idx, scan_name in enumerate(tqdm(scene_names)):
+            scan_dir = os.path.join(data_path, scan_name, f"{scan_name}_offline_prepared_data_2")
             annnotation = np.load(os.path.join(scan_dir, f"{scan_name}_label", f"{scan_name}_bbox.npy"), allow_pickle=True).item()
 
-            anno = self.get_annos(annnotation,scan_name)#* get ann correponding to the butd detr
+            anno = self.get_annos(annnotation,scan_name,data_path)#* get ann correponding to the butd detr
             if anno is not None :
                 anns[scan_name]= anno
+            
+            #!+=================    
+            # if idx == 5 :
+            #     break
+            #!+=================
             
         
         logger.info(f" after filter_bad_scene, length of scan_names :  {len(list(anns.keys()))}, and has cached")
@@ -247,7 +271,7 @@ class ARKitSceneDataset(Dataset):
     param {*} self
     return {*}
     '''
-    def get_annos(self,annotation,scan_id):
+    def get_annos(self,annotation,scan_id,data_path):
         """Load annotations of scannet."""
 
         class_label = annotation['types']
@@ -268,14 +292,15 @@ class ARKitSceneDataset(Dataset):
                 'bbox_class_in_arkitscenes':class_label,
                 'bbox_class_ids_in_arkitscenes':np.array([ARKit_DC.cls2label[l] for l in class_label]),#* box class   id
                 'bbox_class_ids_in_scannet':class_label_in_scannet,#* -1 means not exist in scannet
-                'dataset': 'ARKitScenes'
+                'dataset': 'ARKitScenes',
+                "data_path":data_path
             }
         else :
             return None
 
 
     def __len__(self):
-        return len(self.scan_names)
+        return len(self.annos.keys())
        
     
     '''
@@ -375,7 +400,6 @@ class ARKitSceneDataset(Dataset):
 
         #*  默认训练才使用这个集合
         
-        # if self.split_set == "train":
         if len(sampled_classes) > 10:#* 如果大于10个只取是个,   对应文章生成positive and negtive sample 的方法
             sampled_classes = random.sample(sampled_classes, 10)
 
@@ -479,16 +503,17 @@ class ARKitSceneDataset(Dataset):
 
         augmentations = {}
         
-        if self.split_set == 'train' and self.augment:
+        if self.augment:
             rotate = True
-            pc, color, augmentations = self._augment(point_clouds, color, rotate)
+            point_clouds, color, augmentations = self._augment(point_clouds, color, rotate)
+        else :
+            logger.info(f"no augmentation ")
             
         # e. Concatenate representations
-        point_cloud = pc
         if color is not None:
-            point_cloud = np.concatenate((point_cloud, color), 1)
+            point_clouds = np.concatenate((point_clouds, color), 1)
         
-        return point_cloud, augmentations,origin_color,origin_pc
+        return point_clouds, augmentations,origin_color,origin_pc
 
     
     '''
@@ -594,11 +619,15 @@ class ARKitSceneDataset(Dataset):
 
     def __getitem__(self, idx, **kwargs):
         
-        scan_name = self.scan_names[idx]
+        # scan_name = self.scan_names[idx]
+        scan_name = list(self.annos.keys())[idx]
         anno  = self.annos[scan_name]
+        # scan_name = anno['scan_id']
         
+        
+
         #* load pc
-        scan_dir = os.path.join(self.data_path, scan_name, f"{scan_name}_offline_prepared_data_2")
+        scan_dir = os.path.join(anno['data_path'], scan_name, f"{scan_name}_offline_prepared_data_2")
         mesh_vertices = np.load(os.path.join(scan_dir, f"{scan_name}_data", f"{scan_name}_pc.npy"))
         
 
@@ -793,7 +822,7 @@ def get_positive_map(tokenized, tokens_positive):
 
 
 if __name__ == "__main__":
-    dset = ARKitSceneDataset(split_set="train", augment=True,data_root='datasets/arkitscenes',butd_cls = True)
+    dset = ARKitSceneDataset( augment=True,data_root='datasets/arkitscenes',butd_cls = True)
 
     
     from tqdm import tqdm
@@ -803,11 +832,10 @@ if __name__ == "__main__":
     
     for example in tqdm(dset):
         logger.info(example['scan_ids'])
-        
         # save_(example,example['scan_ids'],debug_path)
-        # print_attr_shape(example)
-
-        if i == 4:
+        print_attr_shape(example)
+        break
+        if i == 2:
             break
         i+=1
         
