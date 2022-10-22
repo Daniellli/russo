@@ -664,7 +664,7 @@ class Joint3DDataset(Dataset):
                 * np.random.random(all_detected_bboxes.shape)
                 + min_
             )
-            corrupt = np.random.random(len(all_detected_bboxes)) > 0.7
+            corrupt = np.random.random(len(all_detected_bboxes)) > 0.7 #! 70的概率用 坏框? 
             all_detected_bboxes[corrupt] = rand_box[corrupt]
             detected_class_ids[corrupt] = np.random.randint(
                 0, len(DC.nyu40ids), (len(detected_class_ids))
