@@ -1,7 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-14 16:25:42
- # @LastEditTime: 2022-10-22 23:56:13
+ # @LastEditTime: 2022-10-23 00:04:11
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/end2end_train.sh
@@ -61,6 +61,7 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --query_points_obj_topk $topk \
     --checkpoint_path $resume_mode_path \
     --lr_decay_intermediate \
+    --query_points_obj_topk $topk \
     2>&1 | tee -a logs/train_test_cls.log
 
 

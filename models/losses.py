@@ -249,7 +249,7 @@ def compute_points_obj_cls_loss_hard_topk(end_points, topk):
 '''
 description:  text-guided keypoint sampling loss
 param {*} data_dict
-param {*} topk
+param {*} topk: 3D SPS: 4 
 param {*} args
 return {*}
 '''
@@ -361,31 +361,40 @@ def compute_kps_loss(data_dict, topk):
 
 
 '''
-description: 
+description:  不对ARKitScene 算这个loss  
 param {*} end_points
 param {*} topk
 return {*}
 '''
 def compute_labeled_points_obj_cls_loss_hard_topk(end_points, topk):
     #!==============================================================
-    supervised_mask  = end_points['supervised_mask']
+
+    # supervised_mask  = end_points['supervised_mask'] 
+    #* 0 是没有标签的, 2 是没有 point_instance_label
+    supervised_mask = ((end_points['supervised_mask']  != 0 )  & ( end_points['supervised_mask']  != 2)).int()
     supervised_inds = torch.nonzero(supervised_mask).squeeze(1).long()
+
+    
     #!==============================================================
 
-    box_label_mask = end_points['box_label_mask']
+    box_label_mask = end_points['box_label_mask'][supervised_inds,:]
 
     seed_inds = end_points['seed_inds'][supervised_inds,:].long()  # B, K
     seed_xyz = end_points['seed_xyz'][supervised_inds,:,:]  # B, K, 3
     seeds_obj_cls_logits = end_points['seeds_obj_cls_logits'][supervised_inds,:,:]  # B, 1, K
 
-    gt_center = end_points['center_label'][:, :, :3]  # B, G, 3
-    gt_size = end_points['size_gts'][:, :, :3]  # B, G, 3
+    gt_center = end_points['center_label'][supervised_inds, :, :3]  # B, G, 3
+    gt_size = end_points['size_gts'][supervised_inds, :, :3]  # B, G, 3
+
     B = gt_center.shape[0]  # batch size
     K = seed_xyz.shape[1]  # number if points from p++ output
     G = gt_center.shape[1]  # number of gt boxes (with padding)
 
     # Assign each point to a GT object
-    point_instance_label = end_points['point_instance_label']  # B, num_points
+    point_instance_label = end_points['point_instance_label'][supervised_inds,:]  # B, num_points
+
+
+
     obj_assignment = torch.gather(point_instance_label, 1, seed_inds)  # B, K
     obj_assignment[obj_assignment < 0] = G - 1  # bg points to last gt
     obj_assignment_one_hot = torch.zeros((B, K, G)).to(seed_xyz.device)

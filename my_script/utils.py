@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 20:04:19
-LastEditTime: 2022-10-07 15:44:45
+LastEditTime: 2022-10-22 11:41:22
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/my_script/utils.py
@@ -274,6 +274,47 @@ def generate_SR3D_labeled_scene_txt(labeled_ratio):
 
     
 
+
+'''
+description:  打印字典所有的key
+param {*} data
+return {*}
+'''
+def get_attr(data):
+    return list(data.keys())
+
+'''
+description: 打印字典每个数据的shape
+param {*} data
+return {*}
+'''
+def print_attr_shape(data):
+    for k,v in data.items():
+        if   isinstance(v,str):
+            
+            logger.info(f"{k} : {v}")
+        elif   isinstance(v,bool):
+            logger.info(f"{k} : {v}")
+        elif   isinstance(v,int):
+            logger.info(f"{k} : {v}")
+        elif   isinstance(v,dict):
+            logger.info(f"printing {k} \n==========================================================================")
+
+            for kk,vv in v.items():
+                if   isinstance(vv,bool):
+                    logger.info(f"{kk} : {vv}")
+                elif   isinstance(vv,float):
+                    logger.info(f"{kk} : {vv}")
+                else :
+                    logger.info(f"{kk} : {vv.shape}")
+            logger.info(f"\n==========================================================================")
+                
+        elif v is not None:
+            logger.info(f"{k} : {v.shape}")
+        else :
+            logger.info(f"{k} some thing wrong ")
+            
+   
 
 
 if __name__ == "__main__":

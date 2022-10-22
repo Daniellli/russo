@@ -1,19 +1,10 @@
 '''
 Author: xushaocong
-Date: 2022-10-04 19:55:17
-LastEditTime: 2022-10-22 01:39:22
-LastEditors: xushaocong
-Description: 
-FilePath: /butd_detr/train.py
-email: xushaocong@stu.xmu.edu.cn
-'''
-'''
-Author: xushaocong
 Date: 2022-10-03 22:00:15
-LastEditTime: 2022-10-04 17:28:33
+LastEditTime: 2022-10-22 16:50:07
 LastEditors: xushaocong
-Description:  修改get_datasets , 换成可以添加使用数据集比例的dataloader
-FilePath: /butd_detr/train_dist_mod_2.py
+Description:  将 ARKitScenes 也作为有标签数据进行监督 , 也就是用mean teacher 
+FilePath: /butd_detr/omni_supervse_train.py
 email: xushaocong@stu.xmu.edu.cn
 '''
 # ------------------------------------------------------------------------
@@ -42,6 +33,7 @@ from src.join_dataset import JointDataset
 
 from src.join_labeled_dataset import JointLabeledDataset
 from src.join_unlabeled_dataset import JointUnlabeledDataset
+from src.labeled_arkitscenes_dataset import ARKitSceneDataset
 
 
 
@@ -177,17 +169,6 @@ def parse_option():
     parser.add_argument('--vis-save-path', default='', type=str)
     parser.add_argument('--upload-wandb',action='store_true', help="upload to wandb or not ?")
     parser.add_argument('--save-input-output',action='store_true', help="save-input-output")
-
-    parser.add_argument('--size_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
-    parser.add_argument('--center_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
-    parser.add_argument('--token_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
-
-    parser.add_argument('--query_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
-    parser.add_argument('--text_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
-
-    parser.add_argument('--labeled_ratio', default=0.2, type=float,help=' labeled datasets ratio ')
-    parser.add_argument('--rampup_length', type=float, default=None, help='rampup_length')
-
     parser.add_argument('--lr_decay_intermediate',action='store_true')
 
 
@@ -253,41 +234,39 @@ class TrainTester(BaseTrainTester):
         # logger.info(f"labeled_ratio:{labeled_ratio}")
         print('Loading datasets:', sorted(list(dataset_dict.keys())))
         
-        labeled_dataset = JointLabeledDataset(
+        labeled_dataset = JointDataset(
             dataset_dict=dataset_dict,
-            test_dataset=args.test_dataset, #? only test set need ? 
-            split='train' ,
-            use_color=args.use_color, use_height=args.use_height,
-            overfit=args.debug,
-            data_path=args.data_root,
-            detect_intermediate=args.detect_intermediate,#? 
-            use_multiview=args.use_multiview, #? 
-            butd=args.butd, #? 
-            butd_gt=args.butd_gt,#? 
-            butd_cls=args.butd_cls,#? 
-            augment_det=args.augment_det,#? 
-            labeled_ratio=args.labeled_ratio
-        )
-        
-        
-        unlabeled_dataset = JointUnlabeledDataset(
-            dataset_dict=dataset_dict,
-            test_dataset=args.test_dataset, #? only test set need ? 
+            test_dataset=args.test_dataset,
             split='train',
             use_color=args.use_color, use_height=args.use_height,
             overfit=args.debug,
             data_path=args.data_root,
-            detect_intermediate=args.detect_intermediate,#? 
-            use_multiview=args.use_multiview, #? 
-            butd=args.butd, #? 
-            butd_gt=args.butd_gt,#? 
-            butd_cls=args.butd_cls,#? 
-            augment_det=args.augment_det,#? 
-            labeled_ratio=args.labeled_ratio
+            detect_intermediate=args.detect_intermediate,
+            use_multiview=args.use_multiview,
+            butd=args.butd,
+            butd_gt=args.butd_gt,
+            butd_cls=args.butd_cls
         )
 
+        arkitscene_datasets = ARKitSceneDataset(augment=True,data_root='datasets/arkitscenes', butd_cls=args.butd_cls)
 
-        
+        # unlabeled_dataset = JointUnlabeledDataset(
+        #     dataset_dict=dataset_dict,
+        #     test_dataset=args.test_dataset, #? only test set need ? 
+        #     split='train',
+        #     use_color=args.use_color, use_height=args.use_height,
+        #     overfit=args.debug,
+        #     data_path=args.data_root,
+        #     detect_intermediate=args.detect_intermediate,#? 
+        #     use_multiview=args.use_multiview, #? 
+        #     butd=args.butd, #? 
+        #     butd_gt=args.butd_gt,#? 
+        #     butd_cls=args.butd_cls,#? 
+        #     augment_det=args.augment_det,#? 
+        #     labeled_ratio=args.labeled_ratio
+        # )
+
+
         
         test_dataset = JointDataset(
             dataset_dict=dataset_dict,
@@ -304,7 +283,7 @@ class TrainTester(BaseTrainTester):
         )
 
         
-        return labeled_dataset,unlabeled_dataset, test_dataset
+        return labeled_dataset,arkitscene_datasets, test_dataset
 
     @staticmethod
     def get_model(args):
@@ -615,7 +594,7 @@ class TrainTester(BaseTrainTester):
 
         #* do not need to load train set when args.evals == True 
         # Datasets
-        labeled_dataset,unlabeled_dataset, test_dataset = self.get_datasets(args)
+        labeled_dataset,arkitscenes_dataset, test_dataset = self.get_datasets(args)
         
         #* 存在一个问题就是val 的数据抽取的不合法,在group_free_pred_bboxes_val 找不到对应的数据
         
@@ -625,9 +604,6 @@ class TrainTester(BaseTrainTester):
         batch_size_list = np.array(args.batch_size.split(',')).astype(np.int64)
 
         
-
-        
-
 
         labeled_sampler = DistributedSampler(labeled_dataset)
         labeled_loader = DataLoader(
@@ -642,15 +618,15 @@ class TrainTester(BaseTrainTester):
             generator=g
         )
 
-        unlabeled_sampler = DistributedSampler(unlabeled_dataset)
-        unlabeled_loader = DataLoader(
-            unlabeled_dataset,
+        arkitscenes_sampler = DistributedSampler(arkitscenes_dataset)
+        arkitscenes_loader = DataLoader(
+            arkitscenes_dataset,
             batch_size=int(batch_size_list[1]),
             shuffle=False,
             num_workers=args.num_workers,
             worker_init_fn=seed_worker,
             pin_memory=True,
-            sampler=unlabeled_sampler,
+            sampler=arkitscenes_sampler,
             drop_last=True,
             generator=g
         )
@@ -668,8 +644,8 @@ class TrainTester(BaseTrainTester):
             drop_last=False,
             generator=g
         )
-        logger.info(f"the iter num  labeled_loader needs :{len(labeled_loader)}, the iter num  unlabeled_loader needs :{len(unlabeled_loader)}, the iter num  test_loader needs :{len(test_loader)},  ")
-        return labeled_loader,unlabeled_loader, test_loader
+        logger.info(f"the iter num  labeled_loader needs :{len(labeled_loader)}, the iter num  arkitscenes_loader needs :{len(arkitscenes_loader)}, the iter num  test_loader needs :{len(test_loader)},  ")
+        return labeled_loader,arkitscenes_loader, test_loader
 
 
            
@@ -689,9 +665,8 @@ class TrainTester(BaseTrainTester):
             ema_param.data.mul_(alpha).add_(1 - alpha, param.data)
 
 
-    def train_one_epoch(self, epoch, labeled_loader,unlabeled_loader ,
-                        model,ema_model,
-                        criterion, set_criterion,
+    def train_one_epoch(self, epoch, labeled_loader,arkitscene_loader ,
+                        model,criterion, set_criterion,
                         optimizer, scheduler, args):
         """
         Run a single epoch.
@@ -705,116 +680,53 @@ class TrainTester(BaseTrainTester):
 
         # Loop over batches
 
-        total_iteration=max(len(labeled_loader),len(unlabeled_loader))
+        total_iteration=len(labeled_loader)
     
         logger.info(f"total_iteration == {total_iteration}")
 
-        center_consistency_weight = self.get_current_consistency_weight(args.center_consistency_weight ,epoch,args)
-        size_consistency_weight = self.get_current_consistency_weight(args.size_consistency_weight ,epoch,args)
-        token_consistency_weight = self.get_current_consistency_weight(args.token_consistency_weight ,epoch,args)
 
-        query_consistency_weight = self.get_current_consistency_weight(args.query_consistency_weight ,epoch,args)
-        text_consistency_weight = self.get_current_consistency_weight(args.text_consistency_weight ,epoch,args)
-
-
-        logger.info(f"center_consistency_weight  : {center_consistency_weight}")
-        logger.info(f"size_consistency_weight  : {size_consistency_weight}")
-        logger.info(f"token_consistency_weight  : {token_consistency_weight}")
-        logger.info(f"query_consistency_weight  : {query_consistency_weight}")
-        logger.info(f"text_consistency_weight  : {text_consistency_weight}")
-
-        unlabeled_loader_iter=iter(unlabeled_loader)
+        arkitscenes_loader_iter=iter(arkitscene_loader)
 
         
         for batch_idx, batch_data in enumerate(labeled_loader):
 
 
             try:
-                batch_data_unlabeled = next(unlabeled_loader_iter)
+                batch_data_arkitscene = next(arkitscenes_loader_iter)
             except StopIteration:
-                unlabeled_loader_iter = iter(unlabeled_loader)
-                batch_data_unlabeled = next(unlabeled_loader_iter)
+                arkitscenes_loader_iter=iter(arkitscene_loader)
+                batch_data_arkitscene = next(arkitscenes_loader_iter)
 
             # Move to GPU
             batch_data = self._to_gpu(batch_data)
-            batch_data_unlabeled = self._to_gpu(batch_data_unlabeled)
+            batch_data_arkitscene = self._to_gpu(batch_data_arkitscene)
             
-            for key in batch_data_unlabeled: #* 两个batch 合成一个batch, 
+            for key in batch_data_arkitscene: #* 两个batch 合成一个batch, 
                 if  isinstance(batch_data[key],list):
-                    batch_data[key] = batch_data[key]+batch_data_unlabeled[key]
+                    batch_data[key] = batch_data[key]+batch_data_arkitscene[key]
                 elif  isinstance(batch_data[key],dict):
                     for kkey in batch_data[key]:
-                        batch_data[key][kkey] = torch.cat((batch_data[key][kkey], batch_data_unlabeled[key][kkey]), dim=0)
+                        batch_data[key][kkey] = torch.cat((batch_data[key][kkey], batch_data_arkitscene[key][kkey]), dim=0)
                 else:
-                    batch_data[key] = torch.cat((batch_data[key], batch_data_unlabeled[key]), dim=0)
+                    batch_data[key] = torch.cat((batch_data[key], batch_data_arkitscene[key]), dim=0)
 
             inputs = self._get_inputs(batch_data)
-            teacher_input=self._get_teacher_inputs(batch_data)
-            
-            
-            
-
-
-            DEBUG=False 
-            if  DEBUG and args.local_rank == 0 :
-                for scene in batch_data['scan_ids']:
-                    make_dirs(osp.join(self.vis_save_path,scene))
-
-                self.check_input(inputs,batch_data['scan_ids'],'student')
-                self.check_input(teacher_input,batch_data['scan_ids'],'teacher')
-                self.check_target(batch_data,batch_data['scan_ids'])
-
-                if batch_idx == 5:
-                    break
 
         
             # Forward pass
             end_points = model(inputs)
-            with torch.no_grad():
-                teacher_end_points = ema_model(teacher_input)   
-
+            
             # Compute loss and gradients, update parameters.
             for key in batch_data:
                 assert (key not in end_points)
                 end_points[key] = batch_data[key]
-                # teacher_end_points[key] = batch_data[key]
-
+            
             #* add index for knowing  what is labeled which is unlabeled 
             loss, end_points = self._compute_loss(
                 end_points, criterion, set_criterion, args
             )
 
-
-
-
-            end_points = get_consistency_loss(end_points, teacher_end_points,batch_data['augmentations'])
-
-            consistent_loss =center_consistency_loss=soft_token_consistency_loss=size_consistency_loss=query_consistency_loss=text_consistency_loss=None
-
-
-            center_consistency_loss = end_points['center_consistency_loss'] * center_consistency_weight
-            soft_token_consistency_loss = end_points['soft_token_consistency_loss']* token_consistency_weight
-            size_consistency_loss = end_points['size_consistency_loss'] * size_consistency_weight
-
-            query_consistency_loss = end_points['query_consistency_loss'] * query_consistency_weight
-            text_consistency_loss = end_points['text_consistency_loss'] * text_consistency_weight
-
-            
-            
-            consistent_loss = soft_token_consistency_loss +center_consistency_loss+size_consistency_loss+query_consistency_loss+text_consistency_loss
-
-
-            #* total loss
-            if consistent_loss is not None:
-                total_loss = loss+consistent_loss
-            else:
-                total_loss = loss
-
-            
-
-            
-       
-            
+            total_loss = loss            
             optimizer.zero_grad()
             total_loss.backward()
             
@@ -827,14 +739,7 @@ class TrainTester(BaseTrainTester):
             optimizer.step()
             scheduler.step()
 
-            #*===================================================
-            #* update  teacher model 
-            #* epoch start from 1 by default , so have to minus one 
-            global_step = (batch_idx+1) + (epoch -args.start_epoch) *total_iteration
-            # alpha = 0.999
-            alpha = 0.99
-            self.update_ema_variables(model,ema_model,alpha,global_step)
-            #*===================================================
+
 
             # Accumulate statistics and print out
             stat_dict = self._accumulate_stats(stat_dict, end_points)
@@ -856,12 +761,12 @@ class TrainTester(BaseTrainTester):
                     #!===================
                     tmp = { f'{key}':stat_dict[key] / args.print_freq  for key in sorted(stat_dict.keys()) if 'loss' in key and 'proposal_' not in key and 'last_' not in key and 'head_' not in key }
                     tmp.update({"student_supervised_loss":loss.clone().detach().item(),
-                                "center_consistency_loss":center_consistency_loss.clone().detach().item() if center_consistency_loss is not None else None,
-                                "soft_token_consistency_loss":soft_token_consistency_loss.clone().detach().item() if soft_token_consistency_loss is not None else None,
-                                "size_consistency_loss":size_consistency_loss.clone().detach().item() if size_consistency_loss is not None else None,
-                                "query_consistency_loss":query_consistency_loss.clone().detach().item() if query_consistency_loss is not None else None,
-                                "text_consistency_loss":text_consistency_loss.clone().detach().item() if text_consistency_loss is not None else None,
-                                "consistent_loss":consistent_loss.clone().detach().item() if consistent_loss is not None else None ,
+                                # "center_consistency_loss":center_consistency_loss.clone().detach().item() if center_consistency_loss is not None else None,
+                                # "soft_token_consistency_loss":soft_token_consistency_loss.clone().detach().item() if soft_token_consistency_loss is not None else None,
+                                # "size_consistency_loss":size_consistency_loss.clone().detach().item() if size_consistency_loss is not None else None,
+                                # "query_consistency_loss":query_consistency_loss.clone().detach().item() if query_consistency_loss is not None else None,
+                                # "text_consistency_loss":text_consistency_loss.clone().detach().item() if text_consistency_loss is not None else None,
+                                # "consistent_loss":consistent_loss.clone().detach().item() if consistent_loss is not None else None ,
                                 "total_loss":total_loss.clone().detach().item(),
                                 "lr": scheduler.get_last_lr()[0]
                             })
@@ -900,16 +805,12 @@ class TrainTester(BaseTrainTester):
 
         """Run main training/testing pipeline."""
         # Get loaders
-        labeled_loader,unlabeled_loader, test_loader = self.get_loaders(args)
-        logger.info(f"length of  labeled dataset: {len(labeled_loader.dataset)} \n  length of  unlabeled dataset: {len(unlabeled_loader.dataset)} \n length of testing dataset: {len(test_loader.dataset)}")
+        labeled_loader,arkitscene_loader, test_loader = self.get_loaders(args)
+        logger.info(f"length of  labeled dataset: {len(labeled_loader.dataset)} \n  length of  unlabeled dataset: {len(arkitscene_loader.dataset)} \n length of testing dataset: {len(test_loader.dataset)}")
         
         # Get model
         model = self.get_model(args)
-        ema_model = self.get_model(args)
         
-        for param in ema_model.parameters():
-            param.detach_()
-
         # Get criterion
         criterion, set_criterion = self.get_criterion(args)
 
@@ -923,7 +824,9 @@ class TrainTester(BaseTrainTester):
         # Move model to devices
         if torch.cuda.is_available():
             model = model.cuda(args.local_rank)
-            ema_model = ema_model.cuda(args.local_rank)
+
+
+
 
         model = DistributedDataParallel(
             model, device_ids=[args.local_rank],
@@ -936,8 +839,7 @@ class TrainTester(BaseTrainTester):
         if args.checkpoint_path:
             assert os.path.isfile(args.checkpoint_path)
             load_checkpoint(args, model, optimizer, scheduler)
-            load_checkpoint(args, ema_model, optimizer, scheduler,distributed2common=True)
-
+            
             if args.lr_decay_intermediate:    
                 tmp = {scheduler._step_count+len(labeled_loader):1 } #* 一个epoch 后decay learning rate 
                 tmp.update({ k:v for  idx, (k,v) in enumerate(scheduler.milestones.items()) if idx != 0})
@@ -949,9 +851,7 @@ class TrainTester(BaseTrainTester):
         best_performce = 0
         save_dir = osp.join(args.log_dir,'performance.txt')
 
-        ema_best_performce = 0
-        ema_save_dir = osp.join(args.log_dir,'ema_performance.txt')
-
+        
         if osp.exists(save_dir):
             os.remove(save_dir)
         #!===============================
@@ -959,14 +859,14 @@ class TrainTester(BaseTrainTester):
         for epoch in range(args.start_epoch, args.max_epoch + 1):
             
             labeled_loader.sampler.set_epoch(epoch)
-            unlabeled_loader.sampler.set_epoch(epoch)
+            arkitscene_loader.sampler.set_epoch(epoch)
 
 
             tic = time.time()
             
 
             self.train_one_epoch(
-                epoch, labeled_loader, unlabeled_loader,model,ema_model,
+                epoch, labeled_loader, arkitscene_loader,model,
                 criterion, set_criterion,
                 optimizer, scheduler, args
             )
@@ -980,6 +880,7 @@ class TrainTester(BaseTrainTester):
                     optimizer.param_groups[1]['lr']
                 )
             )
+
             # save model
             if epoch % args.val_freq == 0:
                 print("Test evaluation.......")
@@ -991,19 +892,9 @@ class TrainTester(BaseTrainTester):
                 
                 if performance is not None :
                     logger.info(','.join(['student_%s:%.04f'%(k,round(v,4)) for k,v in performance.items()]))
-                # else :
-                #     embed()
+      
                 
-                
-                ema_performance = self.evaluate_one_epoch(
-                    epoch, test_loader,
-                    ema_model, criterion, set_criterion, args
-                )
-                if ema_performance is not None :
-                    logger.info(','.join(['teacher_%s:%.04f'%(k,round(v,4)) for k,v in ema_performance.items()]))
-                # else :#* check what cause None ?
-                #     embed()
-                
+           
 
                 #todo 把save as txt 分离出来? 
                 if dist.get_rank() == 0 and args.upload_wandb:
@@ -1016,15 +907,6 @@ class TrainTester(BaseTrainTester):
                             best_performce =  new_performance
                             save_checkpoint(args, epoch, model, optimizer, scheduler ,is_best=True,prefix='student_')
                             wandb.log({'%s'%('student_best_'+k):round(v,4) for k,v in performance.items()})
-
-                    if ema_performance is not None :
-                        wandb.log({'teacher_%s'%(k):round(v,4) for k,v in ema_performance.items()})
-                        is_best,new_performance = save_res(ema_save_dir,epoch,ema_performance,ema_best_performce)
-                        if is_best:
-                            ema_best_performce =  new_performance
-                            save_checkpoint(args, epoch, ema_model, optimizer, scheduler ,is_best=True,prefix='teacher_')     
-                            wandb.log({'%s'%('teacher_best_'+k):round(v,4) for k,v in ema_performance.items()})
-
 
         # Training is over, evaluate
         save_checkpoint(args, 'last', model, optimizer, scheduler, True)

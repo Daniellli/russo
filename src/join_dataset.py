@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 21:28:11
-LastEditTime: 2022-10-17 12:17:07
+LastEditTime: 2022-10-22 23:11:29
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/join_dataset.py
@@ -35,17 +35,34 @@ from transformers import RobertaTokenizerFast
 from IPython import embed
 import wandb
 
+
+
+#*debug 
+import os.path as osp
+import sys
+current = osp.dirname(osp.abspath(__file__))
+root =osp.dirname(current)
+# os.chdir(root)
+sys.path.append(root)
+sys.path.append(current)
+sys.path.append(osp.join(root,'my_script'))
+sys.path.append(osp.join(root,'src'))
+from src.scannet_classes import REL_ALIASES, VIEW_DEP_RELS
+
+
+
 from data.model_util_scannet import ScannetDatasetConfig
 from data.scannet_utils import read_label_mapping
 from src.visual_data_handlers import Scan
-from .scannet_classes import REL_ALIASES, VIEW_DEP_RELS
+# from .scannet_classes import REL_ALIASES, VIEW_DEP_RELS
+
+
 
 NUM_CLASSES = 485
 DC = ScannetDatasetConfig(NUM_CLASSES)
 DC18 = ScannetDatasetConfig(18)
 MAX_NUM_OBJ = 132
 
-import os.path as osp
 from loguru import logger 
 
 
@@ -149,17 +166,98 @@ class JointDataset(Dataset):
         elif dset == 'nr3d': 
             # annos = self.load_nr3d_annos()
             annos = self.load_nr3d_annos_v2()
-            
+        elif dset == 'scanrefer': 
+            annos= self.load_scanrefer_annos()
+
         else :
             raise Exception 
 
         if self.overfit:
             annos = annos[:128]
             # annos = annos[:1280]
-        logger.info(f"{len(annos) }  annotations   loaded ")
+        logger.info(f" {dset} : {len(annos) }  annotations   loaded ")
         
         return annos
 
+
+
+    def load_scanrefer_annos(self):
+        """Load annotations of ScanRefer."""
+        _path = self.data_path + 'scanrefer/ScanRefer_filtered'
+        split = self.split
+        if split in ('val', 'test'):
+            split = 'val'
+
+
+        with open(_path + '_%s.txt' % split) as f:
+            scan_ids = [line.rstrip().strip('\n') for line in f.readlines()]
+
+
+            
+        with open(_path + '_%s.json' % split) as f:
+            reader = json.load(f)
+        annos = [
+            {
+                'scan_id': anno['scene_id'],
+                'target_id': int(anno['object_id']),
+                'distractor_ids': [],
+                'utterance': ' '.join(anno['token']),
+                'target': ' '.join(str(anno['object_name']).split('_')),
+                'anchors': [],
+                'anchor_ids': [],
+                'dataset': 'scanrefer'
+            }
+            for anno in reader
+            if anno['scene_id'] in scan_ids
+        ]
+        # Fix missing target reference
+        for anno in annos:
+            if anno['target'] not in anno['utterance']:
+                anno['utterance'] = (
+                    ' '.join(anno['utterance'].split(' . ')[0].split()[:-1])
+                    + ' ' + anno['target'] + ' . '
+                    + ' . '.join(anno['utterance'].split(' . ')[1:])
+                )
+        # Add distractor info
+        scene2obj = defaultdict(list)
+        sceneobj2used = defaultdict(list)
+        for anno in annos:
+            nyu_labels = [
+                self.label_mapclass[
+                    self.scans[anno['scan_id']].get_object_instance_label(ind)
+                ]
+                for ind in
+                range(len(self.scans[anno['scan_id']].three_d_objects))
+            ]
+            labels = [DC18.type2class.get(lbl, 17) for lbl in nyu_labels]
+            anno['distractor_ids'] = [
+                ind
+                for ind in
+                range(len(self.scans[anno['scan_id']].three_d_objects))
+                if labels[ind] == labels[anno['target_id']]
+                and ind != anno['target_id']
+            ][:32]
+            if anno['target_id'] not in sceneobj2used[anno['scan_id']]:
+                sceneobj2used[anno['scan_id']].append(anno['target_id'])
+                scene2obj[anno['scan_id']].append(labels[anno['target_id']])
+        # Add unique-multi
+        for anno in annos:
+            nyu_labels = [
+                self.label_mapclass[
+                    self.scans[anno['scan_id']].get_object_instance_label(ind)
+                ]
+                for ind in
+                range(len(self.scans[anno['scan_id']].three_d_objects))
+            ]
+            labels = [DC18.type2class.get(lbl, 17) for lbl in nyu_labels]
+            anno['unique'] = (
+                np.array(scene2obj[anno['scan_id']])
+                == labels[anno['target_id']]
+            ).sum() == 1
+        return annos
+
+
+        
     def load_sr3dplus_annos(self):
         """Load annotations of sr3d/sr3d+."""
         return self.load_sr3d_annos(dset='sr3d+')
@@ -653,6 +751,7 @@ class JointDataset(Dataset):
 
         # Object boxes
         all_bboxes = np.zeros((MAX_NUM_OBJ, 6))
+        #* 这获取的是左上角和右下角, 根据增强后的 pc 计算的box 
         all_bboxes_ = np.stack([
             scan.get_object_bbox(k).reshape(-1)
             for k, kept in enumerate(keep) if kept
@@ -777,6 +876,27 @@ class JointDataset(Dataset):
 
         return boxes
 
+
+    '''
+    description:  获取当前scan 对应的box
+    return {*}
+    '''
+    def get_current_pc_box(self,scan):
+        all_bboxes = np.zeros((MAX_NUM_OBJ, 6))
+        #* 这获取的是左上角和右下角, 根据增强后的 pc 计算的box 
+        all_bboxes_ = np.stack([ scan.get_object_bbox(k).reshape(-1) for k in range(len(scan.three_d_objects)) ])
+        # cx, cy, cz, w, h, d
+        all_bboxes_ = np.concatenate((
+            (all_bboxes_[:, :3] + all_bboxes_[:, 3:]) * 0.5,
+            all_bboxes_[:, 3:] - all_bboxes_[:, :3]
+        ), 1)
+        all_bboxes[:len(all_bboxes_)] = all_bboxes_
+        all_bboxes[len(all_bboxes_):] = 10000
+        return all_bboxes
+
+
+
+
     def __getitem__(self, index):
         """Get current batch for input index."""
         split = self.split
@@ -785,6 +905,10 @@ class JointDataset(Dataset):
         anno = self.annos[index]
         scan = self.scans[anno['scan_id']]
         scan.pc = np.copy(scan.orig_pc)
+
+
+        
+        origin_box = self.get_current_pc_box(scan)
 
         # Populate anno (used only for scannet)
         self.random_utt = False
@@ -857,9 +981,11 @@ class JointDataset(Dataset):
         ) = self._get_detected_objects(split, anno['scan_id'], augmentations)
 
         #!===================
-        teacher_box = all_bboxes.copy()
-        teacher_box = self.transformation_box(teacher_box,augmentations)
- 
+        #* wrong
+        # teacher_box = all_bboxes.copy()
+        # teacher_box = self.transformation_box(teacher_box,augmentations)
+        #* right 
+        teacher_box = origin_box
 
         #!===================
 
@@ -1226,3 +1352,35 @@ def unpickle_data(file_name, python2_to_3=False):
         else:
             yield cPickle.load(in_file)
     in_file.close()
+
+
+
+
+
+
+if __name__=="__main__":
+
+    train_dataset = JointDataset(
+        # dataset_dict={'sr3d':1,'scannet':10},
+        dataset_dict={'scannet':10},
+        test_dataset='sr3d', #? only test set need ? 
+        split='train',
+        use_color=True, use_height=False,
+        overfit=True,
+        data_path='datasets/',
+        detect_intermediate=True,#? 
+        use_multiview=False, #? 
+        butd=False,
+        butd_gt=False,
+        butd_cls=True,
+        augment_det=False
+    )
+
+    demo =  train_dataset.__getitem__(0)
+
+    print(demo)
+    
+
+
+
+    

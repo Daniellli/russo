@@ -1,7 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-08-21 19:15:53
- # @LastEditTime: 2022-10-17 20:23:58
+ # @LastEditTime: 2022-10-19 16:10:27
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/train_test_cls.sh
@@ -50,36 +50,35 @@ save_freq=$val_freq;
 
 
 #* for  semi supervision architecture  : step1 
-TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
-    pretrain.py --num_decoder_layers 6 \
-    --use_color \
-    --weight_decay 0.0005 \
-    --data_root $DATA_ROOT \
-    --val_freq $val_freq --batch_size $b_size --save_freq $val_freq --print_freq $print_freq \
-    --lr_backbone=1e-3 --lr=1e-4 \
-    --dataset $train_data --test_dataset $test_data \
-    --detect_intermediate --joint_det \
-    --use_soft_token_loss --use_contrastive_align \
-    --log_dir ./logs/bdetr \
-    --pp_checkpoint $DATA_ROOT/gf_detector_l6o256.pth \
-    --butd_cls --self_attend \
-    --max_epoch 400 --consistency_weight 1e-4 \
-    --upload-wandb \
-    --labeled_ratio $labeled_ratio \
-    2>&1 | tee -a logs/train_test_cls.log
+# TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
+#     pretrain.py --num_decoder_layers 6 \
+#     --use_color \
+#     --weight_decay 0.0005 \
+#     --data_root $DATA_ROOT \
+#     --val_freq $val_freq --batch_size $b_size --save_freq $val_freq --print_freq $print_freq \
+#     --lr_backbone=1e-3 --lr=1e-4 \
+#     --dataset $train_data --test_dataset $test_data \
+#     --detect_intermediate --joint_det \
+#     --use_soft_token_loss --use_contrastive_align \
+#     --log_dir ./logs/bdetr \
+#     --pp_checkpoint $DATA_ROOT/gf_detector_l6o256.pth \
+#     --butd_cls --self_attend \
+#     --max_epoch 400 --consistency_weight 1e-4 \
+#     --upload-wandb \
+#     --labeled_ratio $labeled_ratio \
+#     2>&1 | tee -a logs/train_test_cls.log
 
 # --lr_decay_epochs 25 26 \
 
 
 #* for  semi supervision architecture  : step2
 # b_size='2,14';
-b_size='8,4';
-# resume_mode_path="pretrain/pretrain_ramdom%20anno_41.pth"
-resume_mode_path="pretrain/pretrain_random%20anno_3384_nr3d.pth"
+b_size='4,8';
+resume_mode_path="pretrain/pretrain_random%50_4814_nr3d_340_step1.pth"
 
 #* for not mask 
 size_consistency_weight=1e-5;
-center_consistency_weight=1e-4;
+center_consistency_weight=1e-3;
 token_consistency_weight=1e-2;
 query_consistency_weight=1e-2;
 text_consistency_weight=1e-2;
@@ -90,32 +89,33 @@ text_consistency_weight=1e-2;
 # token_consistency_weight=1;
 
 rampup_length=200;
+epoch=800;
 
-
-# TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
-#     train.py --num_decoder_layers 6 \
-#     --use_color \
-#     --weight_decay 0.0005 \
-#     --data_root $DATA_ROOT \
-#     --val_freq $val_freq --batch_size $b_size --save_freq $save_freq --print_freq $print_freq \
-#     --lr_backbone=1e-3 --lr=1e-4 \
-#     --dataset $train_data --test_dataset $test_data \
-#     --detect_intermediate --joint_det \
-#     --use_soft_token_loss --use_contrastive_align \
-#     --log_dir ./logs/bdetr \
-#     --pp_checkpoint $DATA_ROOT/gf_detector_l6o256.pth \
-#     --butd_cls --self_attend \
-#     --max_epoch 400 \
-#     --size_consistency_weight $size_consistency_weight \
-#     --center_consistency_weight $center_consistency_weight \
-#     --token_consistency_weight $token_consistency_weight \
-#     --query_consistency_weight $query_consistency_weight \
-#     --text_consistency_weight $text_consistency_weight \
-#     --upload-wandb \
-#     --checkpoint_path $resume_mode_path \
-#     --labeled_ratio $labeled_ratio \
-#     --rampup_length $rampup_length \
-#     2>&1 | tee -a logs/train_test_cls.log
+TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
+    train.py --num_decoder_layers 6 \
+    --use_color \
+    --weight_decay 0.0005 \
+    --data_root $DATA_ROOT \
+    --val_freq $val_freq --batch_size $b_size --save_freq $save_freq --print_freq $print_freq \
+    --lr_backbone=1e-3 --lr=1e-4 \
+    --dataset $train_data --test_dataset $test_data \
+    --detect_intermediate --joint_det \
+    --use_soft_token_loss --use_contrastive_align \
+    --log_dir ./logs/bdetr \
+    --pp_checkpoint $DATA_ROOT/gf_detector_l6o256.pth \
+    --butd_cls --self_attend \
+    --max_epoch $epoch \
+    --size_consistency_weight $size_consistency_weight \
+    --center_consistency_weight $center_consistency_weight \
+    --token_consistency_weight $token_consistency_weight \
+    --query_consistency_weight $query_consistency_weight \
+    --text_consistency_weight $text_consistency_weight \
+    --upload-wandb \
+    --checkpoint_path $resume_mode_path \
+    --labeled_ratio $labeled_ratio \
+    --rampup_length $rampup_length \
+    --lr_decay_intermediate \
+    2>&1 | tee -a logs/train_test_cls.log
 
 
 # --lr_decay_epochs 25 26 \

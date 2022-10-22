@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-04 19:55:59
-LastEditTime: 2022-10-17 12:25:24
+LastEditTime: 2022-10-22 23:11:57
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/join_unlabeled_dataset.py
@@ -801,6 +801,24 @@ class JointUnlabeledDataset(Dataset):
 
         return boxes
 
+    '''
+    description:  获取当前scan 对应的box
+    return {*}
+    '''
+    def get_current_pc_box(self,scan):
+        all_bboxes = np.zeros((MAX_NUM_OBJ, 6))
+        #* 这获取的是左上角和右下角, 根据增强后的 pc 计算的box 
+        all_bboxes_ = np.stack([ scan.get_object_bbox(k).reshape(-1) for k in range(len(scan.three_d_objects)) ])
+        # cx, cy, cz, w, h, d
+        all_bboxes_ = np.concatenate((
+            (all_bboxes_[:, :3] + all_bboxes_[:, 3:]) * 0.5,
+            all_bboxes_[:, 3:] - all_bboxes_[:, :3]
+        ), 1)
+        all_bboxes[:len(all_bboxes_)] = all_bboxes_
+        all_bboxes[len(all_bboxes_):] = 10000
+        return all_bboxes
+
+
     def __getitem__(self, index):
         """Get current batch for input index."""
         split = self.split
@@ -809,6 +827,10 @@ class JointUnlabeledDataset(Dataset):
         anno = self.annos[index]
         scan = self.scans[anno['scan_id']]
         scan.pc = np.copy(scan.orig_pc)
+
+        origin_box = self.get_current_pc_box(scan)
+
+
 
         # Populate anno (used only for scannet)
         self.random_utt = False
@@ -881,8 +903,9 @@ class JointUnlabeledDataset(Dataset):
         ) = self._get_detected_objects(split, anno['scan_id'], augmentations)
 
         #!===================
-        teacher_box = all_bboxes.copy()
-        teacher_box = self.transformation_box(teacher_box,augmentations)
+        # teacher_box = all_bboxes.copy()
+        # teacher_box = self.transformation_box(teacher_box,augmentations)
+        teacher_box = origin_box
  
 
         #!===================
@@ -958,6 +981,7 @@ class JointUnlabeledDataset(Dataset):
             #     anno['anchor_ids']
             #     + [-1] * (32 - len(anno['anchor_ids']))
             # ).astype(int),
+            #* detector output =================================================
             "all_detected_boxes": all_detected_bboxes.astype(np.float32),
             "all_detected_bbox_label_mask": all_detected_bbox_label_mask.astype(np.bool8),
             "all_detected_class_ids": detected_class_ids.astype(np.int64),
@@ -965,6 +989,8 @@ class JointUnlabeledDataset(Dataset):
             "is_view_dep": self._is_view_dep(anno['utterance']),
             "is_hard": len(anno['distractor_ids']) > 1,
             "is_unique": len(anno['distractor_ids']) == 0,
+            #*  ================================================================
+            
             # "target_cid": (
             #     class_ids[anno['target_id']]
             #     if isinstance(anno['target_id'], int)
