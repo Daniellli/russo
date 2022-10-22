@@ -1,7 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-22 10:36:35
- # @LastEditTime: 2022-10-22 11:20:19
+ # @LastEditTime: 2022-10-22 14:41:35
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/full_supervise.sh
@@ -12,8 +12,8 @@
 # gpu_num=7
 # b_size=12
 
-gpu_ids="3,4,5,6,7"
-gpu_num=5
+gpu_ids="2,3"
+gpu_num=2
 b_size=12
 
 # gpu_ids="0,1,2,3"

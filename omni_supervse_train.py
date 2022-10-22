@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-03 22:00:15
-LastEditTime: 2022-10-22 11:27:32
+LastEditTime: 2022-10-22 14:44:16
 LastEditors: xushaocong
 Description:  将 ARKitScenes 也作为有标签数据进行监督 , 也就是用mean teacher 
 FilePath: /butd_detr/omni_supervse_train.py
@@ -248,8 +248,7 @@ class TrainTester(BaseTrainTester):
             butd_cls=args.butd_cls
         )
 
-        arkitscene_datasets = ARKitSceneDataset(split_set="train", 
-            augment=True,data_root='datasets/arkitscenes', butd_cls=args.butd_cls)
+        arkitscene_datasets = ARKitSceneDataset(augment=True,data_root='datasets/arkitscenes', butd_cls=args.butd_cls)
 
         # unlabeled_dataset = JointUnlabeledDataset(
         #     dataset_dict=dataset_dict,
