@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-03 22:00:15
-LastEditTime: 2022-10-22 14:44:16
+LastEditTime: 2022-10-22 16:50:07
 LastEditors: xushaocong
 Description:  将 ARKitScenes 也作为有标签数据进行监督 , 也就是用mean teacher 
 FilePath: /butd_detr/omni_supervse_train.py
@@ -761,12 +761,12 @@ class TrainTester(BaseTrainTester):
                     #!===================
                     tmp = { f'{key}':stat_dict[key] / args.print_freq  for key in sorted(stat_dict.keys()) if 'loss' in key and 'proposal_' not in key and 'last_' not in key and 'head_' not in key }
                     tmp.update({"student_supervised_loss":loss.clone().detach().item(),
-                                "center_consistency_loss":center_consistency_loss.clone().detach().item() if center_consistency_loss is not None else None,
-                                "soft_token_consistency_loss":soft_token_consistency_loss.clone().detach().item() if soft_token_consistency_loss is not None else None,
-                                "size_consistency_loss":size_consistency_loss.clone().detach().item() if size_consistency_loss is not None else None,
-                                "query_consistency_loss":query_consistency_loss.clone().detach().item() if query_consistency_loss is not None else None,
-                                "text_consistency_loss":text_consistency_loss.clone().detach().item() if text_consistency_loss is not None else None,
-                                "consistent_loss":consistent_loss.clone().detach().item() if consistent_loss is not None else None ,
+                                # "center_consistency_loss":center_consistency_loss.clone().detach().item() if center_consistency_loss is not None else None,
+                                # "soft_token_consistency_loss":soft_token_consistency_loss.clone().detach().item() if soft_token_consistency_loss is not None else None,
+                                # "size_consistency_loss":size_consistency_loss.clone().detach().item() if size_consistency_loss is not None else None,
+                                # "query_consistency_loss":query_consistency_loss.clone().detach().item() if query_consistency_loss is not None else None,
+                                # "text_consistency_loss":text_consistency_loss.clone().detach().item() if text_consistency_loss is not None else None,
+                                # "consistent_loss":consistent_loss.clone().detach().item() if consistent_loss is not None else None ,
                                 "total_loss":total_loss.clone().detach().item(),
                                 "lr": scheduler.get_last_lr()[0]
                             })

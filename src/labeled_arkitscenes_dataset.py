@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-22 10:41:31
-LastEditTime: 2022-10-22 14:41:18
+LastEditTime: 2022-10-22 16:46:22
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/labeled_arkitscenes_dataset.py
@@ -667,17 +667,13 @@ class ARKitSceneDataset(Dataset):
         
 
 
-        all_detected_bboxes = None
-        all_detected_bbox_label_mask = None
-        detected_class_ids = None
-        classes = None
-        detected_logits=None 
+        all_detected_bboxes = np.zeros(all_bboxes.shape)
+        all_detected_bbox_label_mask = np.zeros(all_bbox_label_mask.shape)
+        detected_class_ids = np.zeros((len(all_bboxes,)))
         if self.butd_cls:
             all_detected_bboxes = all_bboxes #? 那么  这个detected box 和 auged  pc 能对应上吗? 
             all_detected_bbox_label_mask = all_bbox_label_mask
-            detected_class_ids = np.zeros((len(all_bboxes,)))
-            classes = class_ids #?  
-            detected_class_ids[all_bbox_label_mask] = classes[classes !=0]
+            detected_class_ids[all_bbox_label_mask] = class_ids[class_ids !=0]
 
 
 
@@ -692,6 +688,7 @@ class ARKitSceneDataset(Dataset):
         }
 
         
+        
         ret_dict.update( {
             # Basic
             "scan_ids": scan_name,
@@ -703,7 +700,7 @@ class ARKitSceneDataset(Dataset):
             "tokens_positive": tokens_positive.astype(np.int64),
             "positive_map": positive_map.astype(np.float32),
             "relation": ("none"),
-            "target_name": anno['target'][anno['target_id'][0]],
+            "target_name": anno['target'][0],
             "target_id": (anno['target_id'][0]),
 
             "all_bboxes": all_bboxes.astype(np.float32),
@@ -711,10 +708,10 @@ class ARKitSceneDataset(Dataset):
             "all_class_ids": class_ids.astype(np.int64),
 
             #! no detected results: 
-            "all_detected_boxes": all_detected_bboxes.astype(np.float32) if all_detected_bboxes is not None else None,
-            "all_detected_bbox_label_mask": all_detected_bbox_label_mask.astype(np.bool8) if all_detected_bbox_label_mask is not None else None,
-            "all_detected_class_ids": detected_class_ids.astype(np.int64) if detected_class_ids is not None else None,
-            "all_detected_logits": detected_logits.astype(np.float32) if detected_logits is not None else None,
+            "all_detected_boxes": all_detected_bboxes.astype(np.float32),
+            "all_detected_bbox_label_mask": all_detected_bbox_label_mask.astype(np.bool8),
+            "all_detected_class_ids": detected_class_ids.astype(np.int64) ,
+            # "all_detected_logits": detected_logits.astype(np.float32) ,
             #*! no point_instance_label  , namely sematic results
 
             "distractor_ids": np.array(
@@ -732,7 +729,7 @@ class ARKitSceneDataset(Dataset):
             "pc_before_aug":ema_point_clouds.astype(np.float32),
             #! no teacher box because no  detected results, so we can only test on det setting 
             "augmentations":augmentations,
-            "supervised_mask":np.array(1).astype(np.int64),
+            "supervised_mask":np.array(2).astype(np.int64),#*  2 表示有标签 但是没有point_instance_label
         })
 
 
