@@ -1,7 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-22 10:36:35
- # @LastEditTime: 2022-10-22 16:50:36
+ # @LastEditTime: 2022-10-22 16:57:49
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/full_supervise.sh
@@ -27,8 +27,8 @@ b_size=12
 
 
 port=29530
-val_freq=1;
-print_freq=100;
+val_freq=5;
+print_freq=10;
 save_freq=$val_freq;
 #* for debug 
 
@@ -40,7 +40,8 @@ epoch=400;
 # train_data="sr3d nr3d scanrefer scannet sr3d+"
 #todo 将scanrefer 和 joint datasets 整合起来
 
-train_data="sr3d nr3d scanrefer sr3d+"
+# train_data="sr3d nr3d scanrefer sr3d+"
+train_data="sr3d"
 test_data=scanrefer
 DATA_ROOT=datasets/
 # unlabeled_datastes='arkitscenes';

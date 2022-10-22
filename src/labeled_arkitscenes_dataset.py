@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-22 10:41:31
-LastEditTime: 2022-10-22 16:46:22
+LastEditTime: 2022-10-22 20:07:43
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/labeled_arkitscenes_dataset.py
@@ -30,26 +30,36 @@ from torch.utils.data import Dataset
 from tqdm import tqdm
 
 from six.moves import cPickle
-from data.model_util_scannet import ScannetDatasetConfig
-from data.model_util_scannet import rotate_aligned_boxes
+
+# current = osp.dirname(osp.abspath(__file__))
+# root =osp.dirname(current)
+# os.chdir(root)
+# sys.path.append(root)
+# sys.path.append(current)
+# sys.path.append(osp.join(root,'my_script'))
+
+
+
+from data.model_util_scannet import ScannetDatasetConfig,rotate_aligned_boxes
+from my_script.utils import print_attr_shape,make_dirs
+import my_script.pc_utils  as pc_util
+#* debug 
+# import pc_utils  as pc_util
+
+
+
 
 from loguru import logger 
 import trimesh
 
-from my_script.pc_utils import *
-from my_script.utils import print_attr_shape
 
-import my_script.pc_utils  as pc_util
-from my_script.utils import make_dirs
+
 from src.joint_det_dataset import rot_x,rot_y,rot_z
-
-
-
 import torch
-
-
-
 from transformers import RobertaTokenizerFast
+from IPython import embed
+
+
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(BASE_DIR)
@@ -59,8 +69,8 @@ sys.path.append(BASE_DIR)
 DC = ScannetDatasetConfig()
 DC18 = ScannetDatasetConfig(18)
 
-from utils.taxonomy import ARKitDatasetConfig
-ARKit_DC=ARKitDatasetConfig()
+# from utils.taxonomy import ARKitDatasetConfig
+# ARKit_DC=ARKitDatasetConfig()
 
 # MAX_NUM_OBJ = 64
 # NUM_PROPOSAL = 256
@@ -207,7 +217,8 @@ class ARKitSceneDataset(Dataset):
         #* load  language model  
         model_path=osp.join(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__))))),'.cache/huggingface/transformers/roberta')
         self.tokenizer = RobertaTokenizerFast.from_pretrained(model_path)
-
+        self.scene_name = all_scene_name
+        
         logger.info(f"ARKitSceneDataset : {len(self.annos)} sample loaded, scene_name number : {len(all_scene_name)} ")
         
     def __get_scene_name(self,split):
@@ -274,10 +285,34 @@ class ARKitSceneDataset(Dataset):
     def get_annos(self,annotation,scan_id,data_path):
         """Load annotations of scannet."""
 
-        class_label = annotation['types']
-        class_label_in_scannet= np.array([DC.type2class.get(label,-1) for label in class_label] )#*  -1 means not in  scannet class set
-        DC.type2class
+
+        # todo   过滤  不存在任何有效target的 sample 
+        #*  第一步过滤
         
+        class_label = annotation['types']
+        class_label_in_scannet= [DC.type2class.get(label,-1) for label in class_label] #* 双向过滤1: from  arkitscene to scannet ,  -1 means not in  scannet class set, 
+
+
+        #*  第二步过滤
+        finnal_class_label = [] 
+        for c in class_label_in_scannet:
+            if c == -1:#* 第一步过滤 已经过滤掉的数据
+                finnal_class_label.append(c)
+                continue 
+                
+            if DC.class2type[c]  in  class_label and  (c  in set(DC.nyu40id2class) ): #* 第二步过滤, 如果 id 能成功在最初的arkitscene 找到对应 则 保留
+                finnal_class_label.append(c)
+            else :#* 否则改-1 , 表示没找到对应的数据
+                finnal_class_label.append(-1)
+
+
+
+        class_label_in_scannet = np.array(finnal_class_label)
+
+  
+
+
+
         if (class_label_in_scannet!=-1).sum()>0:
             # this will get populated randomly each time
             return {
@@ -300,7 +335,7 @@ class ARKitSceneDataset(Dataset):
 
 
     def __len__(self):
-        return len(self.annos.keys())
+        return len(self.scene_name )
        
     
     '''
@@ -506,8 +541,8 @@ class ARKitSceneDataset(Dataset):
         if self.augment:
             rotate = True
             point_clouds, color, augmentations = self._augment(point_clouds, color, rotate)
-        else :
-            logger.info(f"no augmentation ")
+        # else :
+        #     logger.info(f"no augmentation ")
             
         # e. Concatenate representations
         if color is not None:
@@ -688,7 +723,6 @@ class ARKitSceneDataset(Dataset):
         }
 
         
-        
         ret_dict.update( {
             # Basic
             "scan_ids": scan_name,
@@ -730,6 +764,7 @@ class ARKitSceneDataset(Dataset):
             #! no teacher box because no  detected results, so we can only test on det setting 
             "augmentations":augmentations,
             "supervised_mask":np.array(2).astype(np.int64),#*  2 表示有标签 但是没有point_instance_label
+            
         })
 
 
@@ -827,12 +862,18 @@ if __name__ == "__main__":
     debug_path = "logs/debug"
     # demo = dset.__getitem__(4)
     
+
     for example in tqdm(dset):
-        logger.info(example['scan_ids'])
+        target_num = example['box_label_mask'].astype(np.int64).sum()
+
+        logger.info(f"target number == {target_num}")
+        if len(example['target_name']) == 0:
+            logger.info(example['scan_ids'])
+            logger.info(f"target number :{len(example['target_name'])}")
+            
         # save_(example,example['scan_ids'],debug_path)
-        print_attr_shape(example)
-        break
-        if i == 2:
-            break
+        # print_attr_shape(example)
+        # if i == 2:
+        #     break
         i+=1
         
