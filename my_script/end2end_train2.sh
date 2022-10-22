@@ -1,7 +1,16 @@
 ###
+###
+ # @Author: xushaocong
+ # @Date: 2022-10-23 00:39:49
+ # @LastEditTime: 2022-10-23 00:40:14
+ # @LastEditors: xushaocong
+ # @Description: 
+ # @FilePath: /butd_detr/my_script/end2end_train2.sh
+ # email: xushaocong@stu.xmu.edu.cn
+### 
  # @Author: xushaocong
  # @Date: 2022-10-14 16:25:42
- # @LastEditTime: 2022-10-23 00:40:22
+ # @LastEditTime: 2022-10-23 00:04:11
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/end2end_train.sh
@@ -33,15 +42,14 @@ b_size=16;
 
 
 port=29526
-save_freq=1;
-val_freq=1;
+save_freq=5;
+val_freq=5;
 print_freq=100;
 
 
-resume_mode_path=logs/bdetr/scanrefer/1666377121/ckpt_epoch_105_best.pth;
+# resume_mode_path=logs/bdetr/scanrefer/1666377121/ckpt_epoch_105_best.pth;
 #* for  semi supervision architecture  : step1 
-topk=6;
-
+topk=7;
 TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
     end2end_mod.py --num_decoder_layers 6 \
     --use_color \
@@ -59,11 +67,10 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --upload-wandb \
     --use-tkps \
     --query_points_obj_topk $topk \
-    --checkpoint_path $resume_mode_path \
-    --lr_decay_intermediate \
     2>&1 | tee -a logs/train_test_cls.log
 
-
+# --checkpoint_path $resume_mode_path \
+#     --lr_decay_intermediate \
 
 # --butd 
 # --lr_decay_epochs 25 26 \

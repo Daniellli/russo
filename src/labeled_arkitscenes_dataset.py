@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-22 10:41:31
-LastEditTime: 2022-10-22 23:42:58
+LastEditTime: 2022-10-23 00:38:52
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/labeled_arkitscenes_dataset.py
@@ -69,8 +69,8 @@ sys.path.append(BASE_DIR)
 DC = ScannetDatasetConfig()
 DC18 = ScannetDatasetConfig(18)
 
-# from utils.taxonomy import ARKitDatasetConfig
-# ARKit_DC=ARKitDatasetConfig()
+from utils.taxonomy import ARKitDatasetConfig
+ARKit_DC=ARKitDatasetConfig()
 
 # MAX_NUM_OBJ = 64
 # NUM_PROPOSAL = 256
