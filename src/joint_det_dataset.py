@@ -695,7 +695,6 @@ class Joint3DDataset(Dataset):
             utterance = self._create_scannet_utterance(sampled_classes)
             
             # Target ids
-            #? 看不懂??? 
             if not self.random_utt:  # detection18 phrase
                 anno['target_id'] = np.where(np.array([
                     self.label_map18[

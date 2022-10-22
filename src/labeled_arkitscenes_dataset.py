@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-22 10:41:31
-LastEditTime: 2022-10-22 20:07:43
+LastEditTime: 2022-10-22 23:42:58
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/labeled_arkitscenes_dataset.py
@@ -54,7 +54,7 @@ import trimesh
 
 
 
-from src.joint_det_dataset import rot_x,rot_y,rot_z
+from src.joint_det_dataset import rot_x,rot_y,rot_z,box2points,points2box
 import torch
 from transformers import RobertaTokenizerFast
 from IPython import embed
@@ -345,13 +345,13 @@ class ARKitSceneDataset(Dataset):
     return {*}
     '''
     def downsample_ceil(self,mesh_vertices):
-        logger.info(f"before delete ceil :{mesh_vertices.shape}")        
+        # logger.info(f"before delete ceil :{mesh_vertices.shape}")        
         delete_thres = np.percentile(mesh_vertices[..., 2], 80)
         filter_mask = (mesh_vertices[..., 2] >= delete_thres)
         new_vertices= mesh_vertices[~filter_mask].copy()
         del mesh_vertices
         mesh_vertices = new_vertices
-        logger.info(f"after  delete ceil :{mesh_vertices.shape}")
+        # logger.info(f"after  delete ceil :{mesh_vertices.shape}")
         return mesh_vertices
   
         
@@ -369,7 +369,12 @@ class ARKitSceneDataset(Dataset):
 
         target_bboxes= np.copy(scene_box[:, 0:6])
 
+
         #* downsample points
+        if self.debug:
+            mesh_vertices=self.downsample_ceil(mesh_vertices)
+
+
         point_cloud, choices = pc_util.random_sampling(mesh_vertices,
             self.num_points, return_choices=True)    
 
@@ -471,12 +476,21 @@ class ARKitSceneDataset(Dataset):
         return any(rel in words for rel in rels)
 
 
+    '''
+    description:  
+    param {*} self
+    param {*} pc
+    param {*} color
+    param {*} rotate
+    return {*}
+    '''
     def _augment(self, pc, color, rotate):
         augmentations = {}
 
         # Rotate/flip only if we don't have a view_dep sentence
         if rotate:
-            theta_z = 90*np.random.randint(0, 4) + (2*np.random.rand() - 1) * 5
+            # theta_z = 90*np.random.randint(0, 4) + (2*np.random.rand() - 1) * 5
+            theta_z = 90*np.random.randint(0, 1) + (2*np.random.rand() - 1) * 5
             # Flipping along the YZ plane
             augmentations['yz_flip'] = np.random.random() > 0.5
             if augmentations['yz_flip']:
@@ -533,13 +547,18 @@ class ARKitSceneDataset(Dataset):
 
         # d. Augmentations
         color = color - self.mean_rgb
-        origin_pc = np.copy(np.concatenate([point_clouds,color],axis=-1))
+        origin_pc = None
+        if  self.debug :#* 用原来的color
+            origin_pc = np.copy(np.concatenate([point_clouds,origin_color],axis=-1))
+        else:
+            origin_pc = np.copy(np.concatenate([point_clouds,color],axis=-1))
 
 
         augmentations = {}
-        
+
         if self.augment:
-            rotate = True
+            #* 不能进行rotation, 因为我们scene 没有align to origin  point 
+            rotate =False
             point_clouds, color, augmentations = self._augment(point_clouds, color, rotate)
         # else :
         #     logger.info(f"no augmentation ")
@@ -569,7 +588,7 @@ class ARKitSceneDataset(Dataset):
 
 
         #!+========================================
-        # if self.split == 'train' and self.augment:  # jitter boxes
+        # if self.augment:  # jitter boxes
         #     bboxes[:len(tids)] *= (0.95 + 0.1*np.random.random((len(tids), 6)))
         #!+========================================
 
@@ -642,13 +661,43 @@ class ARKitSceneDataset(Dataset):
         class_ids[all_bbox_label_mask] = anno['bbox_class_ids_in_scannet'][anno['bbox_class_ids_in_scannet'] !=-1]
 
         #!================
-        # if self.split == 'train' and self.augment:
+        # if self.augment:
         #     all_bboxes *= (0.95 + 0.1*np.random.random((len(all_bboxes), 6)))
         #!================
 
         return class_ids, all_bboxes,all_bbox_label_mask
 
-        
+    
+
+    '''
+    description: 
+    param {*} self
+    param {*} boxes
+    param {*} augmentations
+    return {*}
+    '''
+    def align_box_to_pc(self,boxes,augmentations):
+
+        #* do not transformation bbox 
+        if len(augmentations.keys()) >0:  #* 不是训练的集的话 这个      augmentations 就是空
+            all_det_pts = box2points(boxes).reshape(-1, 3)
+
+
+            all_det_pts = rot_z(all_det_pts, augmentations['theta_z'])  
+            all_det_pts = rot_x(all_det_pts, augmentations['theta_x'])
+            all_det_pts = rot_y(all_det_pts, augmentations['theta_y'])
+
+            if augmentations.get('yz_flip', False):
+                all_det_pts[:, 0] = -all_det_pts[:, 0]
+            if augmentations.get('xz_flip', False):
+                all_det_pts[:, 1] = -all_det_pts[:, 1]
+
+            
+            all_det_pts += augmentations['shift']
+            all_det_pts *= augmentations['scale']
+            boxes = points2box(all_det_pts.reshape(-1, 8, 3))
+
+        return boxes
 
 
 
@@ -660,7 +709,7 @@ class ARKitSceneDataset(Dataset):
         # scan_name = anno['scan_id']
         
         
-
+        
         #* load pc
         scan_dir = os.path.join(anno['data_path'], scan_name, f"{scan_name}_offline_prepared_data_2")
         mesh_vertices = np.load(os.path.join(scan_dir, f"{scan_name}_data", f"{scan_name}_pc.npy"))
@@ -683,21 +732,31 @@ class ARKitSceneDataset(Dataset):
         
                 
         point_clouds, augmentations, og_color,origin_pc=self._get_pc(point_clouds)
+
+        #* teacher's things
+        teacher_box = np.zeros((MAX_NUM_OBJ, 6))
+        teacher_box[:bboxes.shape[0],:] = np.copy(bboxes)
+
+        teacher_pc = origin_pc
+
+
+        #* align box 
+        bboxes = self.align_box_to_pc(bboxes,augmentations)
+
         
         if self.debug:
-            debug_pc = np.concatenate([origin_pc[:,:3],og_color],axis=-1)
+            # debug_pc = np.concatenate([origin_pc[:,:3],og_color],axis=-1)
+            debug_pc = np.concatenate([point_clouds[:,:3],og_color],axis=-1) #* 用augment 之后的数据可视化检查
 
-            
-            
-        ema_point_clouds = origin_pc
+        
 
         #* 获取对应的 utterance target 对应的box, 
         #! 少了point_instance_label
         gt_bboxes, box_label_mask = self._get_target_boxes(bboxes,anno)
-
         tokens_positive, positive_map = self._get_token_positive_map(anno)
 
-        #* scene gt box , already done 
+
+        #* scene gt box , already done
         class_ids,all_bboxes,all_bbox_label_mask=self._get_scene_objects(bboxes,anno)
         
 
@@ -723,10 +782,12 @@ class ARKitSceneDataset(Dataset):
         }
 
         
+
+        
         ret_dict.update( {
             # Basic
             "scan_ids": scan_name,
-            "point_clouds": point_clouds.astype(np.float32) if not  self.debug  else debug_pc, 
+            "point_clouds": point_clouds.astype(np.float32) if not  self.debug  else debug_pc.astype(np.float32), 
             "utterances": (
                 ' '.join(anno['utterance'].replace(',', ' ,').split())
                 + ' . not mentioned'
@@ -760,7 +821,8 @@ class ARKitSceneDataset(Dataset):
             "is_unique": len(anno['distractor_ids']) == 0,
             #?  对应scennet calss set 的class ID
             "target_cid": (anno['bbox_class_ids_in_scannet'][anno['target_id'][0]]),
-            "pc_before_aug":ema_point_clouds.astype(np.float32),
+            "pc_before_aug":teacher_pc.astype(np.float32),
+            "teacher_box":teacher_box.astype(np.float32),
             #! no teacher box because no  detected results, so we can only test on det setting 
             "augmentations":augmentations,
             "supervised_mask":np.array(2).astype(np.int64),#*  2 表示有标签 但是没有point_instance_label
