@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-03 22:00:15
-LastEditTime: 2022-10-22 11:08:20
+LastEditTime: 2022-10-22 11:27:32
 LastEditors: xushaocong
 Description:  将 ARKitScenes 也作为有标签数据进行监督 , 也就是用mean teacher 
 FilePath: /butd_detr/omni_supervse_train.py
@@ -645,7 +645,7 @@ class TrainTester(BaseTrainTester):
             drop_last=False,
             generator=g
         )
-        logger.info(f"the iter num  labeled_loader needs :{len(labeled_loader)}, the iter num  unlabeled_loader needs :{len(unlabeled_loader)}, the iter num  test_loader needs :{len(test_loader)},  ")
+        logger.info(f"the iter num  labeled_loader needs :{len(labeled_loader)}, the iter num  arkitscenes_loader needs :{len(arkitscenes_loader)}, the iter num  test_loader needs :{len(test_loader)},  ")
         return labeled_loader,arkitscenes_loader, test_loader
 
 
@@ -681,7 +681,7 @@ class TrainTester(BaseTrainTester):
 
         # Loop over batches
 
-        total_iteration=max(len(labeled_loader),len(unlabeled_loader))
+        total_iteration=len(labeled_loader)
     
         logger.info(f"total_iteration == {total_iteration}")
 
@@ -807,7 +807,7 @@ class TrainTester(BaseTrainTester):
         """Run main training/testing pipeline."""
         # Get loaders
         labeled_loader,arkitscene_loader, test_loader = self.get_loaders(args)
-        logger.info(f"length of  labeled dataset: {len(labeled_loader.dataset)} \n  length of  unlabeled dataset: {len(unlabeled_loader.dataset)} \n length of testing dataset: {len(test_loader.dataset)}")
+        logger.info(f"length of  labeled dataset: {len(labeled_loader.dataset)} \n  length of  unlabeled dataset: {len(arkitscene_loader.dataset)} \n length of testing dataset: {len(test_loader.dataset)}")
         
         # Get model
         model = self.get_model(args)
@@ -860,7 +860,7 @@ class TrainTester(BaseTrainTester):
         for epoch in range(args.start_epoch, args.max_epoch + 1):
             
             labeled_loader.sampler.set_epoch(epoch)
-            unlabeled_loader.sampler.set_epoch(epoch)
+            arkitscene_loader.sampler.set_epoch(epoch)
 
 
             tic = time.time()

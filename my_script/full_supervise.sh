@@ -1,7 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-22 10:36:35
- # @LastEditTime: 2022-10-22 11:11:17
+ # @LastEditTime: 2022-10-22 11:20:19
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/full_supervise.sh
@@ -26,7 +26,7 @@ b_size=12
 
 
 
-port=29522
+port=29530
 val_freq=5;
 print_freq=100;
 save_freq=$val_freq;
@@ -34,7 +34,7 @@ save_freq=$val_freq;
 
 
 #* for  semi supervision architecture  : step2
-b_size='8,2';
+b_size='1,1';
 # resume_mode_path="pretrain/butd_no_tkps_5284_sr3d_nr3d_scanrefer_sr3dplus_74.pth"
 epoch=400;
 # train_data="sr3d nr3d scanrefer scannet sr3d+"
