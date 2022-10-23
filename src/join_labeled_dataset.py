@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-04 19:55:56
-LastEditTime: 2022-10-24 00:21:09
+LastEditTime: 2022-10-24 00:31:07
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/join_labeled_dataset.py
@@ -162,8 +162,6 @@ class JointLabeledDataset(Dataset):
             annos  = self.load_nr3d_annos_v2()
         elif dset == 'scanrefer': 
             annos= self.load_scanrefer_annos()
-
-
         else :
             raise Exception 
         
@@ -181,9 +179,13 @@ class JointLabeledDataset(Dataset):
         if split in ('val', 'test'):
             split = 'val'
 
-
-        with open(_path + '_%s.txt' % split) as f:
-            scan_ids = [line.rstrip().strip('\n') for line in f.readlines()]
+        if split== 'train' and self.labeled_ratio is not None:
+            with open(_path + '_%s_%.1f.txt' % (split,self.labeled_ratio)) as f:
+                labeld_scan_ids = [line.rstrip().strip('\n') for line in f.readlines()]
+            scan_ids = set(labeld_scan_ids)
+        else :
+            with open(_path + '_%s.txt' % split) as f:
+                scan_ids = [line.rstrip().strip('\n') for line in f.readlines()]
 
 
             

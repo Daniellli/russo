@@ -1,4 +1,13 @@
 
+###
+ # @Author: xushaocong
+ # @Date: 2022-10-24 00:27:51
+ # @LastEditTime: 2022-10-24 00:34:59
+ # @LastEditors: xushaocong
+ # @Description: 
+ # @FilePath: /butd_detr/my_script/pretrain.sh
+ # email: xushaocong@stu.xmu.edu.cn
+### 
 # train_data="sr3d nr3d scanrefer scannet sr3d+"
 # train_data="sr3d nr3d scanrefer sr3d+";
 train_data=scanrefer;
@@ -55,7 +64,7 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
 
     
 # --upload-wandb \
-    #  --joint_det
+#  --joint_det
 # --checkpoint_path $resume_mode_path \
 #     --lr_decay_intermediate \
 # --use-tkps \
