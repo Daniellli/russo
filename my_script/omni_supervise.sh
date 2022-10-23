@@ -2,7 +2,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-22 01:33:28
- # @LastEditTime: 2022-10-22 01:48:22
+ # @LastEditTime: 2022-10-24 00:07:15
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/omni_supervise.sh
@@ -54,7 +54,7 @@ save_freq=$val_freq;
 
 #* for  semi supervision architecture  : step2
 b_size='8,4';
-resume_mode_path="pretrain/butd_no_tkps_5284_sr3d_nr3d_scanrefer_sr3dplus_74.pth"
+resume_mode_path="pretrain/pretrain_nr3d_sr3d_sr3dplus_scanrefer_5491_39.pth"
 
 
 #* for not mask 
@@ -64,13 +64,14 @@ token_consistency_weight=1;
 query_consistency_weight=1;
 text_consistency_weight=1;
 
-rampup_length=100;
-epoch=800;
+rampup_length=30;
+epoch=600;
+
 # train_data="sr3d nr3d scanrefer scannet sr3d+"
 train_data="sr3d nr3d scanrefer sr3d+"
-test_data=scanrefer
+test_data=nr3d
 DATA_ROOT=datasets/
-unlabeled_datastes='arkitscenes';
+
 TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
     omni_train.py --num_decoder_layers 6 \
     --use_color \
@@ -93,9 +94,14 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --upload-wandb \
     --checkpoint_path $resume_mode_path \
     --rampup_length $rampup_length \
-    --unlabeled_dataset $unlabeled_datastes \
     2>&1 | tee -a logs/train_test_cls.log
     
+
+
+
+
+
+
 # --lr_decay_intermediate \
 # --labeled_ratio $labeled_ratio \
 # --lr_decay_epochs 25 26 \
