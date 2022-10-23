@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-04 19:55:17
-LastEditTime: 2022-10-22 01:39:22
+LastEditTime: 2022-10-23 20:08:07
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/train.py
@@ -38,7 +38,7 @@ import torch.distributed as dist
 from main_utils import BaseTrainTester
 from data.model_util_scannet import ScannetDatasetConfig
 # from src.joint_det_dataset import Joint3DDataset
-from src.join_dataset import JointDataset
+from src.join_dataset import JointDataset,points2box
 
 from src.join_labeled_dataset import JointLabeledDataset
 from src.join_unlabeled_dataset import JointUnlabeledDataset
@@ -61,7 +61,8 @@ from utils.box_util import get_3d_box
 import json
 import wandb
 from loguru import logger 
-from my_script.utils import * 
+from my_script.utils import save_for_vis
+
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -401,65 +402,89 @@ class TrainTester(BaseTrainTester):
             )
         # Main eval branch
         # DEBUG=True
+        
+        #!=================================================================================
         pred_bboxes = []
+        CONFIG_DICT = {
+            'remove_empty_box': False, 'use_3d_nms': True,
+            'nms_iou': 0.25, 'use_old_type_nms': False, 'cls_nms': True,
+            'per_class_proposal': True, 'conf_thresh': 0.0,
+            'dataset_config': ScannetDatasetConfig(18),
+            'hungarian_loss': True
+        }
+        #!=================================================================================
+
+
         for batch_idx, batch_data in enumerate(test_loader):#* the length of batch data == 26 , 
+
             stat_dict, end_points = self._main_eval_branch(
                 batch_idx, batch_data, test_loader, model, stat_dict,
                 criterion, set_criterion, args
             )
             #!==== generate result for upload evaluation server , scanrefer ===============================
             SAVE_RES =  False
-            if SAVE_RES: 
-                #* end_points['last_sem_cls_scores']  : [B,query_num,distribution for tokens(256)]  
-                #* 1. 对 分布取softmax 
-                #* 2. 取最大值的index, 如果最大值的索引是255 则 需要 
-                #* 3. 对 分布取softmax 
-                prefix="last_"
-                
-                query_dist_map = end_points[f'{prefix}sem_cls_scores'].softmax(-1) #* 
-                objectness_preds_batch = torch.argmax(query_dist_map, 2).long() #* 等于255 应该是没有匹配到文本token的, 如paper解释的一样
-                pred_masks = (objectness_preds_batch !=255).float()
-                
-                # end_points['utterances']
-                # pred_ref = torch.argmax(data_dict['cluster_ref'] * pred_masks, 1) # (B,)
-                
-                for i in range(pred_masks.shape[0]):
-                    # compute the iou 
-                    #* 存在一个utterence 有多个匹配的情况!!!  不知道选哪个?   choose first one for now 
-                    if pred_masks[i].sum() !=0 :
+            
+            if SAVE_RES:
+                prefix = 'last_'
+                #* return format :  pred_cls, pred_box and conf (0-1)
+                #* box 是8个定点
+                batch_pred_map_cls = parse_predictions(
+                    end_points, CONFIG_DICT, prefix,
+                    size_cls_agnostic=True)
+                for idx,batch_res in  enumerate(batch_pred_map_cls):
 
-                        matched_obj_size =end_points[f'{prefix}pred_size'][i][pred_masks[i]==1][0].detach().cpu().numpy()
-                        matched_obj_center =end_points[f'{prefix}center'][i][pred_masks[i]==1][0].detach().cpu().numpy() 
-                        matched_obj_xyz =end_points[f'{prefix}base_xyz'][i][pred_masks[i]==1][0].detach().cpu().numpy() 
+                    score = np.array([x[2] for x in batch_res])
+                    # max_idx = np.argmax(score)#* 只取confidence 最大的, 不管是什么哪个target  , 这个对应的是target id , 也就是第几个目标
+                    topk = 10
+                    max_indexes = np.argsort(score)[-topk:]
 
+                    # score[max_indexes][::-1]#* 倒序的 转 正序的
+                    batch_res=  np.array(batch_res)
+                    obj_id=batch_res[max_indexes][:,0] #?
+                    boxes =batch_res[max_indexes][:,1]
+                    boxes = np.array([ box.tolist() for box in boxes])
+                    boxes = points2box(boxes)
 
-                        _bbox = get_3d_box(matched_obj_size,0, matched_obj_center) #* angle 不知道
-                        
-                        pred_data = {
-                            "scene_id": end_points["scan_ids"][i],
-                            "object_id": end_points["target_id"][i],
-                            "ann_id": end_points['ann_id'][i],
-                            "bbox": _bbox.tolist(),
-                            "unique_multiple":  end_points["is_unique"][i].item()==False, #* return true means multiple 
-                            "others": 1 if end_points["target_cid"][i] == 17 else 0
-                        }
-                        pred_bboxes.append(pred_data)
+              
+                    # pred_data = {
+                    #     "scene_id": end_points['scan_ids'][idx],
+                    #     "object_id": obj_id,
+                    #     "ann_id": end_points['ann_id'][idx],#* 训练的时候没用到, 所以dataloader没有加载
+                    #     "bbox": box.tolist(),
+                    #     "unique_multiple":  end_points["is_unique"][idx].item()==False, #* return true means multiple 
+                    #     "others": 1 if end_points["target_cid"][idx] == 17 else 0
+                    # }
+                    # pred_bboxes.append(pred_data)
+                    
+                    #* save for vis 
+                    save_for_vis(boxes,batch_data['point_clouds'][idx],self.vis_save_path,end_points['scan_ids'][idx],flag='student')
+                    save_for_vis(batch_data['all_bboxes'][idx][batch_data['all_bbox_label_mask'][idx]].cpu().numpy(),batch_data['point_clouds'][idx],self.vis_save_path,end_points['scan_ids'][idx],flag='student2')
+                    save_for_vis((torch.cat([batch_data['size_gts'],batch_data['center_label']],axis=-1)[idx][batch_data['box_label_mask'][idx].bool()]).cpu().numpy()
+                                    ,batch_data['point_clouds'][idx],self.vis_save_path,end_points['scan_ids'][idx],flag='teacher')
 
+                    
+                    
+                    
+                    
+                    
+                    
             #!=================================================================================
             if evaluator is not None:
                 for prefix in prefixes:
                     evaluator.evaluate(end_points, prefix)
+                    
         evaluator.synchronize_between_processes()
-        #!===================
-        #* dump for upload evaluation server 
-        logger.info("dumping...")
-        pred_path = os.path.join(args.log_dir, "pred.json")
-        with open(pred_path, "w") as f:
-            json.dump(pred_bboxes, f, indent=4)
-        logger.info("done!")
         
+        #* dump for upload evaluation server ========================================
+        # if SAVE_RES: 
+        #     logger.info("dumping...")
+        #     pred_path = os.path.join(args.log_dir, "pred.json")
+        #     with open(pred_path, "w") as f:
+        #         json.dump(pred_bboxes, f, indent=4)
+        #     logger.info("done!")
+        #*===========================================================================
+
         ans = None
-        #!===================
         if dist.get_rank() == 0:
             if evaluator is not None:
                 evaluator.print_stats()
@@ -562,6 +587,7 @@ class TrainTester(BaseTrainTester):
             batch_pred_map_cls = parse_predictions(
                 end_points, CONFIG_DICT, prefix,
                 size_cls_agnostic=True)
+                
             batch_gt_map_cls = parse_groundtruths(
                 end_points, CONFIG_DICT,
                 size_cls_agnostic=True)
@@ -705,7 +731,7 @@ class TrainTester(BaseTrainTester):
 
         # Loop over batches
 
-        total_iteration=max(len(labeled_loader),len(unlabeled_loader))
+        total_iteration=len(labeled_loader)
     
         logger.info(f"total_iteration == {total_iteration}")
 
@@ -752,9 +778,7 @@ class TrainTester(BaseTrainTester):
             teacher_input=self._get_teacher_inputs(batch_data)
             
             
-            
-
-
+            #* check input
             DEBUG=False 
             if  DEBUG and args.local_rank == 0 :
                 for scene in batch_data['scan_ids']:
@@ -767,7 +791,6 @@ class TrainTester(BaseTrainTester):
                 if batch_idx == 5:
                     break
 
-        
             # Forward pass
             end_points = model(inputs)
             with torch.no_grad():
@@ -784,23 +807,15 @@ class TrainTester(BaseTrainTester):
                 end_points, criterion, set_criterion, args
             )
 
-
-
-
             end_points = get_consistency_loss(end_points, teacher_end_points,batch_data['augmentations'])
-
             consistent_loss =center_consistency_loss=soft_token_consistency_loss=size_consistency_loss=query_consistency_loss=text_consistency_loss=None
-
 
             center_consistency_loss = end_points['center_consistency_loss'] * center_consistency_weight
             soft_token_consistency_loss = end_points['soft_token_consistency_loss']* token_consistency_weight
             size_consistency_loss = end_points['size_consistency_loss'] * size_consistency_weight
-
             query_consistency_loss = end_points['query_consistency_loss'] * query_consistency_weight
             text_consistency_loss = end_points['text_consistency_loss'] * text_consistency_weight
 
-            
-            
             consistent_loss = soft_token_consistency_loss +center_consistency_loss+size_consistency_loss+query_consistency_loss+text_consistency_loss
 
 
@@ -810,11 +825,6 @@ class TrainTester(BaseTrainTester):
             else:
                 total_loss = loss
 
-            
-
-            
-       
-            
             optimizer.zero_grad()
             total_loss.backward()
             
@@ -853,7 +863,6 @@ class TrainTester(BaseTrainTester):
 
 
                 if args.upload_wandb and args.local_rank==0:
-                    #!===================
                     tmp = { f'{key}':stat_dict[key] / args.print_freq  for key in sorted(stat_dict.keys()) if 'loss' in key and 'proposal_' not in key and 'last_' not in key and 'head_' not in key }
                     tmp.update({"student_supervised_loss":loss.clone().detach().item(),
                                 "center_consistency_loss":center_consistency_loss.clone().detach().item() if center_consistency_loss is not None else None,
@@ -866,7 +875,6 @@ class TrainTester(BaseTrainTester):
                                 "lr": scheduler.get_last_lr()[0]
                             })
                     wandb.log(tmp)
-                    #!===================
 
                 for key in sorted(stat_dict.keys()):
                     stat_dict[key] = 0
@@ -901,7 +909,7 @@ class TrainTester(BaseTrainTester):
         """Run main training/testing pipeline."""
         # Get loaders
         labeled_loader,unlabeled_loader, test_loader = self.get_loaders(args)
-        logger.info(f"length of  labeled dataset: {len(labeled_loader.dataset)} \n  length of  unlabeled dataset: {len(unlabeled_loader.dataset)} \n length of testing dataset: {len(test_loader.dataset)}")
+        logger.info(f"length of  labeled dataset: {len(labeled_loader.dataset)} \t  length of  unlabeled dataset: {len(unlabeled_loader.dataset)} \t length of testing dataset: {len(test_loader.dataset)}")
         
         # Get model
         model = self.get_model(args)
@@ -943,6 +951,28 @@ class TrainTester(BaseTrainTester):
                 tmp.update({ k:v for  idx, (k,v) in enumerate(scheduler.milestones.items()) if idx != 0})
                 scheduler.milestones = tmp
 
+
+        if args.eval:
+
+            # performance = self.evaluate_one_epoch(
+            #     args.start_epoch, test_loader,
+            #     model, criterion, set_criterion, args
+            # )
+            
+            # if performance is not None :
+            #     logger.info(','.join(['student_%s:%.04f'%(k,round(v,4)) for k,v in performance.items()]))
+            
+            
+            
+            ema_performance = self.evaluate_one_epoch(
+                args.start_epoch, test_loader,
+                ema_model, criterion, set_criterion, args
+            )
+            if ema_performance is not None :
+                logger.info(','.join(['teacher_%s:%.04f'%(k,round(v,4)) for k,v in ema_performance.items()]))
+            # else :#* check what cause None ?
+
+            
 
         # Training loop
         #!===============================

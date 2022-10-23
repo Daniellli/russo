@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 21:28:11
-LastEditTime: 2022-10-22 23:11:29
+LastEditTime: 2022-10-23 19:05:08
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/join_dataset.py
@@ -961,6 +961,16 @@ class JointDataset(Dataset):
 
         # Point cloud representation#* point_cloud == [x,y,z,r,g,b], 50000 points 
         point_cloud, augmentations, og_color ,origin_pc= self._get_pc(anno, scan)
+
+
+        #!+========================================================
+        #* 用场景原始color
+        if self.overfit:
+            point_cloud = np.copy(np.concatenate([point_cloud[:,:3],og_color],axis=-1) )
+            origin_pc =  np.copy(np.concatenate([origin_pc[:,:3],og_color],axis=-1) )
+        #!+======================================================== 
+
+
 
         # "Target" boxes: append anchors if they're to be detected
         gt_bboxes, box_label_mask, point_instance_label = \
