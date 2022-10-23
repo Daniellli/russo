@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-22 01:38:43
-LastEditTime: 2022-10-23 23:13:48
+LastEditTime: 2022-10-23 23:55:26
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/omni_train.py
@@ -923,6 +923,32 @@ class TrainTester(BaseTrainTester):
                 tmp.update({ k:v for  idx, (k,v) in enumerate(scheduler.milestones.items()) if idx != 0})
                 scheduler.milestones = tmp
 
+
+
+
+
+        if args.eval:
+            print("Test evaluation.......")
+
+            performance = self.evaluate_one_epoch(
+                args.start_epoch, test_loader,
+                model, criterion, set_criterion, args
+            )
+            
+            if performance is not None :
+                logger.info(','.join(['student_%s:%.04f'%(k,round(v,4)) for k,v in performance.items()]))
+            # else :
+            #     embed()
+            
+            
+            ema_performance = self.evaluate_one_epoch(
+                args.start_epoch, test_loader,
+                ema_model, criterion, set_criterion, args
+            )
+            if ema_performance is not None :
+                logger.info(','.join(['teacher_%s:%.04f'%(k,round(v,4)) for k,v in ema_performance.items()]))
+            exit(0)
+            
 
         # Training loop
         #!===============================

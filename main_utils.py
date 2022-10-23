@@ -276,7 +276,7 @@ class BaseTrainTester:
         )
         
         self.vis_save_path=osp.join(args.log_dir,'debug')
-        os.makedirs(self.vis_save_path)
+        os.makedirs(self.vis_save_path,exist_ok=True)
         
         # Save config file and initialize tb writer
         if dist.get_rank() == 0:
