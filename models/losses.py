@@ -882,7 +882,7 @@ def compute_labeled_hungarian_loss(end_points, num_decoder_layers, set_criterion
     """Compute Hungarian matching loss containing CE, bbox and giou."""
     #!================================================================
     DEBUG = False
-    supervised_mask  = end_points['supervised_mask']
+    supervised_mask  = (end_points['supervised_mask']==1).int()
     supervised_inds = torch.nonzero(supervised_mask).squeeze(1).long()
     #!================================================================
     

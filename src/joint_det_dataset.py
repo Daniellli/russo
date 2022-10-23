@@ -674,6 +674,19 @@ class Joint3DDataset(Dataset):
             detected_class_ids, detected_logits
         )
 
+    def get_origin_data(self,index):
+        
+        # Read annotation
+        anno = self.annos[index]
+        scan = self.scans[anno['scan_id']]
+
+        return np.concatenate([scan.orig_pc,scan.color],axis=-1),anno['scan_id']
+
+        
+
+        
+        
+
     def __getitem__(self, index):
         """Get current batch for input index."""
         split = self.split
@@ -682,6 +695,7 @@ class Joint3DDataset(Dataset):
         anno = self.annos[index]
         scan = self.scans[anno['scan_id']]
         scan.pc = np.copy(scan.orig_pc)
+        
 
         #!=================
         # logger.info(anno['dataset'])

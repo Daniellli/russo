@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-03 22:00:15
-LastEditTime: 2022-10-08 18:27:55
+LastEditTime: 2022-10-24 00:10:33
 LastEditors: xushaocong
 Description:  修改get_datasets , 换成可以添加使用数据集比例的dataloader
 FilePath: /butd_detr/pretrain.py
@@ -27,8 +27,8 @@ import torch.distributed as dist
 
 from main_utils import parse_option, BaseTrainTester
 from data.model_util_scannet import ScannetDatasetConfig
-# from src.joint_det_dataset import Joint3DDataset
-from src.join_dataset import JointDataset
+from src.join_labeled_dataset import JointLabeledDataset
+
 from src.grounding_evaluator import GroundingEvaluator, GroundingGTEvaluator
 from models import BeaUTyDETR
 from models import APCalculator, parse_predictions, parse_groundtruths
@@ -81,7 +81,7 @@ class TrainTester(BaseTrainTester):
 
         print('Loading datasets:', sorted(list(dataset_dict.keys())))
         
-        train_dataset = JointDataset(
+        train_dataset = JointLabeledDataset(
             dataset_dict=dataset_dict,
             test_dataset=args.test_dataset, #? only test set need ? 
             split='train' if not args.debug else 'val',

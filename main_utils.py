@@ -275,6 +275,9 @@ class BaseTrainTester:
             name=name
         )
         
+        self.vis_save_path=osp.join(args.log_dir,'debug')
+        os.makedirs(self.vis_save_path,exist_ok=True)
+        
         # Save config file and initialize tb writer
         if dist.get_rank() == 0:
             path = os.path.join(args.log_dir, "config.json")
@@ -282,6 +285,7 @@ class BaseTrainTester:
                 json.dump(vars(args), f, indent=2)
             self.logger.info("Full config saved to {}".format(path))
             self.logger.info(str(vars(args)))
+            
 
     @staticmethod
     def get_datasets(args):
@@ -672,6 +676,7 @@ class BaseTrainTester:
                         inputs['point_clouds'][i].clone().detach().cpu().numpy(),
                         os.path.join(self.vis_save_path, '%s_gt.ply'%(batch_data['scan_ids'][i]))
                     )
+                    
 
             
 
@@ -769,31 +774,13 @@ class BaseTrainTester:
         # inputs['det_bbox_label_mask']#* [2,132]   , 对应是目标还是padding 
         # inputs['det_class_ids']#* [2,132] , 对应类别信息
 
-
-
         B,N,_=inputs['point_clouds'].shape
-
         for i in range(B):
-            # print(inputs['text'][i])
 
-            # draw_pc_box(
-            #             numpy2open3d_colorful(inputs['point_clouds'][i].clone().detach().cpu().numpy()),
-            #             inputs['det_boxes'][i][inputs['det_bbox_label_mask'][i]].clone().detach().cpu().numpy(),
-            #             save_path=os.path.join(self.vis_save_path, '%s_gt.txt'%(batch_data['scan_ids'][i]))
-            #             )  
-            
             write_pc_as_ply(
                         inputs['point_clouds'][i].clone().detach().cpu().numpy(),
                         os.path.join(self.vis_save_path,scan_ids[i], '%s_gt_%s.ply'%(scan_ids[i],FLAG))
                     )
-
-            
-
-            #* ply format bounding box 
-            # write_oriented_bbox(
-            #         inputs['det_boxes'][i][inputs['det_bbox_label_mask'][i]].clone().detach().cpu().numpy(),
-            #         os.path.join(self.vis_save_path, '%s_box.ply'%(batch_data['scan_ids'][i])),colors=None
-            # )#* colors 可以定义框的颜色
 
 
             #* open3d  format bounding box 
@@ -801,9 +788,6 @@ class BaseTrainTester:
             inputs['det_boxes'][i][inputs['det_bbox_label_mask'][i]].clone().detach().cpu().numpy(),
             fmt='%s')
             
-
-
-
             #* write utterances
             with open(os.path.join(self.vis_save_path, scan_ids[i],'%s_utterances_%s.txt'%(scan_ids[i],FLAG)), 'w') as f :
                 f.write(inputs['text'][i])
