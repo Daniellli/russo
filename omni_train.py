@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-22 01:38:43
-LastEditTime: 2022-10-22 01:45:31
+LastEditTime: 2022-10-23 22:47:39
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/omni_train.py
@@ -46,11 +46,10 @@ import torch.distributed as dist
 
 from main_utils import BaseTrainTester
 from data.model_util_scannet import ScannetDatasetConfig
+
 # from src.joint_det_dataset import Joint3DDataset
 from src.join_dataset import JointDataset
 
-from src.join_labeled_dataset import JointLabeledDataset
-from src.join_unlabeled_dataset import JointUnlabeledDataset
 from src.arkitscenes_dataset import ARKitSceneDataset
 
 
@@ -186,30 +185,18 @@ def parse_option():
 
     #* mine args 
     parser.add_argument('--gpu-ids', default='7', type=str)
-    parser.add_argument('--vis-save-path', default='', type=str)
     parser.add_argument('--upload-wandb',action='store_true', help="upload to wandb or not ?")
-    parser.add_argument('--save-input-output',action='store_true', help="save-input-output")
 
     parser.add_argument('--size_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
     parser.add_argument('--center_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
     parser.add_argument('--token_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
-
     parser.add_argument('--query_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
     parser.add_argument('--text_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
-
-    parser.add_argument('--labeled_ratio', default=0.2, type=float,help=' labeled datasets ratio ')
     parser.add_argument('--rampup_length', type=float, default=None, help='rampup_length')
 
     parser.add_argument('--lr_decay_intermediate',action='store_true')
 
-
-    
-
-    
-
-
     args, _ = parser.parse_known_args()
-
     args.eval = args.eval or args.eval_train
 
     return args
