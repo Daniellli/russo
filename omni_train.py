@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-22 01:38:43
-LastEditTime: 2022-10-23 22:47:39
+LastEditTime: 2022-10-23 23:13:48
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/omni_train.py
@@ -47,10 +47,8 @@ import torch.distributed as dist
 from main_utils import BaseTrainTester
 from data.model_util_scannet import ScannetDatasetConfig
 
-# from src.joint_det_dataset import Joint3DDataset
 from src.join_dataset import JointDataset
-
-from src.arkitscenes_dataset import ARKitSceneDataset
+from src.unlabeled_arkitscenes_dataset import ARKitSceneDataset
 
 
 
@@ -213,7 +211,8 @@ class TrainTester(BaseTrainTester):
             self.vis_save_path = osp.join(args.log_dir,"vis_results",time.strftime("%Y:%m:%d",time.gmtime(time.time()))+"_"+str(int(time.time())))
             os.makedirs(self.vis_save_path)
 
-        self.DEBUG = args.save_input_output
+        self.DEBUG= args.debug
+
             
             
         
@@ -265,28 +264,11 @@ class TrainTester(BaseTrainTester):
             butd_gt=args.butd_gt,
             butd_cls=args.butd_cls
         )
-
-        unlabeled_dataset = ARKitSceneDataset(split_set="train", 
-            augment=True,data_root='datasets/arkitscenes')
-
-        # unlabeled_dataset = JointUnlabeledDataset(
-        #     dataset_dict=dataset_dict,
-        #     test_dataset=args.test_dataset, #? only test set need ? 
-        #     split='train',
-        #     use_color=args.use_color, use_height=args.use_height,
-        #     overfit=args.debug,
-        #     data_path=args.data_root,
-        #     detect_intermediate=args.detect_intermediate,#? 
-        #     use_multiview=args.use_multiview, #? 
-        #     butd=args.butd, #? 
-        #     butd_gt=args.butd_gt,#? 
-        #     butd_cls=args.butd_cls,#? 
-        #     augment_det=args.augment_det,#? 
-        #     labeled_ratio=args.labeled_ratio
-        # )
-
-
         
+
+        arkitscenes_dataset = ARKitSceneDataset(
+            augment=True,data_root='datasets/arkitscenes',
+            butd_cls=args.butd_cls)
         
         test_dataset = JointDataset(
             dataset_dict=dataset_dict,
@@ -303,7 +285,7 @@ class TrainTester(BaseTrainTester):
         )
 
         
-        return labeled_dataset,unlabeled_dataset, test_dataset
+        return labeled_dataset,arkitscenes_dataset, test_dataset
 
     @staticmethod
     def get_model(args):
@@ -614,7 +596,7 @@ class TrainTester(BaseTrainTester):
 
         #* do not need to load train set when args.evals == True 
         # Datasets
-        labeled_dataset,unlabeled_dataset, test_dataset = self.get_datasets(args)
+        labeled_dataset,arkitscenes_dataset, test_dataset = self.get_datasets(args)
         
         #* 存在一个问题就是val 的数据抽取的不合法,在group_free_pred_bboxes_val 找不到对应的数据
         
@@ -641,15 +623,15 @@ class TrainTester(BaseTrainTester):
             generator=g
         )
 
-        unlabeled_sampler = DistributedSampler(unlabeled_dataset)
-        unlabeled_loader = DataLoader(
-            unlabeled_dataset,
+        arkitscenes_sampler = DistributedSampler(arkitscenes_dataset)
+        arkitscenes_loader = DataLoader(
+            arkitscenes_dataset,
             batch_size=int(batch_size_list[1]),
             shuffle=False,
             num_workers=args.num_workers,
             worker_init_fn=seed_worker,
             pin_memory=True,
-            sampler=unlabeled_sampler,
+            sampler=arkitscenes_sampler,
             drop_last=True,
             generator=g
         )
@@ -667,8 +649,9 @@ class TrainTester(BaseTrainTester):
             drop_last=False,
             generator=g
         )
-        logger.info(f"the iter num  labeled_loader needs :{len(labeled_loader)}, the iter num  unlabeled_loader needs :{len(unlabeled_loader)}, the iter num  test_loader needs :{len(test_loader)},  ")
-        return labeled_loader,unlabeled_loader, test_loader
+        logger.info(f"the iter num  labeled_loader needs :{len(labeled_loader)}, the iter num  unlabeled_loader needs :{len(arkitscenes_loader)}, the iter num  test_loader needs :{len(test_loader)},  ")
+
+        return labeled_loader,arkitscenes_loader, test_loader
 
 
            
@@ -688,7 +671,7 @@ class TrainTester(BaseTrainTester):
             ema_param.data.mul_(alpha).add_(1 - alpha, param.data)
 
 
-    def train_one_epoch(self, epoch, labeled_loader,unlabeled_loader ,
+    def train_one_epoch(self, epoch, labeled_loader,arkitscenes_loader ,
                         model,ema_model,
                         criterion, set_criterion,
                         optimizer, scheduler, args):
@@ -704,7 +687,7 @@ class TrainTester(BaseTrainTester):
 
         # Loop over batches
 
-        total_iteration=max(len(labeled_loader),len(unlabeled_loader))
+        total_iteration=len(labeled_loader)
     
         logger.info(f"total_iteration == {total_iteration}")
 
@@ -722,39 +705,38 @@ class TrainTester(BaseTrainTester):
         logger.info(f"query_consistency_weight  : {query_consistency_weight}")
         logger.info(f"text_consistency_weight  : {text_consistency_weight}")
 
-        unlabeled_loader_iter=iter(unlabeled_loader)
+        arkitscenes_loader_iter=iter(arkitscenes_loader)
 
         
         for batch_idx, batch_data in enumerate(labeled_loader):
 
 
             try:
-                batch_data_unlabeled = next(unlabeled_loader_iter)
+                batch_data_arkitscenes = next(arkitscenes_loader_iter)
             except StopIteration:
-                unlabeled_loader_iter = iter(unlabeled_loader)
-                batch_data_unlabeled = next(unlabeled_loader_iter)
+                arkitscenes_loader_iter = iter(arkitscenes_loader)
+                batch_data_arkitscenes = next(arkitscenes_loader_iter)
 
             # Move to GPU
             batch_data = self._to_gpu(batch_data)
-            batch_data_unlabeled = self._to_gpu(batch_data_unlabeled)
-            
-            for key in batch_data_unlabeled: #* 两个batch 合成一个batch, 
+            batch_data_arkitscenes = self._to_gpu(batch_data_arkitscenes)
+
+            #* 两个batch 合成一个batch
+            for key in batch_data_arkitscenes: 
                 if  isinstance(batch_data[key],list):
-                    batch_data[key] = batch_data[key]+batch_data_unlabeled[key]
+                    batch_data[key] = batch_data[key]+batch_data_arkitscenes[key]
                 elif  isinstance(batch_data[key],dict):
                     for kkey in batch_data[key]:
-                        batch_data[key][kkey] = torch.cat((batch_data[key][kkey], batch_data_unlabeled[key][kkey]), dim=0)
+                        batch_data[key][kkey] = torch.cat((batch_data[key][kkey], batch_data_arkitscenes[key][kkey]), dim=0)
                 else:
-                    batch_data[key] = torch.cat((batch_data[key], batch_data_unlabeled[key]), dim=0)
+                    batch_data[key] = torch.cat((batch_data[key], batch_data_arkitscenes[key]), dim=0)
+
 
             inputs = self._get_inputs(batch_data)
             teacher_input=self._get_teacher_inputs(batch_data)
             
-            
-            
 
-
-            DEBUG=False 
+            DEBUG=args.debug 
             if  DEBUG and args.local_rank == 0 :
                 for scene in batch_data['scan_ids']:
                     make_dirs(osp.join(self.vis_save_path,scene))
@@ -899,8 +881,7 @@ class TrainTester(BaseTrainTester):
 
         """Run main training/testing pipeline."""
         # Get loaders
-        labeled_loader,unlabeled_loader, test_loader = self.get_loaders(args)
-        logger.info(f"length of  labeled dataset: {len(labeled_loader.dataset)} \n  length of  unlabeled dataset: {len(unlabeled_loader.dataset)} \n length of testing dataset: {len(test_loader.dataset)}")
+        labeled_loader,arkitscenes_loader, test_loader = self.get_loaders(args)
         
         # Get model
         model = self.get_model(args)
@@ -958,14 +939,14 @@ class TrainTester(BaseTrainTester):
         for epoch in range(args.start_epoch, args.max_epoch + 1):
             
             labeled_loader.sampler.set_epoch(epoch)
-            unlabeled_loader.sampler.set_epoch(epoch)
+            arkitscenes_loader.sampler.set_epoch(epoch)
 
 
             tic = time.time()
             
 
             self.train_one_epoch(
-                epoch, labeled_loader, unlabeled_loader,model,ema_model,
+                epoch, labeled_loader, arkitscenes_loader,model,ema_model,
                 criterion, set_criterion,
                 optimizer, scheduler, args
             )

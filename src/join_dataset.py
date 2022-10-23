@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 21:28:11
-LastEditTime: 2022-10-23 19:05:08
+LastEditTime: 2022-10-23 23:17:43
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/join_dataset.py
@@ -75,11 +75,9 @@ class JointDataset(Dataset):
                  data_path='./',
                  use_color=False, use_height=False, use_multiview=False,
                  detect_intermediate=False,
-                 butd=False, butd_gt=False, butd_cls=False, augment_det=False,
-                 labeled_ratio=None):
+                 butd=False, butd_gt=False, butd_cls=False, augment_det=False):
         """Initialize dataset (here for ReferIt3D utterances)."""
         #!+==================================
-        self.labeled_ratio = labeled_ratio
         #!+==================================
 
         self.dataset_dict = dataset_dict
@@ -142,15 +140,15 @@ class JointDataset(Dataset):
         self.scans = list(self.scans)[0]
         if self.split != 'train':
             self.annos = self.load_annos(test_dataset)
+            logger.info(f" for test , {test_dataset} : {len(self.annos) }  annotations loaded ")
         else:
             self.annos = []
             for dset, cnt in dataset_dict.items():
                 if cnt > 0:
                     _annos = self.load_annos(dset)
                     self.annos += (_annos * cnt)
+                    logger.info(f" {dset} : {len(_annos) }  annotations loaded ,after loading this datasets, total number of datasets become: {len(self.annos)}")
             
-
-        
 
     def load_annos(self, dset):
         """Load annotations of given dataset."""
@@ -175,7 +173,6 @@ class JointDataset(Dataset):
         if self.overfit:
             annos = annos[:128]
             # annos = annos[:1280]
-        logger.info(f" {dset} : {len(annos) }  annotations   loaded ")
         
         return annos
 
@@ -267,16 +264,9 @@ class JointDataset(Dataset):
         split = self.split
         if split == 'val':
             split = 'test'
-        
-        #todo :从 数据中 不同的场景取self.labeled_ratio  的数据
-        if split== 'train' and self.labeled_ratio is not None:
-            with open(os.path.join('data/meta_data/sr3d_{}_{}.txt'.format(split,self.labeled_ratio)), 'r') as f:
-                labeled_scenes = f.read().split('\n')
-            logger.info(f"{len(labeled_scenes) } scenes loaded ")
-            scan_ids = set(labeled_scenes)
-
-        else :
-            with open('data/meta_data/sr3d_%s_scans.txt' % split) as f:
+    
+       
+        with open('data/meta_data/sr3d_%s_scans.txt' % split) as f:
                 scan_ids = set(eval(f.read()))
         #* every scene has 
         with open(self.data_path + '/refer_it_3d/%s.csv' % dset) as f:
@@ -312,15 +302,9 @@ class JointDataset(Dataset):
             split = 'test'
             
 
-        if split== 'train' and self.labeled_ratio is not None:
-            with open(os.path.join('data/meta_data/nr3d_{}_{}.txt'.format(split,self.labeled_ratio)), 'r') as f:
-                labeled_scenes = f.read().split('\n')
-            logger.info(f"{len(labeled_scenes) } scenes loaded ")
-            scan_ids = set(labeled_scenes)
-            
-        else:
-            with open('data/meta_data/nr3d_%s_scans.txt' % split) as f:
-                scan_ids = set(eval(f.read()))
+     
+        with open('data/meta_data/nr3d_%s_scans.txt' % split) as f:
+            scan_ids = set(eval(f.read()))
 
 
 
@@ -375,68 +359,34 @@ class JointDataset(Dataset):
             split = 'test'
             
 
-        if split== 'train' and self.labeled_ratio is not None:
-            with open(os.path.join('data/meta_data/nr3d_{}_{}.txt'.format(split,self.labeled_ratio)), 'r') as f:
-                assignment_ids = f.read().split('\n')
-            logger.info(f"{len(assignment_ids) } assignments ids  loaded ")
-            assignment_ids = set(assignment_ids)
+     
+        with open('data/meta_data/nr3d_%s_scans.txt' % split) as f:
+            scan_ids = set(eval(f.read()))
 
-            with open(self.data_path + 'refer_it_3d/nr3d.csv') as f:
-                csv_reader = csv.reader(f)
-                headers = next(csv_reader)
-                headers = {header: h for h, header in enumerate(headers)}
-                annos = [
-                    {
-                        'scan_id': line[headers['scan_id']],
-                        'target_id': int(line[headers['target_id']]),
-                        'target': line[headers['instance_type']],
-                        'utterance': line[headers['utterance']],
-                        'anchor_ids': [],
-                        'anchors': [],
-                        'dataset': 'nr3d'
-                    }
-                    for line in csv_reader
-                    #!+==================
-                    # if line[headers['scan_id']] in scan_ids
-                    if line[headers['assignmentid']] in assignment_ids
-                    #!+==================
-                    and
-                    str(line[headers['mentions_target_class']]).lower() == 'true'
-                    and
-                    (
-                        str(line[headers['correct_guess']]).lower() == 'true'
-                        or split != 'test'
-                    )
-                ]
-
-        else:
-            with open('data/meta_data/nr3d_%s_scans.txt' % split) as f:
-                scan_ids = set(eval(f.read()))
-
-            with open(self.data_path + 'refer_it_3d/nr3d.csv') as f:
-                csv_reader = csv.reader(f)
-                headers = next(csv_reader)
-                headers = {header: h for h, header in enumerate(headers)}
-                annos = [
-                    {
-                        'scan_id': line[headers['scan_id']],
-                        'target_id': int(line[headers['target_id']]),
-                        'target': line[headers['instance_type']],
-                        'utterance': line[headers['utterance']],
-                        'anchor_ids': [],
-                        'anchors': [],
-                        'dataset': 'nr3d'
-                    }
-                    for line in csv_reader
-                    if line[headers['scan_id']] in scan_ids
-                    and
-                    str(line[headers['mentions_target_class']]).lower() == 'true'
-                    and
-                    (
-                        str(line[headers['correct_guess']]).lower() == 'true'
-                        or split != 'test'
-                    )
-                ]
+        with open(self.data_path + 'refer_it_3d/nr3d.csv') as f:
+            csv_reader = csv.reader(f)
+            headers = next(csv_reader)
+            headers = {header: h for h, header in enumerate(headers)}
+            annos = [
+                {
+                    'scan_id': line[headers['scan_id']],
+                    'target_id': int(line[headers['target_id']]),
+                    'target': line[headers['instance_type']],
+                    'utterance': line[headers['utterance']],
+                    'anchor_ids': [],
+                    'anchors': [],
+                    'dataset': 'nr3d'
+                }
+                for line in csv_reader
+                if line[headers['scan_id']] in scan_ids
+                and
+                str(line[headers['mentions_target_class']]).lower() == 'true'
+                and
+                (
+                    str(line[headers['correct_guess']]).lower() == 'true'
+                    or split != 'test'
+                )
+            ]
 
         # Add distractor info
         for anno in annos:
