@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-04 19:55:59
-LastEditTime: 2022-10-24 15:11:39
+LastEditTime: 2022-10-24 15:29:14
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/join_unlabeled_dataset.py
@@ -134,20 +134,20 @@ class JointUnlabeledDataset(Dataset):
         self.scans = list(self.scans)[0]
         if self.split != 'train':
             self.annos = self.load_annos(test_dataset)
+            logger.info(f" for test , {test_dataset} : {len(self.annos) }  annotations loaded ")
         else:
             self.annos = []
             for dset, cnt in dataset_dict.items():
                 if cnt > 0:
                     _annos = self.load_annos(dset)
                     self.annos += (_annos * cnt)
+                    logger.info(f" {dset} : {len(_annos) }  annotations loaded ,after loading this datasets, total number of datasets become: {len(self.annos)}")
             
 
         
 
     def load_annos(self, dset):
         """Load annotations of given dataset."""
-
-        #!===============
         annos = None
         if dset == "sr3d":
             annos  = self.load_sr3d_annos()
@@ -158,14 +158,104 @@ class JointUnlabeledDataset(Dataset):
         elif dset == 'nr3d':
             # annos  = self.load_nr3d_annos()
             annos  = self.load_nr3d_annos_v2()
-            
+        elif dset == 'scanrefer': 
+            annos= self.load_scanrefer_annos()
         else :
             raise Exception 
-        logger.info(f"{len(annos) }  annotations   loaded ")
         
         if self.overfit:
             annos = annos[:128]
 
+        return annos
+
+
+
+
+    def load_scanrefer_annos(self):
+        """Load annotations of ScanRefer."""
+        _path = self.data_path + 'scanrefer/ScanRefer_filtered'
+        split = self.split
+        if split in ('val', 'test'):
+            split = 'val'
+
+        if split== 'train' and self.labeled_ratio is not None:
+
+            with open(_path + '_%s.txt' % split) as f:
+                all_scan_ids = [line.rstrip().strip('\n') for line in f.readlines()]
+
+
+            with open(_path + '_%s_%.1f.txt' % (split,self.labeled_ratio)) as f:
+                labeld_scan_ids = [line.rstrip().strip('\n') for line in f.readlines()]
+            
+            scan_ids = list(set(all_scan_ids) - set(labeld_scan_ids))
+
+            
+        else :
+            with open(_path + '_%s.txt' % split) as f:
+                scan_ids = [line.rstrip().strip('\n') for line in f.readlines()]
+
+
+            
+        with open(_path + '_%s.json' % split) as f:
+            reader = json.load(f)
+        annos = [
+            {
+                'scan_id': anno['scene_id'],
+                'target_id': int(anno['object_id']),
+                'distractor_ids': [],
+                'utterance': ' '.join(anno['token']),
+                'target': ' '.join(str(anno['object_name']).split('_')),
+                'anchors': [],
+                'anchor_ids': [],
+                'dataset': 'scanrefer'
+            }
+            for anno in reader
+            if anno['scene_id'] in scan_ids
+        ]
+        # Fix missing target reference
+        for anno in annos:
+            if anno['target'] not in anno['utterance']:
+                anno['utterance'] = (
+                    ' '.join(anno['utterance'].split(' . ')[0].split()[:-1])
+                    + ' ' + anno['target'] + ' . '
+                    + ' . '.join(anno['utterance'].split(' . ')[1:])
+                )
+        # Add distractor info
+        scene2obj = defaultdict(list)
+        sceneobj2used = defaultdict(list)
+        for anno in annos:
+            nyu_labels = [
+                self.label_mapclass[
+                    self.scans[anno['scan_id']].get_object_instance_label(ind)
+                ]
+                for ind in
+                range(len(self.scans[anno['scan_id']].three_d_objects))
+            ]
+            labels = [DC18.type2class.get(lbl, 17) for lbl in nyu_labels]
+            anno['distractor_ids'] = [
+                ind
+                for ind in
+                range(len(self.scans[anno['scan_id']].three_d_objects))
+                if labels[ind] == labels[anno['target_id']]
+                and ind != anno['target_id']
+            ][:32]
+            if anno['target_id'] not in sceneobj2used[anno['scan_id']]:
+                sceneobj2used[anno['scan_id']].append(anno['target_id'])
+                scene2obj[anno['scan_id']].append(labels[anno['target_id']])
+        # Add unique-multi
+        for anno in annos:
+            nyu_labels = [
+                self.label_mapclass[
+                    self.scans[anno['scan_id']].get_object_instance_label(ind)
+                ]
+                for ind in
+                range(len(self.scans[anno['scan_id']].three_d_objects))
+            ]
+            labels = [DC18.type2class.get(lbl, 17) for lbl in nyu_labels]
+            anno['unique'] = (
+                np.array(scene2obj[anno['scan_id']])
+                == labels[anno['target_id']]
+            ).sum() == 1
         return annos
 
 
@@ -190,7 +280,6 @@ class JointUnlabeledDataset(Dataset):
                 all_assignment_ids = f.read().split('\n')
 
             assignment_ids =set(all_assignment_ids) -  set(assignment_ids)
-            logger.info(f"{len(assignment_ids) } unlabeled assignments ids  loaded")
 
             
 
@@ -286,7 +375,6 @@ class JointUnlabeledDataset(Dataset):
             with open('data/meta_data/nr3d_%s_scans.txt' % split) as f:
                 all_scan_ids = set(eval(f.read()))
             scan_ids = list(all_scan_ids-scan_ids)
-            logger.info(f"{len(scan_ids) } scenes loaded ")
         else :
             with open('data/meta_data/nr3d_%s_scans.txt' % split) as f:
                 scan_ids = set(eval(f.read()))
@@ -346,7 +434,6 @@ class JointUnlabeledDataset(Dataset):
                 all_scan_ids = set(eval(f.read()))
 
             scan_ids = list(all_scan_ids-scan_ids)
-            logger.info(f"{len(labeled_scenes) } scenes loaded ")
         else :
             with open('data/meta_data/sr3d_%s_scans.txt' % split) as f:
                 scan_ids = set(eval(f.read()))
