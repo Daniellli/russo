@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-04 19:55:59
-LastEditTime: 2022-10-24 10:15:34
+LastEditTime: 2022-10-24 15:42:54
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/join_unlabeled_dataset.py
@@ -894,7 +894,7 @@ class JointUnlabeledDataset(Dataset):
             all_bboxes_[:, 3:] - all_bboxes_[:, :3]
         ), 1)
         all_bboxes[:len(all_bboxes_)] = all_bboxes_
-        all_bboxes[len(all_bboxes_):] = 10000
+        # all_bboxes[len(all_bboxes_):] = 10000
         return all_bboxes
 
 
@@ -908,8 +908,6 @@ class JointUnlabeledDataset(Dataset):
         scan.pc = np.copy(scan.orig_pc)
 
         origin_box = self.get_current_pc_box(scan)
-
-
 
         # Populate anno (used only for scannet)
         self.random_utt = False
@@ -993,9 +991,9 @@ class JointUnlabeledDataset(Dataset):
         #!===================
         # teacher_box = all_bboxes.copy()
         # teacher_box = self.transformation_box(teacher_box,augmentations)
-        teacher_box = origin_box
- 
 
+        teacher_box = origin_box
+        
         #!===================
 
         # Assume a perfect object detector 

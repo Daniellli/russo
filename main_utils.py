@@ -443,11 +443,16 @@ class BaseTrainTester:
             #!=========================================
             #* 将milestone的第一个元素 也就是lr decay 提前到之后的第一个epoch
             if args.lr_decay_intermediate:    
+
+                #* 用lr_decay_epochs 作为milestone
+                n_iter_per_epoch=  len(train_loader)
+                milestones={(m - args.warmup_epoch) * n_iter_per_epoch : 1  for m in args.lr_decay_epochs}
+                scheduler.milestones = milestones
                 
-                # tmp = {(args.start_epoch+1 ) * len(train_loader):1 }
-                tmp = {scheduler._step_count+len(train_loader):1 } #* 一个epoch 后decay learning rate 
-                tmp.update({ k:v for  idx, (k,v) in enumerate(scheduler.milestones.items()) if idx != 0})
-                scheduler.milestones = tmp
+                # tmp = {scheduler._step_count+n_iter_per_epoch:1 } #* 一个epoch 后decay learning rate 
+                # tmp.update({ k:v for  idx, (k,v) in enumerate(scheduler.milestones.items()) if idx != 0})
+                # scheduler.milestones = tmp
+                
             
             #!=========================================
 
