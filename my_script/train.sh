@@ -1,7 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-23 11:57:16
- # @LastEditTime: 2022-10-23 11:59:32
+ # @LastEditTime: 2022-10-24 16:17:21
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/train.sh
@@ -22,9 +22,10 @@ train_data=sr3d
 test_data=sr3d
 DATA_ROOT=datasets/
 
-gpu_ids="3,4,5,6,7"
-gpu_num=5
+gpu_ids="0,1,2,3,8";
+gpu_num=5;
 b_size=12
+
 
 
 
@@ -44,7 +45,7 @@ print_freq=100;
 save_freq=$val_freq;
 
 rampup_length=100;
-epoch=800;
+epoch=400;
 port=29522
 
 
@@ -72,7 +73,6 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --token_consistency_weight $token_consistency_weight \
     --query_consistency_weight $query_consistency_weight \
     --text_consistency_weight $text_consistency_weight \
-    --upload-wandb \
     --checkpoint_path $resume_model_path \
     --labeled_ratio $labeled_ratio \
     --rampup_length $rampup_length \
@@ -80,5 +80,10 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
 
     
 
+
+
+
+
+# --upload-wandb \
 # --lr_decay_intermediate \
 # --lr_decay_epochs 25 26 \

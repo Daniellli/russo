@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-04 19:55:56
-LastEditTime: 2022-10-24 00:31:07
+LastEditTime: 2022-10-24 15:41:41
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/join_labeled_dataset.py
@@ -882,7 +882,6 @@ class JointLabeledDataset(Dataset):
             all_bboxes_[:, 3:] - all_bboxes_[:, :3]
         ), 1)
         all_bboxes[:len(all_bboxes_)] = all_bboxes_
-        all_bboxes[len(all_bboxes_):] = 10000
         return all_bboxes
 
 
@@ -895,8 +894,7 @@ class JointLabeledDataset(Dataset):
         anno = self.annos[index]
         scan = self.scans[anno['scan_id']]
         scan.pc = np.copy(scan.orig_pc)
-
-
+        
         origin_box = self.get_current_pc_box(scan)
 
         # Populate anno (used only for scannet)
@@ -952,7 +950,7 @@ class JointLabeledDataset(Dataset):
         point_cloud, augmentations, og_color ,origin_pc= self._get_pc(anno, scan)
 
         #!+========================================================
-        #* 用场景原始color
+        #* 用场景原始color 
         if self.overfit:
             point_cloud = np.copy(np.concatenate([point_cloud[:,:3],og_color],axis=-1) )
             origin_pc =  np.copy(np.concatenate([origin_pc[:,:3],og_color],axis=-1) )
@@ -979,7 +977,6 @@ class JointLabeledDataset(Dataset):
         #!===================
         # teacher_box = all_bboxes.copy()
         # teacher_box = self.transformation_box(teacher_box,augmentations)
- 
         teacher_box = origin_box
         #!===================
 
