@@ -598,6 +598,96 @@ class Joint3DDataset(Dataset):
         all_bbox_label_mask = keep
         return class_ids, all_bboxes, all_bbox_label_mask
 
+
+    
+        
+    def load_bin(self,path):
+        detected_dict =  np.fromfile(path,dtype=np.float32).reshape(-1,8)
+
+        class_ids = detected_dict[:,-1].astype(np.int64)
+        box =  detected_dict[:,:6]
+        return box,class_ids
+
+
+
+
+    '''
+    description:  忘记保存logit了,  并且类别和butd detr作者的map对不上
+    param {*} self
+    param {*} split
+    param {*} scan_id
+    param {*} augmentations
+    return {*}
+    '''
+    def _get_detected_objects_fcaf3d(self, split, scan_id, augmentations):
+        # Initialize
+        all_detected_bboxes = np.zeros((MAX_NUM_OBJ, 6))
+        all_detected_bbox_label_mask = np.array([False] * MAX_NUM_OBJ)
+        detected_class_ids = np.zeros((MAX_NUM_OBJ,))
+        detected_logits = np.zeros((MAX_NUM_OBJ, NUM_CLASSES))
+
+        # Load
+        
+        box,class_ids =self.load_bin(f'{self.data_path}fcaf3d_scannet/{scan_id}.bin')
+
+
+        all_bboxes_ = box
+        classes = class_ids
+        
+        #!something wrong
+        # cid = np.array([DC.nyu40id2class[
+        #     self.label_map[c]] for c in class_ids
+        # ])
+        cid = class_ids.copy()
+
+
+        assert len(classes) < MAX_NUM_OBJ
+        assert len(classes) == all_bboxes_.shape[0]
+
+
+        num_objs = len(classes)
+        all_detected_bboxes[:num_objs] = all_bboxes_
+
+        all_detected_bbox_label_mask[:num_objs] = np.array([True] * num_objs)
+        detected_class_ids[:num_objs] = cid
+        #! 忘记让焕昂哥保存这个了!!!
+        # detected_logits[:num_objs] = detected_dict['logits']
+    
+        
+        # Match current augmentations
+        if self.augment and self.split == 'train':
+            all_det_pts = box2points(all_detected_bboxes).reshape(-1, 3)
+            all_det_pts = rot_z(all_det_pts, augmentations['theta_z'])
+            all_det_pts = rot_x(all_det_pts, augmentations['theta_x'])
+            all_det_pts = rot_y(all_det_pts, augmentations['theta_y'])
+            if augmentations.get('yz_flip', False):
+                all_det_pts[:, 0] = -all_det_pts[:, 0]
+            if augmentations.get('xz_flip', False):
+                all_det_pts[:, 1] = -all_det_pts[:, 1]
+            all_det_pts += augmentations['shift']
+            all_det_pts *= augmentations['scale']
+            all_detected_bboxes = points2box(all_det_pts.reshape(-1, 8, 3))
+        if self.augment_det and self.split == 'train':
+            min_ = all_detected_bboxes.min(0)
+            max_ = all_detected_bboxes.max(0)
+            rand_box = (
+                (max_ - min_)[None]
+                * np.random.random(all_detected_bboxes.shape)
+                + min_
+            )
+            corrupt = np.random.random(len(all_detected_bboxes)) > 0.7 #! 70的概率用 坏框? 
+            all_detected_bboxes[corrupt] = rand_box[corrupt]
+            detected_class_ids[corrupt] = np.random.randint(
+                0, len(DC.nyu40ids), (len(detected_class_ids))
+            )[corrupt]
+        return (
+            all_detected_bboxes, all_detected_bbox_label_mask,
+            detected_class_ids, detected_logits
+        )
+
+
+
+
     def _get_detected_objects(self, split, scan_id, augmentations):
         # Initialize
         all_detected_bboxes = np.zeros((MAX_NUM_OBJ, 6))
@@ -612,17 +702,6 @@ class Joint3DDataset(Dataset):
             allow_pickle=True
         ).item()
         
-        # train_file_name = f'{self.data_path}group_free_pred_bboxes_train/{scan_id}.npy'
-        # test_file_name = f'{self.data_path}group_free_pred_bboxes_test/{scan_id}.npy'
-        # val_file_name = f'{self.data_path}group_free_pred_bboxes_val/{scan_id}.npy'
-        
-        # if osp.exists(train_file_name):
-        #     detected_dict = np.load(train_file_name,allow_pickle=True).item()
-        # elif osp.exists(test_file_name):
-        #     detected_dict = np.load(test_file_name,allow_pickle=True).item()
-        # else:
-        #     detected_dict = np.load(val_file_name,allow_pickle=True).item()
-        #!+=========================
 
         all_bboxes_ = np.array(detected_dict['box'])
         classes = detected_dict['class']
@@ -643,6 +722,8 @@ class Joint3DDataset(Dataset):
         all_detected_bbox_label_mask[:num_objs] = np.array([True] * num_objs)
         detected_class_ids[:num_objs] = cid
         detected_logits[:num_objs] = detected_dict['logits']
+
+
         # Match current augmentations
         if self.augment and self.split == 'train':
             all_det_pts = box2points(all_detected_bboxes).reshape(-1, 3)
@@ -765,11 +846,22 @@ class Joint3DDataset(Dataset):
             class_ids, all_bboxes, all_bbox_label_mask
         ) = self._get_scene_objects(scan)
 
+
+
         #* Detected boxes
+        #* group free 
         (
             all_detected_bboxes, all_detected_bbox_label_mask,
             detected_class_ids, detected_logits
         ) = self._get_detected_objects(split, anno['scan_id'], augmentations)
+
+
+        #* FCAF3D 
+        # (
+        #     all_detected_bboxes, all_detected_bbox_label_mask,
+        #     detected_class_ids, detected_logits
+        # ) =self._get_detected_objects_fcaf3d(split, anno['scan_id'], augmentations)
+        
 
         # Assume a perfect object detector 
         if self.butd_gt:
