@@ -1,7 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-23 11:57:16
- # @LastEditTime: 2022-10-24 15:51:36
+ # @LastEditTime: 2022-10-24 16:17:21
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/train.sh
@@ -50,7 +50,7 @@ port=29522
 
 
 #* for  semi supervision architecture  : step2
-b_size='4,12';
+b_size='4,8';
 resume_model_path=pretrain/pretrain_ramdom%20anno_41.pth;
 
 

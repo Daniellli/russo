@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-04 19:55:17
-LastEditTime: 2022-10-24 16:06:41
+LastEditTime: 2022-10-24 16:17:46
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/train.py
@@ -939,14 +939,6 @@ class TrainTester(BaseTrainTester):
             broadcast_buffers=True  # , find_unused_parameters=True
         )
 
-
-
-     
-
-
-
-            
-
         
         #* file and variable for saving the eval res 
         best_performce = 0
@@ -972,29 +964,34 @@ class TrainTester(BaseTrainTester):
                 scheduler.milestones = tmp
 
             #* eval student model 
-            performance = self.evaluate_one_epoch(
-                args.start_epoch, test_loader,
-                model, criterion, set_criterion, args
-            )
-            
-            if performance is not None :
-                logger.info(','.join(['student_%s:%.04f'%(k,round(v,4)) for k,v in performance.items()]))
-                is_best,snew_performance = save_res(save_dir,args.start_epoch-1,performance,best_performce)
 
-                if is_best:
-                    best_performce = snew_performance
+            if args.eval:
+                performance = self.evaluate_one_epoch(
+                    args.start_epoch, test_loader,
+                    model, criterion, set_criterion, args
+                )
+                
+                if performance is not None :
+                    logger.info(','.join(['student_%s:%.04f'%(k,round(v,4)) for k,v in performance.items()]))
+                    is_best,snew_performance = save_res(save_dir,args.start_epoch-1,performance,best_performce)
 
-            #* eval teacher model 
-            ema_performance = self.evaluate_one_epoch(
-                args.start_epoch, test_loader,
-                ema_model, criterion, set_criterion, args
-            )
+                    if is_best:
+                        best_performce = snew_performance
 
-            if ema_performance is not None :
-                logger.info(','.join(['teacher_%s:%.04f'%(k,round(v,4)) for k,v in ema_performance.items()]))
-                is_best,tnew_performance = save_res(ema_save_dir,args.start_epoch-1,ema_performance,ema_best_performce)
-                if is_best:
-                    ema_best_performce= tnew_performance
+                #* eval teacher model 
+                ema_performance = self.evaluate_one_epoch(
+                    args.start_epoch, test_loader,
+                    ema_model, criterion, set_criterion, args
+                )
+
+                if ema_performance is not None :
+                    logger.info(','.join(['teacher_%s:%.04f'%(k,round(v,4)) for k,v in ema_performance.items()]))
+                    is_best,tnew_performance = save_res(ema_save_dir,args.start_epoch-1,ema_performance,ema_best_performce)
+                    if is_best:
+                        ema_best_performce= tnew_performance
+
+
+
                     
         #* Training loop
         for epoch in range(args.start_epoch, args.max_epoch + 1):
