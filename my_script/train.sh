@@ -1,7 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-23 11:57:16
- # @LastEditTime: 2022-10-23 11:59:32
+ # @LastEditTime: 2022-10-24 10:17:23
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/train.sh
@@ -22,9 +22,9 @@ train_data=sr3d
 test_data=sr3d
 DATA_ROOT=datasets/
 
-gpu_ids="3,4,5,6,7"
-gpu_num=5
-b_size=12
+gpu_ids="0,1,2,3"
+gpu_num=4
+b_size=16
 
 
 
@@ -43,13 +43,13 @@ val_freq=1;
 print_freq=100;
 save_freq=$val_freq;
 
-rampup_length=100;
-epoch=800;
+rampup_length=30;
+epoch=400;
 port=29522
 
 
 #* for  semi supervision architecture  : step2
-b_size='4,8';
+b_size='4,12';
 resume_model_path=pretrain/pretrain_ramdom%20anno_41.pth;
 
 
