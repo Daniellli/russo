@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-04 19:55:17
-LastEditTime: 2022-10-23 20:08:07
+LastEditTime: 2022-10-24 14:43:41
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/train.py
@@ -698,7 +698,7 @@ class TrainTester(BaseTrainTester):
         return labeled_loader,unlabeled_loader, test_loader
 
 
-           
+            
     '''
     description: transfer the parameter of student model to teacher model 
     param {*} self
@@ -711,6 +711,7 @@ class TrainTester(BaseTrainTester):
     def update_ema_variables(self,model, ema_model, alpha, global_step):
         # Use the true average until the exponential average is more correct
         alpha = min(1 - 1 / (global_step + 1), alpha)
+        # logger.info(f"alpha:{alpha} ,global_step :{global_step}")
         for ema_param, param in zip(ema_model.parameters(), model.parameters()):
             ema_param.data.mul_(alpha).add_(1 - alpha, param.data)
 
@@ -954,13 +955,13 @@ class TrainTester(BaseTrainTester):
 
         if args.eval:
 
-            # performance = self.evaluate_one_epoch(
-            #     args.start_epoch, test_loader,
-            #     model, criterion, set_criterion, args
-            # )
+            performance = self.evaluate_one_epoch(
+                args.start_epoch, test_loader,
+                model, criterion, set_criterion, args
+            )
             
-            # if performance is not None :
-            #     logger.info(','.join(['student_%s:%.04f'%(k,round(v,4)) for k,v in performance.items()]))
+            if performance is not None :
+                logger.info(','.join(['student_%s:%.04f'%(k,round(v,4)) for k,v in performance.items()]))
             
             
             
@@ -970,7 +971,7 @@ class TrainTester(BaseTrainTester):
             )
             if ema_performance is not None :
                 logger.info(','.join(['teacher_%s:%.04f'%(k,round(v,4)) for k,v in ema_performance.items()]))
-            # else :#* check what cause None ?
+
 
             
 
@@ -1021,9 +1022,11 @@ class TrainTester(BaseTrainTester):
                 
                 if performance is not None :
                     logger.info(','.join(['student_%s:%.04f'%(k,round(v,4)) for k,v in performance.items()]))
-                # else :
-                #     embed()
-                
+                    is_best,snew_performance = save_res(save_dir,epoch,performance,best_performce)
+                    if is_best:
+                        best_performce =  snew_performance
+                        save_checkpoint(args, epoch, model, optimizer, scheduler ,is_best=True,prefix='student_')
+
                 
                 ema_performance = self.evaluate_one_epoch(
                     epoch, test_loader,
@@ -1031,28 +1034,24 @@ class TrainTester(BaseTrainTester):
                 )
                 if ema_performance is not None :
                     logger.info(','.join(['teacher_%s:%.04f'%(k,round(v,4)) for k,v in ema_performance.items()]))
-                # else :#* check what cause None ?
-                #     embed()
+                    is_best,tnew_performance = save_res(ema_save_dir,epoch,ema_performance,ema_best_performce)
+                    if is_best:
+                        ema_best_performce =  tnew_performance
+                        save_checkpoint(args, epoch, ema_model, optimizer, scheduler ,is_best=True,prefix='teacher_')     
                 
+
 
                 #todo 把save as txt 分离出来? 
                 if dist.get_rank() == 0 and args.upload_wandb:
                     #* model (student model )
-                    
                     if performance is not None :
                         wandb.log({'student_%s'%(k):round(v,4) for k,v in performance.items()})
-                        is_best,new_performance = save_res(save_dir,epoch,performance,best_performce)
                         if is_best:
-                            best_performce =  new_performance
-                            save_checkpoint(args, epoch, model, optimizer, scheduler ,is_best=True,prefix='student_')
                             wandb.log({'%s'%('student_best_'+k):round(v,4) for k,v in performance.items()})
 
                     if ema_performance is not None :
                         wandb.log({'teacher_%s'%(k):round(v,4) for k,v in ema_performance.items()})
-                        is_best,new_performance = save_res(ema_save_dir,epoch,ema_performance,ema_best_performce)
                         if is_best:
-                            ema_best_performce =  new_performance
-                            save_checkpoint(args, epoch, ema_model, optimizer, scheduler ,is_best=True,prefix='teacher_')     
                             wandb.log({'%s'%('teacher_best_'+k):round(v,4) for k,v in ema_performance.items()})
 
 

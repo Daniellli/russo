@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-04 19:55:56
-LastEditTime: 2022-10-24 15:28:58
+LastEditTime: 2022-10-24 15:38:54
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/join_labeled_dataset.py
@@ -897,7 +897,7 @@ class JointLabeledDataset(Dataset):
         scan.pc = np.copy(scan.orig_pc)
 
 
-        origin_box = self.get_current_pc_box(scan)
+        # origin_box = self.get_current_pc_box(scan)
 
         # Populate anno (used only for scannet)
         self.random_utt = False
@@ -952,7 +952,7 @@ class JointLabeledDataset(Dataset):
         point_cloud, augmentations, og_color ,origin_pc= self._get_pc(anno, scan)
 
         #!+========================================================
-        #* 用场景原始color
+        #* 用场景原始color 
         if self.overfit:
             point_cloud = np.copy(np.concatenate([point_cloud[:,:3],og_color],axis=-1) )
             origin_pc =  np.copy(np.concatenate([origin_pc[:,:3],og_color],axis=-1) )
@@ -977,10 +977,10 @@ class JointLabeledDataset(Dataset):
         ) = self._get_detected_objects(split, anno['scan_id'], augmentations)
 
         #!===================
-        # teacher_box = all_bboxes.copy()
-        # teacher_box = self.transformation_box(teacher_box,augmentations)
+        teacher_box = all_bboxes.copy()
+        teacher_box = self.transformation_box(teacher_box,augmentations)
  
-        teacher_box = origin_box
+        # teacher_box = origin_box
         #!===================
 
         # Assume a perfect object detector 

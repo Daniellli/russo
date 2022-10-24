@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-04 19:55:59
-LastEditTime: 2022-10-24 15:29:14
+LastEditTime: 2022-10-24 15:39:03
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/join_unlabeled_dataset.py
@@ -907,9 +907,7 @@ class JointUnlabeledDataset(Dataset):
         scan = self.scans[anno['scan_id']]
         scan.pc = np.copy(scan.orig_pc)
 
-        origin_box = self.get_current_pc_box(scan)
-
-
+        # origin_box = self.get_current_pc_box(scan)
 
         # Populate anno (used only for scannet)
         self.random_utt = False
@@ -991,9 +989,9 @@ class JointUnlabeledDataset(Dataset):
         ) = self._get_detected_objects(split, anno['scan_id'], augmentations)
 
         #!===================
-        # teacher_box = all_bboxes.copy()
-        # teacher_box = self.transformation_box(teacher_box,augmentations)
-        teacher_box = origin_box
+        teacher_box = all_bboxes.copy()
+        teacher_box = self.transformation_box(teacher_box,augmentations)
+        # teacher_box = origin_box
  
 
         #!===================
