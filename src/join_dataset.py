@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 21:28:11
-LastEditTime: 2022-10-23 23:17:43
+LastEditTime: 2022-10-24 15:10:53
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/join_dataset.py
@@ -841,7 +841,7 @@ class JointDataset(Dataset):
             all_bboxes_[:, 3:] - all_bboxes_[:, :3]
         ), 1)
         all_bboxes[:len(all_bboxes_)] = all_bboxes_
-        all_bboxes[len(all_bboxes_):] = 10000
+        # all_bboxes[len(all_bboxes_):] = 10000
         return all_bboxes
 
 

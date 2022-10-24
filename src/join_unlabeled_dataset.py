@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-04 19:55:59
-LastEditTime: 2022-10-23 16:21:46
+LastEditTime: 2022-10-24 15:11:39
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/join_unlabeled_dataset.py
@@ -807,7 +807,7 @@ class JointUnlabeledDataset(Dataset):
             all_bboxes_[:, 3:] - all_bboxes_[:, :3]
         ), 1)
         all_bboxes[:len(all_bboxes_)] = all_bboxes_
-        all_bboxes[len(all_bboxes_):] = 10000
+        # all_bboxes[len(all_bboxes_):] = 10000
         return all_bboxes
 
 
