@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-04 19:55:56
-LastEditTime: 2022-10-24 15:38:54
+LastEditTime: 2022-10-24 15:41:41
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/join_labeled_dataset.py
@@ -882,7 +882,6 @@ class JointLabeledDataset(Dataset):
             all_bboxes_[:, 3:] - all_bboxes_[:, :3]
         ), 1)
         all_bboxes[:len(all_bboxes_)] = all_bboxes_
-        # all_bboxes[len(all_bboxes_):] = 10000
         return all_bboxes
 
 
@@ -895,9 +894,8 @@ class JointLabeledDataset(Dataset):
         anno = self.annos[index]
         scan = self.scans[anno['scan_id']]
         scan.pc = np.copy(scan.orig_pc)
-
-
-        # origin_box = self.get_current_pc_box(scan)
+        
+        origin_box = self.get_current_pc_box(scan)
 
         # Populate anno (used only for scannet)
         self.random_utt = False
@@ -977,10 +975,9 @@ class JointLabeledDataset(Dataset):
         ) = self._get_detected_objects(split, anno['scan_id'], augmentations)
 
         #!===================
-        teacher_box = all_bboxes.copy()
-        teacher_box = self.transformation_box(teacher_box,augmentations)
- 
-        # teacher_box = origin_box
+        # teacher_box = all_bboxes.copy()
+        # teacher_box = self.transformation_box(teacher_box,augmentations)
+        teacher_box = origin_box
         #!===================
 
         # Assume a perfect object detector 

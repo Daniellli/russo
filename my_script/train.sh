@@ -1,11 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-23 11:57:16
-<<<<<<< Updated upstream
- # @LastEditTime: 2022-10-24 15:38:47
-=======
- # @LastEditTime: 2022-10-24 14:37:14
->>>>>>> Stashed changes
+ # @LastEditTime: 2022-10-24 15:51:36
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/train.sh
@@ -26,15 +22,9 @@ train_data=sr3d
 test_data=sr3d
 DATA_ROOT=datasets/
 
-<<<<<<< Updated upstream
-gpu_ids="0,1,2,3"
-gpu_num=4
-b_size=16
-=======
 gpu_ids="0,1,2,3,8";
 gpu_num=5;
 b_size=12
->>>>>>> Stashed changes
 
 
 
@@ -86,14 +76,14 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --checkpoint_path $resume_model_path \
     --labeled_ratio $labeled_ratio \
     --rampup_length $rampup_length \
-    --eval \
     2>&1 | tee -a logs/train_test_cls.log
 
     
 
 
 
-# --upload-wandb \
 
+
+# --upload-wandb \
 # --lr_decay_intermediate \
 # --lr_decay_epochs 25 26 \

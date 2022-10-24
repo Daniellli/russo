@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-04 19:55:17
-LastEditTime: 2022-10-24 14:43:41
+LastEditTime: 2022-10-24 16:06:41
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/train.py
@@ -941,42 +941,14 @@ class TrainTester(BaseTrainTester):
 
 
 
-        # Check for a checkpoint
-        if args.checkpoint_path:
-            assert os.path.isfile(args.checkpoint_path)
-            load_checkpoint(args, model, optimizer, scheduler)
-            load_checkpoint(args, ema_model, optimizer, scheduler,distributed2common=True)
+     
 
-            if args.lr_decay_intermediate:    
-                tmp = {scheduler._step_count+len(labeled_loader):1 } #* 一个epoch 后decay learning rate 
-                tmp.update({ k:v for  idx, (k,v) in enumerate(scheduler.milestones.items()) if idx != 0})
-                scheduler.milestones = tmp
-
-
-        if args.eval:
-
-            performance = self.evaluate_one_epoch(
-                args.start_epoch, test_loader,
-                model, criterion, set_criterion, args
-            )
-            
-            if performance is not None :
-                logger.info(','.join(['student_%s:%.04f'%(k,round(v,4)) for k,v in performance.items()]))
-            
-            
-            
-            ema_performance = self.evaluate_one_epoch(
-                args.start_epoch, test_loader,
-                ema_model, criterion, set_criterion, args
-            )
-            if ema_performance is not None :
-                logger.info(','.join(['teacher_%s:%.04f'%(k,round(v,4)) for k,v in ema_performance.items()]))
 
 
             
 
-        # Training loop
-        #!===============================
+        
+        #* file and variable for saving the eval res 
         best_performce = 0
         save_dir = osp.join(args.log_dir,'performance.txt')
 
@@ -985,8 +957,46 @@ class TrainTester(BaseTrainTester):
 
         if osp.exists(save_dir):
             os.remove(save_dir)
-        #!===============================
-        
+
+        #* 1.Check for a checkpoint
+        #* 2.eval and save res to a txt file 
+        if args.checkpoint_path:
+            assert os.path.isfile(args.checkpoint_path)
+            load_checkpoint(args, model, optimizer, scheduler)
+            load_checkpoint(args, ema_model, optimizer, scheduler,distributed2common=True)
+
+            #* update lr decay milestones
+            if args.lr_decay_intermediate:    
+                tmp = {scheduler._step_count+len(labeled_loader):1 } #* 一个epoch 后decay learning rate 
+                tmp.update({ k:v for  idx, (k,v) in enumerate(scheduler.milestones.items()) if idx != 0})
+                scheduler.milestones = tmp
+
+            #* eval student model 
+            performance = self.evaluate_one_epoch(
+                args.start_epoch, test_loader,
+                model, criterion, set_criterion, args
+            )
+            
+            if performance is not None :
+                logger.info(','.join(['student_%s:%.04f'%(k,round(v,4)) for k,v in performance.items()]))
+                is_best,snew_performance = save_res(save_dir,args.start_epoch-1,performance,best_performce)
+
+                if is_best:
+                    best_performce = snew_performance
+
+            #* eval teacher model 
+            ema_performance = self.evaluate_one_epoch(
+                args.start_epoch, test_loader,
+                ema_model, criterion, set_criterion, args
+            )
+
+            if ema_performance is not None :
+                logger.info(','.join(['teacher_%s:%.04f'%(k,round(v,4)) for k,v in ema_performance.items()]))
+                is_best,tnew_performance = save_res(ema_save_dir,args.start_epoch-1,ema_performance,ema_best_performce)
+                if is_best:
+                    ema_best_performce= tnew_performance
+                    
+        #* Training loop
         for epoch in range(args.start_epoch, args.max_epoch + 1):
             
             labeled_loader.sampler.set_epoch(epoch)
@@ -1002,7 +1012,6 @@ class TrainTester(BaseTrainTester):
                 optimizer, scheduler, args
             )
 
-
             self.logger.info(
                 'epoch {}, total time {:.2f}, '
                 'lr_base {:.5f}, lr_pointnet {:.5f}'.format(
@@ -1011,10 +1020,11 @@ class TrainTester(BaseTrainTester):
                     optimizer.param_groups[1]['lr']
                 )
             )
+
             # save model
             if epoch % args.val_freq == 0:
-                print("Test evaluation.......")
 
+                print("Test evaluation.......")
                 performance = self.evaluate_one_epoch(
                     epoch, test_loader,
                     model, criterion, set_criterion, args
@@ -1032,6 +1042,7 @@ class TrainTester(BaseTrainTester):
                     epoch, test_loader,
                     ema_model, criterion, set_criterion, args
                 )
+
                 if ema_performance is not None :
                     logger.info(','.join(['teacher_%s:%.04f'%(k,round(v,4)) for k,v in ema_performance.items()]))
                     is_best,tnew_performance = save_res(ema_save_dir,epoch,ema_performance,ema_best_performce)
@@ -1039,8 +1050,7 @@ class TrainTester(BaseTrainTester):
                         ema_best_performce =  tnew_performance
                         save_checkpoint(args, epoch, ema_model, optimizer, scheduler ,is_best=True,prefix='teacher_')     
                 
-
-
+                
                 #todo 把save as txt 分离出来? 
                 if dist.get_rank() == 0 and args.upload_wandb:
                     #* model (student model )
