@@ -1,7 +1,8 @@
+
 ###
  # @Author: xushaocong
- # @Date: 2022-10-23 10:46:29
- # @LastEditTime: 2022-10-23 10:50:20
+ # @Date: 2022-10-24 00:27:51
+ # @LastEditTime: 2022-10-24 10:07:49
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/pretrain.sh

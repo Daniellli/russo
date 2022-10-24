@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-04 19:55:59
-LastEditTime: 2022-10-22 23:11:57
+LastEditTime: 2022-10-23 16:21:46
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/join_unlabeled_dataset.py
@@ -189,9 +189,6 @@ class JointUnlabeledDataset(Dataset):
             with open(os.path.join('data/meta_data/nr3d_{}_all_assignmentid.txt'.format(split)), 'r') as f:
                 all_assignment_ids = f.read().split('\n')
 
-
-            logger.info(f"{len(assignment_ids) } labeled assignments ids  loaded \t {len(all_assignment_ids) } all assignments ids loaded ")
-            
             assignment_ids =set(all_assignment_ids) -  set(assignment_ids)
             logger.info(f"{len(assignment_ids) } unlabeled assignments ids  loaded")
 
@@ -284,15 +281,12 @@ class JointUnlabeledDataset(Dataset):
         if split== 'train' and self.labeled_ratio is not None:
             with open(os.path.join('data/meta_data/nr3d_{}_{}.txt'.format(split,self.labeled_ratio)), 'r') as f:
                 labeled_scenes = f.read().split('\n')
-            logger.info(f"{len(labeled_scenes) } scenes loaded ")
-            scan_ids = set(labeled_scenes)
             
-            #!+=============================
+            scan_ids = set(labeled_scenes)
             with open('data/meta_data/nr3d_%s_scans.txt' % split) as f:
                 all_scan_ids = set(eval(f.read()))
-
             scan_ids = list(all_scan_ids-scan_ids)
-            #!+=============================
+            logger.info(f"{len(scan_ids) } scenes loaded ")
         else :
             with open('data/meta_data/nr3d_%s_scans.txt' % split) as f:
                 scan_ids = set(eval(f.read()))
@@ -346,15 +340,13 @@ class JointUnlabeledDataset(Dataset):
         if split== 'train' and self.labeled_ratio is not None:
             with open(os.path.join('data/meta_data/sr3d_{}_{}.txt'.format(split,self.labeled_ratio)), 'r') as f:
                 labeled_scenes = f.read().split('\n')
-            logger.info(f"{len(labeled_scenes) } scenes loaded ")
-            scan_ids = set(labeled_scenes)
             
-            #!+=============================
+            scan_ids = set(labeled_scenes)
             with open('data/meta_data/sr3d_%s_scans.txt' % split) as f:
                 all_scan_ids = set(eval(f.read()))
 
             scan_ids = list(all_scan_ids-scan_ids)
-            #!+=============================
+            logger.info(f"{len(labeled_scenes) } scenes loaded ")
         else :
             with open('data/meta_data/sr3d_%s_scans.txt' % split) as f:
                 scan_ids = set(eval(f.read()))
@@ -884,6 +876,15 @@ class JointUnlabeledDataset(Dataset):
         # Point cloud representation#* point_cloud == [x,y,z,r,g,b], 50000 points 
         point_cloud, augmentations, og_color ,origin_pc= self._get_pc(anno, scan)
 
+
+        #!+=====================
+        #* 用场景原始color
+        if self.overfit:
+            point_cloud = np.copy(np.concatenate([point_cloud[:,:3],og_color],axis=-1) )
+            origin_pc =  np.copy(np.concatenate([origin_pc[:,:3],og_color],axis=-1) )
+            
+
+        #!+=====================
         # "Target" boxes: append anchors if they're to be detected
         gt_bboxes, box_label_mask, point_instance_label = \
             self._get_target_boxes(anno, scan)

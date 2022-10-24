@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 20:04:19
-LastEditTime: 2022-10-22 11:41:22
+LastEditTime: 2022-10-23 18:27:00
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/my_script/utils.py
@@ -17,6 +17,8 @@ import numpy as np
 import torch 
 import torch.nn as nn
 from loguru import logger 
+
+from my_script.pc_utils import write_pc_as_ply
 
 def make_dirs(path):
 
@@ -315,6 +317,62 @@ def print_attr_shape(data):
             logger.info(f"{k} some thing wrong ")
             
    
+
+
+
+'''
+description:  存储model 预测的结果用于上传ScanRefer evalution server , 
+param {*} end_points : 输入一个batch 的 forward results, 返回  一个batch 的parse 结果
+return {*}
+'''
+def my_parse_prediction(end_points):
+    prefix="last_"
+    query_dist_map = end_points[f'{prefix}sem_cls_scores'].softmax(-1) #* 
+    objectness_preds_batch = torch.argmax(query_dist_map, 2).long() #* 等于255 应该是没有匹配到文本token的, 如paper解释的一样
+    pred_masks = (objectness_preds_batch !=255).float()
+    
+    for i in range(pred_masks.shape[0]):
+        # compute the iou 
+        #* 存在一个utterence 有多个匹配的情况!!!  不知道选哪个?   choose first one for now 
+        if pred_masks[i].sum() !=0 :
+
+            matched_obj_size =end_points[f'{prefix}pred_size'][i][pred_masks[i]==1][0].detach().cpu().numpy()
+            matched_obj_center =end_points[f'{prefix}center'][i][pred_masks[i]==1][0].detach().cpu().numpy() 
+            matched_obj_xyz =end_points[f'{prefix}base_xyz'][i][pred_masks[i]==1][0].detach().cpu().numpy() 
+
+
+            _bbox = get_3d_box(matched_obj_size,0, matched_obj_center) #* angle 不知道
+            
+            pred_data = {
+                "scene_id": end_points["scan_ids"][i],
+                "object_id": end_points["target_id"][i],
+                "ann_id": end_points['ann_id'][i],
+                "bbox": _bbox.tolist(),
+                "unique_multiple":  end_points["is_unique"][i].item()==False, #* return true means multiple 
+                "others": 1 if end_points["target_cid"][i] == 17 else 0
+            }
+            pred_bboxes.append(pred_data)
+    return pred_bboxes
+
+
+
+
+'''
+description: 
+param {*} data
+param {*} scene_name
+param {*} save_root
+param {*} has_color
+param {*} flag
+return {*}
+'''
+def save_for_vis(box,pc,save_path,scene_name,flag = "debug"):
+      #* for teacher or student 
+  
+    write_pc_as_ply(pc,os.path.join(save_path, '%s_gt_%s.ply'%(scene_name,flag)))
+    
+  
+    np.savetxt(os.path.join(save_path,'%s_box_%s.txt'%(scene_name,flag)),box,fmt='%s')
 
 
 if __name__ == "__main__":

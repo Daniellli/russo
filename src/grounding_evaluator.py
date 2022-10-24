@@ -63,9 +63,6 @@ class GroundingEvaluator:
             'bbs': 'Box given span (soft-token)',
             'bbf': 'Box given span (contrastive)'
         }
-        #!+============
-        # embed()
-        #!+============
         for prefix in self.prefixes:
             for mode in ['bbs', 'bbf']:
                 for t in self.thresholds:
@@ -172,6 +169,11 @@ class GroundingEvaluator:
                     found = thresholded[:, :k].any(1)
                     self.dets[(prefix, t, k, 'bbs')] += found.sum().item()
                     self.gts[(prefix, t, k, 'bbs')] += len(thresholded)
+
+
+        
+
+
 
     def evaluate_bbox_by_contrast(self, end_points, prefix):
         """

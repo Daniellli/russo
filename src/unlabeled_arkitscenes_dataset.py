@@ -1,7 +1,16 @@
 '''
 Author: xushaocong
+Date: 2022-10-23 22:52:09
+LastEditTime: 2022-10-23 23:06:40
+LastEditors: xushaocong
+Description: 
+FilePath: /butd_detr/src/unlabeled_arkitscenes_dataset.py
+email: xushaocong@stu.xmu.edu.cn
+'''
+'''
+Author: xushaocong
 Date: 2022-10-22 10:41:31
-LastEditTime: 2022-10-23 22:52:39
+LastEditTime: 2022-10-23 00:38:52
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/labeled_arkitscenes_dataset.py
@@ -76,6 +85,7 @@ ARKit_DC=ARKitDatasetConfig()
 # NUM_PROPOSAL = 256
 MAX_NUM_OBJ = 132
 NUM_CLASSES = 485
+
 
 
 
@@ -198,15 +208,13 @@ class ARKitSceneDataset(Dataset):
             self.annos.update(annos)
             all_scene_name += list(annos.keys())
             
-            logger.info(f"split {split } : {len(annos)} loaded")
+            logger.info(f"split of {split} : {len(annos) }  annotations loaded ,after loading this datasets, total number of datasets become: {len(self.annos)}")
 
-        logger.info(f" total length  : {len(self.annos)} loaded")
         #* load  language model  
         model_path=osp.join(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__))))),'.cache/huggingface/transformers/roberta')
         self.tokenizer = RobertaTokenizerFast.from_pretrained(model_path)
         self.scene_name = all_scene_name
         
-        logger.info(f"ARKitSceneDataset : {len(self.annos)} sample loaded, scene_name number : {len(all_scene_name)} ")
         
     def __get_scene_name(self,split):
         data_split_path = None
@@ -242,9 +250,6 @@ class ARKitSceneDataset(Dataset):
     '''
     def filter_bad_scene_and_cache(self,file_name,scene_names,data_path):
         anns = {}
-        scan_box = []
-        logger.info(f" before filter_bad_scene, length of scan_names :  {len(scene_names)}")
-        
         for idx, scan_name in enumerate(tqdm(scene_names)):
             scan_dir = os.path.join(data_path, scan_name, f"{scan_name}_offline_prepared_data_2")
             annnotation = np.load(os.path.join(scan_dir, f"{scan_name}_label", f"{scan_name}_bbox.npy"), allow_pickle=True).item()
@@ -257,9 +262,7 @@ class ARKitSceneDataset(Dataset):
             # if idx == 5 :
             #     break
             #!+=================
-            
         
-        logger.info(f" after filter_bad_scene, length of scan_names :  {len(list(anns.keys()))}, and has cached")
         pickle_data(file_name, anns)
         return  anns
 
@@ -332,13 +335,13 @@ class ARKitSceneDataset(Dataset):
     return {*}
     '''
     def downsample_ceil(self,mesh_vertices):
-        # logger.info(f"before delete ceil :{mesh_vertices.shape}")        
+        
         delete_thres = np.percentile(mesh_vertices[..., 2], 80)
         filter_mask = (mesh_vertices[..., 2] >= delete_thres)
         new_vertices= mesh_vertices[~filter_mask].copy()
         del mesh_vertices
         mesh_vertices = new_vertices
-        # logger.info(f"after  delete ceil :{mesh_vertices.shape}")
+        
         return mesh_vertices
   
         
@@ -547,8 +550,7 @@ class ARKitSceneDataset(Dataset):
             #* 不能进行rotation, 因为我们scene 没有align to origin  point 
             rotate =False
             point_clouds, color, augmentations = self._augment(point_clouds, color, rotate)
-        # else :
-        #     logger.info(f"no augmentation ")
+        
             
         # e. Concatenate representations
         if color is not None:
@@ -723,10 +725,10 @@ class ARKitSceneDataset(Dataset):
         #* teacher's things
         teacher_box = np.zeros((MAX_NUM_OBJ, 6))
         teacher_box[:bboxes.shape[0],:] = np.copy(bboxes)
-
         teacher_pc = origin_pc
 
 
+        
         #* align box 
         bboxes = self.align_box_to_pc(bboxes,augmentations)
 
@@ -762,10 +764,10 @@ class ARKitSceneDataset(Dataset):
 
         #* sem_cls_label 没有用! 
         ret_dict = {
-            'box_label_mask': box_label_mask.astype(np.float32),
-            'center_label': gt_bboxes[:, :3].astype(np.float32),
-            'sem_cls_label': np.zeros(MAX_NUM_OBJ).astype(np.int64),
-            'size_gts': gt_bboxes[:, 3:].astype(np.float32),
+            # 'box_label_mask': box_label_mask.astype(np.float32),
+            # 'center_label': gt_bboxes[:, :3].astype(np.float32),
+            # 'sem_cls_label': np.zeros(MAX_NUM_OBJ).astype(np.int64),
+            # 'size_gts': gt_bboxes[:, 3:].astype(np.float32),
         }
 
         
@@ -779,41 +781,41 @@ class ARKitSceneDataset(Dataset):
                 ' '.join(anno['utterance'].replace(',', ' ,').split())
                 + ' . not mentioned'
             ),
-            "tokens_positive": tokens_positive.astype(np.int64),
-            "positive_map": positive_map.astype(np.float32),
-            "relation": ("none"),
-            "target_name": anno['target'][0],
-            "target_id": (anno['target_id'][0]),
+            # "tokens_positive": tokens_positive.astype(np.int64),
+            # "positive_map": positive_map.astype(np.float32),
+            # "relation": ("none"),
+            # "target_name": anno['target'][0],
+            # "target_id": (anno['target_id'][0]),
 
-            "all_bboxes": all_bboxes.astype(np.float32),
-            "all_bbox_label_mask":all_bbox_label_mask.astype(np.bool8),
-            "all_class_ids": class_ids.astype(np.int64),
+            # "all_bboxes": all_bboxes.astype(np.float32),
+            # "all_bbox_label_mask":all_bbox_label_mask.astype(np.bool8),
+            # "all_class_ids": class_ids.astype(np.int64),
 
             #! no detected results: 
+            #* for cls task 
             "all_detected_boxes": all_detected_bboxes.astype(np.float32),
             "all_detected_bbox_label_mask": all_detected_bbox_label_mask.astype(np.bool8),
             "all_detected_class_ids": detected_class_ids.astype(np.int64) ,
             # "all_detected_logits": detected_logits.astype(np.float32) ,
             #*! no point_instance_label  , namely sematic results
 
-            "distractor_ids": np.array(
-                anno['distractor_ids'] + [-1] * (32 - len(anno['distractor_ids']))
-            ).astype(int),
-            "anchor_ids": np.array(
-                anno['anchor_ids'] + [-1] * (32 - len(anno['anchor_ids']))
-            ).astype(int),
+            # "distractor_ids": np.array(
+            #     anno['distractor_ids'] + [-1] * (32 - len(anno['distractor_ids']))
+            # ).astype(int),
+            # "anchor_ids": np.array(
+            #     anno['anchor_ids'] + [-1] * (32 - len(anno['anchor_ids']))
+            # ).astype(int),
             
             "is_view_dep": self._is_view_dep(anno['utterance']),
             "is_hard": len(anno['distractor_ids']) > 1,
             "is_unique": len(anno['distractor_ids']) == 0,
             #?  对应scennet calss set 的class ID
-            "target_cid": (anno['bbox_class_ids_in_scannet'][anno['target_id'][0]]),
+            # "target_cid": (anno['bbox_class_ids_in_scannet'][anno['target_id'][0]]),
             "pc_before_aug":teacher_pc.astype(np.float32),
             "teacher_box":teacher_box.astype(np.float32),
             #! no teacher box because no  detected results, so we can only test on det setting 
             "augmentations":augmentations,
             "supervised_mask":np.array(2).astype(np.int64),#*  2 表示有标签 但是没有point_instance_label
-            
         })
 
 

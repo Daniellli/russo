@@ -1,21 +1,13 @@
 ###
-###
  # @Author: xushaocong
- # @Date: 2022-10-22 01:33:28
- # @LastEditTime: 2022-10-24 00:07:15
+ # @Date: 2022-10-23 11:57:16
+ # @LastEditTime: 2022-10-23 11:59:32
  # @LastEditors: xushaocong
  # @Description: 
- # @FilePath: /butd_detr/my_script/omni_supervise.sh
+ # @FilePath: /butd_detr/my_script/train.sh
  # email: xushaocong@stu.xmu.edu.cn
 ### 
- # @Author: xushaocong
- # @Date: 2022-08-21 19:15:53
- # @LastEditTime: 2022-10-19 16:10:27
- # @LastEditors: xushaocong
- # @Description: 
- # @FilePath: /butd_detr/my_script/train_test_cls.sh
- # email: xushaocong@stu.xmu.edu.cn
-### 
+
 
 
 
@@ -25,36 +17,16 @@ export PYTHONWARNINGS='ignore:semaphore_tracker:UserWarning'
 #!  NR3D and ScanRefer  need much more epoch for converge 
 #!  To train on multiple datasets, e.g. on SR3D and NR3D simultaneously, set --TRAIN_DATASET sr3d nr3d.
 
-
-
-# gpu_ids="0,2,3,4,6,7,9"
-# gpu_num=7
-# b_size=12
+# train_data="sr3d nr3d scanrefer scannet sr3d+"
+train_data=sr3d
+test_data=sr3d
+DATA_ROOT=datasets/
 
 gpu_ids="3,4,5,6,7"
 gpu_num=5
 b_size=12
 
-# gpu_ids="0,1,2,3"
-# gpu_num=4
-# b_size=44
 
-# gpu_ids="1,2,3"
-# gpu_num=3;
-# b_size=20;
-
-
-
-port=29522
-val_freq=1;
-print_freq=100;
-save_freq=$val_freq;
-#* for debug 
-
-
-#* for  semi supervision architecture  : step2
-b_size='8,4';
-resume_mode_path="pretrain/pretrain_nr3d_sr3d_sr3dplus_scanrefer_5491_39.pth"
 
 
 #* for not mask 
@@ -64,16 +36,25 @@ token_consistency_weight=1;
 query_consistency_weight=1;
 text_consistency_weight=1;
 
-rampup_length=30;
-epoch=600;
 
-# train_data="sr3d nr3d scanrefer scannet sr3d+"
-train_data="sr3d nr3d scanrefer sr3d+"
-test_data=nr3d
-DATA_ROOT=datasets/
+
+labeled_ratio=0.2;
+val_freq=1;
+print_freq=100;
+save_freq=$val_freq;
+
+rampup_length=100;
+epoch=800;
+port=29522
+
+
+#* for  semi supervision architecture  : step2
+b_size='4,8';
+resume_model_path=pretrain/pretrain_ramdom%20anno_41.pth;
+
 
 TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
-    omni_train.py --num_decoder_layers 6 \
+    train.py --num_decoder_layers 6 \
     --use_color \
     --weight_decay 0.0005 \
     --data_root $DATA_ROOT \
@@ -92,19 +73,12 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --query_consistency_weight $query_consistency_weight \
     --text_consistency_weight $text_consistency_weight \
     --upload-wandb \
-    --checkpoint_path $resume_mode_path \
+    --checkpoint_path $resume_model_path \
+    --labeled_ratio $labeled_ratio \
     --rampup_length $rampup_length \
     2>&1 | tee -a logs/train_test_cls.log
+
     
-
-
-
-
-
 
 # --lr_decay_intermediate \
-# --labeled_ratio $labeled_ratio \
 # --lr_decay_epochs 25 26 \
-
-
-    
