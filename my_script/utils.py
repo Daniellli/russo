@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 20:04:19
-LastEditTime: 2022-10-25 16:57:25
+LastEditTime: 2022-10-25 18:56:22
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/my_script/utils.py
@@ -684,6 +684,12 @@ def my_parse_prediction(end_points):
 
 
 
+def save_box(box,path):
+    np.savetxt(path,box,fmt='%s')
+
+def save_pc(pc,path):
+    write_pc_as_ply(pc,path)
+
 
 '''
 description: 
@@ -696,11 +702,42 @@ return {*}
 '''
 def save_for_vis(box,pc,save_path,scene_name,flag = "debug"):
       #* for teacher or student 
-  
-    write_pc_as_ply(pc,os.path.join(save_path, '%s_gt_%s.ply'%(scene_name,flag)))
+    save_pc(pc,os.path.join(save_path, '%s_gt_%s.ply'%(scene_name,flag)))
     
-  
-    np.savetxt(os.path.join(save_path,'%s_box_%s.txt'%(scene_name,flag)),box,fmt='%s')
+    save_box(box,os.path.join(save_path,'%s_box_%s.txt'%(scene_name,flag)) )
+
+
+
+def save_txt(data,path):
+    
+    with open(path,'w')as f :
+        f.write(data)
+
+
+
+
+
+'''
+description:  for huanang detector 
+param {*} datasets
+return {*}
+'''
+def save_pc_for_detector(datasets):
+
+    save_dir = "datasets/scannet_pc"
+    make_dirs(save_dir)
+
+    length = datasets.__len__()
+    print(f"len : {length}")
+    for idx in range(length):
+        pc,scane_name = datasets.get_origin_data(idx)
+        save_path = osp.join(save_dir,f"{scane_name}_pc.npy")
+        np.save(save_path,pc)
+
+
+
+
+
 
 
 if __name__ == "__main__":
@@ -712,4 +749,10 @@ if __name__ == "__main__":
     #* 生成labeled datasets for SR3D
     for x in np.linspace(0.1,0.9,9):
         generate_SR3D_labeled_scene_txt(round(x,1))
+
+
+    #* demo for save_pc_for_detector
+    # save_pc_for_detector(train_dataset)
+    # save_pc_for_detector(val_dataset)
+    # pc,scane_name=val_dataset.get_origin_data(0)
 

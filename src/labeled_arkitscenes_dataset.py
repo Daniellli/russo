@@ -1,7 +1,11 @@
 '''
 Author: xushaocong
 Date: 2022-10-22 10:41:31
-LastEditTime: 2022-10-25 17:34:44
+<<<<<<< HEAD
+LastEditTime: 2022-10-25 18:56:22
+=======
+LastEditTime: 2022-10-25 09:18:09
+>>>>>>> f6d54c16c9417810615e7a2ea5802fff9f00e302
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/labeled_arkitscenes_dataset.py
@@ -124,7 +128,7 @@ class LabeledARKitSceneDataset(Dataset):
         self.tokenizer = RobertaTokenizerFast.from_pretrained(model_path)
         self.scene_name = all_scene_name
         
-        logger.info(f"ARKitSceneDataset : {len(self.annos)} sample loaded, scene_name number : {len(all_scene_name)} ")
+        logger.info(f"LabeledARKitSceneDataset : {len(self.annos)} sample loaded, scene_name number : {len(all_scene_name)} ")
         
     def __get_scene_name(self,split):
         data_split_path = None
@@ -764,7 +768,7 @@ def save_(data,scene_name,save_root,has_color= True,flag = "debug"):
 
 
 if __name__ == "__main__":
-    dset = ARKitSceneDataset( augment=True,data_root='datasets/arkitscenes',butd_cls = True)
+    dset = LabeledARKitSceneDataset( augment=True,data_root='datasets/arkitscenes',butd_cls = True)
 
     
     from tqdm import tqdm

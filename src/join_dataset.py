@@ -1,3 +1,12 @@
+'''
+Author: xushaocong
+Date: 2022-10-02 21:28:11
+LastEditTime: 2022-10-25 09:35:47
+LastEditors: xushaocong
+Description: 
+FilePath: /butd_detr/src/join_dataset.py
+email: xushaocong@stu.xmu.edu.cn
+'''
 # ------------------------------------------------------------------------
 # BEAUTY DETR
 # Copyright (c) 2022 Ayush Jain & Nikolaos Gkanatsios
@@ -15,6 +24,7 @@ import os
 import random
 from six.moves import cPickle
 
+
 import numpy as np
 import torch
 from torch.utils.data import Dataset
@@ -25,24 +35,38 @@ from transformers import RobertaTokenizerFast
 from IPython import embed
 import wandb
 
+
+
+#*debug 
+import os.path as osp
+import sys
+current = osp.dirname(osp.abspath(__file__))
+root =osp.dirname(current)
+# os.chdir(root)
+sys.path.append(root)
+sys.path.append(current)
+sys.path.append(osp.join(root,'my_script'))
+sys.path.append(osp.join(root,'src'))
+from src.scannet_classes import REL_ALIASES, VIEW_DEP_RELS
+
+
+
 from data.model_util_scannet import ScannetDatasetConfig
 from data.scannet_utils import read_label_mapping
 from src.visual_data_handlers import Scan
-from .scannet_classes import REL_ALIASES, VIEW_DEP_RELS
-from loguru import logger 
+# from .scannet_classes import REL_ALIASES, VIEW_DEP_RELS
+
+
+
 NUM_CLASSES = 485
 DC = ScannetDatasetConfig(NUM_CLASSES)
 DC18 = ScannetDatasetConfig(18)
 MAX_NUM_OBJ = 132
 
-import os.path as osp
+from loguru import logger 
 
 
-
-
-
-
-class Joint3DDataset(Dataset):
+class JointDataset(Dataset):
     """Dataset utilities for ReferIt3D."""
 
     def __init__(self, dataset_dict={'sr3d': 1, 'scannet': 10},
@@ -53,6 +77,9 @@ class Joint3DDataset(Dataset):
                  detect_intermediate=False,
                  butd=False, butd_gt=False, butd_cls=False, augment_det=False):
         """Initialize dataset (here for ReferIt3D utterances)."""
+        #!+==================================
+        #!+==================================
+
         self.dataset_dict = dataset_dict
         self.test_dataset = test_dataset
         self.split = split
@@ -97,7 +124,9 @@ class Joint3DDataset(Dataset):
         self.multiview_data = {}
         
         model_path=osp.join(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__))))),'.cache/huggingface/transformers/roberta')
+
         self.tokenizer = RobertaTokenizerFast.from_pretrained(model_path)
+        
         
         if os.path.exists('data/cls_results.json'):
             with open('data/cls_results.json') as fid:
@@ -119,12 +148,12 @@ class Joint3DDataset(Dataset):
                     _annos = self.load_annos(dset)
                     self.annos += (_annos * cnt)
                     logger.info(f" {dset} : {len(_annos) }  annotations loaded ,after loading this datasets, total number of datasets become: {len(self.annos)}")
+            
 
-
-        
-    
     def load_annos(self, dset):
         """Load annotations of given dataset."""
+
+        #!===============
         annos = None
         if dset == "sr3d":
             annos  = self.load_sr3d_annos()
@@ -133,97 +162,20 @@ class Joint3DDataset(Dataset):
         elif dset == 'scannet':
             annos  = self.load_scannet_annos()
         elif dset == 'nr3d': 
-            annos = self.load_nr3d_annos()
+            # annos = self.load_nr3d_annos()
+            annos = self.load_nr3d_annos_v2()
         elif dset == 'scanrefer': 
             annos= self.load_scanrefer_annos()
-
         else :
             raise Exception 
 
         if self.overfit:
             annos = annos[:128]
+            # annos = annos[:1280]
         
         return annos
 
 
-    def load_sr3dplus_annos(self):
-        """Load annotations of sr3d/sr3d+."""
-        return self.load_sr3d_annos(dset='sr3d+')
-
-    def load_sr3d_annos(self, dset='sr3d'):
-        """Load annotations of sr3d/sr3d+."""
-        split = self.split
-        if split == 'val':
-            split = 'test'
-        with open('data/meta_data/sr3d_%s_scans.txt' % split) as f:
-            scan_ids = set(eval(f.read()))
-        # with open(self.data_path + 'refer_it_3d/%s.csv' % dset) as f:
-        with open(self.data_path + '/refer_it_3d/%s.csv' % dset) as f:
-            csv_reader = csv.reader(f)
-            headers = next(csv_reader)
-            headers = {header: h for h, header in enumerate(headers)}
-            annos = [
-                {
-                    'scan_id': line[headers['scan_id']],
-                    'target_id': int(line[headers['target_id']]),
-                    'distractor_ids': eval(line[headers['distractor_ids']]),
-                    'utterance': line[headers['utterance']],
-                    'target': line[headers['instance_type']],
-                    'anchors': eval(line[headers['anchors_types']]),
-                    'anchor_ids': eval(line[headers['anchor_ids']]),
-                    'dataset': dset
-                }
-                for line in csv_reader
-                if line[headers['scan_id']] in scan_ids
-                and
-                str(line[headers['mentions_target_class']]).lower() == 'true'
-            ]
-        return annos
-
-    def load_nr3d_annos(self):
-        """Load annotations of nr3d."""
-        split = self.split
-        if split == 'val':
-            split = 'test'
-        with open('data/meta_data/nr3d_%s_scans.txt' % split) as f:
-            scan_ids = set(eval(f.read()))
-        with open(self.data_path + 'refer_it_3d/nr3d.csv') as f:
-            csv_reader = csv.reader(f)
-            headers = next(csv_reader)
-            headers = {header: h for h, header in enumerate(headers)}
-            annos = [
-                {
-                    'scan_id': line[headers['scan_id']],
-                    'target_id': int(line[headers['target_id']]),
-                    'target': line[headers['instance_type']],
-                    'utterance': line[headers['utterance']],
-                    'anchor_ids': [],
-                    'anchors': [],
-                    'dataset': 'nr3d'
-                }
-                for line in csv_reader
-                if line[headers['scan_id']] in scan_ids
-                and
-                str(line[headers['mentions_target_class']]).lower() == 'true'
-                and
-                (
-                    str(line[headers['correct_guess']]).lower() == 'true'
-                    or split != 'test'
-                )
-            ]
-        # Add distractor info
-        for anno in annos:
-            anno['distractor_ids'] = [
-                ind
-                for ind in
-                range(len(self.scans[anno['scan_id']].three_d_objects))
-                if self.scans[anno['scan_id']].get_object_instance_label(ind)
-                == anno['target']
-                and ind != anno['target_id']
-            ]
-        # Filter out sentences that do not explicitly mention the target class
-        annos = [anno for anno in annos if anno['target'] in anno['utterance']]
-        return annos
 
     def load_scanrefer_annos(self):
         """Load annotations of ScanRefer."""
@@ -299,6 +251,159 @@ class Joint3DDataset(Dataset):
                 == labels[anno['target_id']]
             ).sum() == 1
         return annos
+
+
+        
+    def load_sr3dplus_annos(self):
+        """Load annotations of sr3d/sr3d+."""
+        return self.load_sr3d_annos(dset='sr3d+')
+
+    def load_sr3d_annos(self, dset='sr3d'):
+        """Load annotations of sr3d/sr3d+."""
+        split = self.split
+        if split == 'val':
+            split = 'test'
+    
+       
+        with open('data/meta_data/sr3d_%s_scans.txt' % split) as f:
+                scan_ids = set(eval(f.read()))
+        #* every scene has 
+        with open(self.data_path + '/refer_it_3d/%s.csv' % dset) as f:
+            csv_reader = csv.reader(f)
+            headers = next(csv_reader)
+            headers = {header: h for h, header in enumerate(headers)}
+            annos = [
+                {
+                    'scan_id': line[headers['scan_id']],
+                    'target_id': int(line[headers['target_id']]),
+                    'distractor_ids': eval(line[headers['distractor_ids']]),
+                    'utterance': line[headers['utterance']],
+                    'target': line[headers['instance_type']],
+                    'anchors': eval(line[headers['anchors_types']]),
+                    'anchor_ids': eval(line[headers['anchor_ids']]),
+                    'dataset': dset
+                }
+                for line in csv_reader
+                if line[headers['scan_id']] in scan_ids
+                and
+                str(line[headers['mentions_target_class']]).lower() == 'true'
+            ]
+        
+        
+        return annos
+
+    
+
+    def load_nr3d_annos(self):
+        """Load annotations of nr3d."""
+        split = self.split
+        if split == 'val':
+            split = 'test'
+            
+
+     
+        with open('data/meta_data/nr3d_%s_scans.txt' % split) as f:
+            scan_ids = set(eval(f.read()))
+
+
+
+        with open(self.data_path + 'refer_it_3d/nr3d.csv') as f:
+            csv_reader = csv.reader(f)
+            headers = next(csv_reader)
+            headers = {header: h for h, header in enumerate(headers)}
+            annos = [
+                {
+                    'scan_id': line[headers['scan_id']],
+                    'target_id': int(line[headers['target_id']]),
+                    'target': line[headers['instance_type']],
+                    'utterance': line[headers['utterance']],
+                    'anchor_ids': [],
+                    'anchors': [],
+                    'dataset': 'nr3d'
+                }
+                for line in csv_reader
+                if line[headers['scan_id']] in scan_ids
+                and
+                str(line[headers['mentions_target_class']]).lower() == 'true'
+                and
+                (
+                    str(line[headers['correct_guess']]).lower() == 'true'
+                    or split != 'test'
+                )
+            ]
+        # Add distractor info
+        for anno in annos:
+            anno['distractor_ids'] = [
+                ind
+                for ind in
+                range(len(self.scans[anno['scan_id']].three_d_objects))
+                if self.scans[anno['scan_id']].get_object_instance_label(ind)
+                == anno['target']
+                and ind != anno['target_id']
+            ]
+        # Filter out sentences that do not explicitly mention the target class
+        annos = [anno for anno in annos if anno['target'] in anno['utterance']]
+        return annos
+
+    
+    '''
+    description:  根据assignment id 来加载数据集
+    param {*} self
+    return {*}
+    '''
+    def load_nr3d_annos_v2(self):
+        """Load annotations of nr3d."""
+        split = self.split
+        if split == 'val':
+            split = 'test'
+            
+
+     
+        with open('data/meta_data/nr3d_%s_scans.txt' % split) as f:
+            scan_ids = set(eval(f.read()))
+
+        with open(self.data_path + 'refer_it_3d/nr3d.csv') as f:
+            csv_reader = csv.reader(f)
+            headers = next(csv_reader)
+            headers = {header: h for h, header in enumerate(headers)}
+            annos = [
+                {
+                    'scan_id': line[headers['scan_id']],
+                    'target_id': int(line[headers['target_id']]),
+                    'target': line[headers['instance_type']],
+                    'utterance': line[headers['utterance']],
+                    'anchor_ids': [],
+                    'anchors': [],
+                    'dataset': 'nr3d'
+                }
+                for line in csv_reader
+                if line[headers['scan_id']] in scan_ids
+                and
+                str(line[headers['mentions_target_class']]).lower() == 'true'
+                and
+                (
+                    str(line[headers['correct_guess']]).lower() == 'true'
+                    or split != 'test'
+                )
+            ]
+
+        # Add distractor info
+        for anno in annos:
+            anno['distractor_ids'] = [
+                ind
+                for ind in
+                range(len(self.scans[anno['scan_id']].three_d_objects))
+                if self.scans[anno['scan_id']].get_object_instance_label(ind)
+                == anno['target']
+                and ind != anno['target_id']
+            ]
+
+        # Filter out sentences that do not explicitly mention the target class
+        annos = [anno for anno in annos if anno['target'] in anno['utterance']]
+        return annos
+
+
+
 
     def load_scannet_annos(self):
         """Load annotations of scannet."""
@@ -460,6 +565,10 @@ class Joint3DDataset(Dataset):
             multiview_data = self._load_multiview(scan_id)
 
         # d. Augmentations
+        #!+========
+        origin_pc = np.concatenate([scan.pc.copy(), color.copy()], 1)
+        #!+========
+
         augmentations = {}
         if self.split == 'train' and self.augment:
             rotate_natural = (
@@ -484,7 +593,7 @@ class Joint3DDataset(Dataset):
         if multiview_data is not None:
             point_cloud = np.concatenate([point_cloud, multiview_data], 1)
 
-        return point_cloud, augmentations, scan.color
+        return point_cloud, augmentations, scan.color,origin_pc
 
     def _get_token_positive_map(self, anno):
         """Return correspondence of boxes to tokens."""
@@ -567,6 +676,9 @@ class Joint3DDataset(Dataset):
 
         return bboxes, box_label_mask, point_instance_label
 
+
+
+
     def _get_scene_objects(self, scan):
         # Objects to keep
         keep_ = np.array([
@@ -588,6 +700,7 @@ class Joint3DDataset(Dataset):
 
         # Object boxes
         all_bboxes = np.zeros((MAX_NUM_OBJ, 6))
+        #* 这获取的是左上角和右下角, 根据增强后的 pc 计算的box 
         all_bboxes_ = np.stack([
             scan.get_object_bbox(k).reshape(-1)
             for k, kept in enumerate(keep) if kept
@@ -605,96 +718,6 @@ class Joint3DDataset(Dataset):
         all_bbox_label_mask = keep
         return class_ids, all_bboxes, all_bbox_label_mask
 
-
-    
-        
-    def load_bin(self,path):
-        detected_dict =  np.fromfile(path,dtype=np.float32).reshape(-1,8)
-
-        class_ids = detected_dict[:,-1].astype(np.int64)
-        box =  detected_dict[:,:6]
-        return box,class_ids
-
-
-
-
-    '''
-    description:  忘记保存logit了,  并且类别和butd detr作者的map对不上
-    param {*} self
-    param {*} split
-    param {*} scan_id
-    param {*} augmentations
-    return {*}
-    '''
-    def _get_detected_objects_fcaf3d(self, split, scan_id, augmentations):
-        # Initialize
-        all_detected_bboxes = np.zeros((MAX_NUM_OBJ, 6))
-        all_detected_bbox_label_mask = np.array([False] * MAX_NUM_OBJ)
-        detected_class_ids = np.zeros((MAX_NUM_OBJ,))
-        detected_logits = np.zeros((MAX_NUM_OBJ, NUM_CLASSES))
-
-        # Load
-        
-        box,class_ids =self.load_bin(f'{self.data_path}fcaf3d_scannet/{scan_id}.bin')
-
-
-        all_bboxes_ = box
-        classes = class_ids
-        
-        #!something wrong
-        # cid = np.array([DC.nyu40id2class[
-        #     self.label_map[c]] for c in class_ids
-        # ])
-        cid = class_ids.copy()
-
-
-        assert len(classes) < MAX_NUM_OBJ
-        assert len(classes) == all_bboxes_.shape[0]
-
-
-        num_objs = len(classes)
-        all_detected_bboxes[:num_objs] = all_bboxes_
-
-        all_detected_bbox_label_mask[:num_objs] = np.array([True] * num_objs)
-        detected_class_ids[:num_objs] = cid
-        #! 忘记让焕昂哥保存这个了!!!
-        # detected_logits[:num_objs] = detected_dict['logits']
-    
-        
-        # Match current augmentations
-        if self.augment and self.split == 'train':
-            all_det_pts = box2points(all_detected_bboxes).reshape(-1, 3)
-            all_det_pts = rot_z(all_det_pts, augmentations['theta_z'])
-            all_det_pts = rot_x(all_det_pts, augmentations['theta_x'])
-            all_det_pts = rot_y(all_det_pts, augmentations['theta_y'])
-            if augmentations.get('yz_flip', False):
-                all_det_pts[:, 0] = -all_det_pts[:, 0]
-            if augmentations.get('xz_flip', False):
-                all_det_pts[:, 1] = -all_det_pts[:, 1]
-            all_det_pts += augmentations['shift']
-            all_det_pts *= augmentations['scale']
-            all_detected_bboxes = points2box(all_det_pts.reshape(-1, 8, 3))
-        if self.augment_det and self.split == 'train':
-            min_ = all_detected_bboxes.min(0)
-            max_ = all_detected_bboxes.max(0)
-            rand_box = (
-                (max_ - min_)[None]
-                * np.random.random(all_detected_bboxes.shape)
-                + min_
-            )
-            corrupt = np.random.random(len(all_detected_bboxes)) > 0.7 #! 70的概率用 坏框? 
-            all_detected_bboxes[corrupt] = rand_box[corrupt]
-            detected_class_ids[corrupt] = np.random.randint(
-                0, len(DC.nyu40ids), (len(detected_class_ids))
-            )[corrupt]
-        return (
-            all_detected_bboxes, all_detected_bbox_label_mask,
-            detected_class_ids, detected_logits
-        )
-
-
-
-
     def _get_detected_objects(self, split, scan_id, augmentations):
         # Initialize
         all_detected_bboxes = np.zeros((MAX_NUM_OBJ, 6))
@@ -709,6 +732,17 @@ class Joint3DDataset(Dataset):
             allow_pickle=True
         ).item()
         
+        # train_file_name = f'{self.data_path}group_free_pred_bboxes_train/{scan_id}.npy'
+        # test_file_name = f'{self.data_path}group_free_pred_bboxes_test/{scan_id}.npy'
+        # val_file_name = f'{self.data_path}group_free_pred_bboxes_val/{scan_id}.npy'
+        
+        # if osp.exists(train_file_name):
+        #     detected_dict = np.load(train_file_name,allow_pickle=True).item()
+        # elif osp.exists(test_file_name):
+        #     detected_dict = np.load(test_file_name,allow_pickle=True).item()
+        # else:
+        #     detected_dict = np.load(val_file_name,allow_pickle=True).item()
+        #!+=========================
 
         all_bboxes_ = np.array(detected_dict['box'])
         classes = detected_dict['class']
@@ -729,8 +763,6 @@ class Joint3DDataset(Dataset):
         all_detected_bbox_label_mask[:num_objs] = np.array([True] * num_objs)
         detected_class_ids[:num_objs] = cid
         detected_logits[:num_objs] = detected_dict['logits']
-
-
         # Match current augmentations
         if self.augment and self.split == 'train':
             all_det_pts = box2points(all_detected_bboxes).reshape(-1, 3)
@@ -752,7 +784,7 @@ class Joint3DDataset(Dataset):
                 * np.random.random(all_detected_bboxes.shape)
                 + min_
             )
-            corrupt = np.random.random(len(all_detected_bboxes)) > 0.7 #! 70的概率用 坏框? 
+            corrupt = np.random.random(len(all_detected_bboxes)) > 0.7
             all_detected_bboxes[corrupt] = rand_box[corrupt]
             detected_class_ids[corrupt] = np.random.randint(
                 0, len(DC.nyu40ids), (len(detected_class_ids))
@@ -762,18 +794,56 @@ class Joint3DDataset(Dataset):
             detected_class_ids, detected_logits
         )
 
-    def get_origin_data(self,index):
+    
+    '''
+    description:  对detector 的bbox进行数据增强 ,#! 没有加入噪声
+    param {*} self
+    param {*} all_detected_bboxes
+    param {*} augmentations
+    return {*}
+    '''
+    def transformation_box(self,boxes,augmentations):
         
-        # Read annotation
-        anno = self.annos[index]
-        scan = self.scans[anno['scan_id']]
+        #* do not transformation bbox 
+        if len(augmentations.keys()) >0:  #* 不是训练的集的话 这个      augmentations 就是空
+            all_det_pts = box2points(boxes).reshape(-1, 3)
 
-        return np.concatenate([scan.orig_pc,scan.color],axis=-1),anno['scan_id']
 
-        
+            all_det_pts = rot_z(all_det_pts, augmentations['theta_z'])  
+            all_det_pts = rot_x(all_det_pts, augmentations['theta_x'])
+            all_det_pts = rot_y(all_det_pts, augmentations['theta_y'])
 
-        
-        
+            if augmentations.get('yz_flip', False):
+                all_det_pts[:, 0] = -all_det_pts[:, 0]
+            if augmentations.get('xz_flip', False):
+                all_det_pts[:, 1] = -all_det_pts[:, 1]
+
+            
+            all_det_pts += augmentations['shift']
+            all_det_pts *= augmentations['scale']
+            boxes = points2box(all_det_pts.reshape(-1, 8, 3))
+
+        return boxes
+
+
+    '''
+    description:  获取当前scan 对应的box
+    return {*}
+    '''
+    def get_current_pc_box(self,scan):
+        all_bboxes = np.zeros((MAX_NUM_OBJ, 6))
+        #* 这获取的是左上角和右下角, 根据增强后的 pc 计算的box 
+        all_bboxes_ = np.stack([ scan.get_object_bbox(k).reshape(-1) for k in range(len(scan.three_d_objects)) ])
+        # cx, cy, cz, w, h, d
+        all_bboxes_ = np.concatenate((
+            (all_bboxes_[:, :3] + all_bboxes_[:, 3:]) * 0.5,
+            all_bboxes_[:, 3:] - all_bboxes_[:, :3]
+        ), 1)
+        all_bboxes[:len(all_bboxes_)] = all_bboxes_
+        return all_bboxes
+
+
+
 
     def __getitem__(self, index):
         """Get current batch for input index."""
@@ -783,11 +853,10 @@ class Joint3DDataset(Dataset):
         anno = self.annos[index]
         scan = self.scans[anno['scan_id']]
         scan.pc = np.copy(scan.orig_pc)
-        
 
-        #!=================
-        # logger.info(anno['dataset'])
-        #!=================
+
+        
+        origin_box = self.get_current_pc_box(scan)
 
         # Populate anno (used only for scannet)
         self.random_utt = False
@@ -839,7 +908,17 @@ class Joint3DDataset(Dataset):
             anno['utterance'] = utterance
 
         # Point cloud representation#* point_cloud == [x,y,z,r,g,b], 50000 points 
-        point_cloud, augmentations, og_color = self._get_pc(anno, scan)
+        point_cloud, augmentations, og_color ,origin_pc= self._get_pc(anno, scan)
+
+
+        #!+========================================================
+        #* 用场景原始color
+        if self.overfit:
+            point_cloud = np.copy(np.concatenate([point_cloud[:,:3],og_color],axis=-1) )
+            origin_pc =  np.copy(np.concatenate([origin_pc[:,:3],og_color],axis=-1) )
+        #!+======================================================== 
+
+
 
         # "Target" boxes: append anchors if they're to be detected
         gt_bboxes, box_label_mask, point_instance_label = \
@@ -853,22 +932,20 @@ class Joint3DDataset(Dataset):
             class_ids, all_bboxes, all_bbox_label_mask
         ) = self._get_scene_objects(scan)
 
-
-
         #* Detected boxes
-        #* group free 
         (
             all_detected_bboxes, all_detected_bbox_label_mask,
             detected_class_ids, detected_logits
         ) = self._get_detected_objects(split, anno['scan_id'], augmentations)
 
+        #!===================
+        #* wrong
+        # teacher_box = all_bboxes.copy()
+        # teacher_box = self.transformation_box(teacher_box,augmentations)
+        #* right 
+        teacher_box = origin_box
 
-        #* FCAF3D 
-        # (
-        #     all_detected_bboxes, all_detected_bbox_label_mask,
-        #     detected_class_ids, detected_logits
-        # ) =self._get_detected_objects_fcaf3d(split, anno['scan_id'], augmentations)
-        
+        #!===================
 
         # Assume a perfect object detector 
         if self.butd_gt:
@@ -953,7 +1030,11 @@ class Joint3DDataset(Dataset):
                 if isinstance(anno['target_id'], int)
                 else class_ids[anno['target_id'][0]]
             ),
+            "pc_before_aug":origin_pc.astype(np.float32),
+            "teacher_box":teacher_box.astype(np.float32),
+            "augmentations":augmentations,
             "supervised_mask":np.array(1).astype(np.int64)
+
         })
         return ret_dict
 
@@ -1134,11 +1215,6 @@ def rot_z(pc, theta):
     ).T
 
 
-'''
-description: 
-param {*} box:  格式是 xyz whl 
-return {*}
-'''
 def box2points(box):
     """Convert box center/hwd coordinates to vertices (8x3)."""
     x_min, y_min, z_min = (box[:, :3] - (box[:, 3:] / 2)).transpose(1, 0)
@@ -1234,3 +1310,35 @@ def unpickle_data(file_name, python2_to_3=False):
         else:
             yield cPickle.load(in_file)
     in_file.close()
+
+
+
+
+
+
+if __name__=="__main__":
+
+    train_dataset = JointDataset(
+        # dataset_dict={'sr3d':1,'scannet':10},
+        dataset_dict={'scannet':10},
+        test_dataset='sr3d', #? only test set need ? 
+        split='train',
+        use_color=True, use_height=False,
+        overfit=True,
+        data_path='datasets/',
+        detect_intermediate=True,#? 
+        use_multiview=False, #? 
+        butd=False,
+        butd_gt=False,
+        butd_cls=True,
+        augment_det=False
+    )
+
+    demo =  train_dataset.__getitem__(0)
+
+    print(demo)
+    
+
+
+
+    

@@ -2,7 +2,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-24 00:27:51
- # @LastEditTime: 2022-10-25 18:33:39
+ # @LastEditTime: 2022-10-25 18:56:22
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/pretrain.sh
@@ -50,14 +50,26 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --log_dir ./logs/bdetr \
     --pp_checkpoint $DATA_ROOT/gf_detector_l6o256.pth \
     --butd_cls --self_attend \
-    --max_epoch 400 --consistency_weight 1e-4 \
+    --max_epoch 400 \
     --upload-wandb \
     --labeled_ratio $labeled_ratio \
     --checkpoint_path $resume_mode_path \
+    --lr_decay_epochs 101 105 \
     --lr_decay_intermediate \
     --lr_decay_epochs 90 95 \
     --debug \
     2>&1 | tee -a logs/train_test_cls.log
+
+    
+
+#  --joint_det
+
+# --use-tkps \
+# --query_points_obj_topk $topk \
+
+# --dbeug \
+
+
 
 
 

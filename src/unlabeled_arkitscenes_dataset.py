@@ -1,10 +1,10 @@
 '''
 Author: xushaocong
 Date: 2022-10-21 09:41:47
-LastEditTime: 2022-10-22 02:01:51
+LastEditTime: 2022-10-25 18:56:19
 LastEditors: xushaocong
 Description: 
-FilePath: /butd_detr/src/arkitscenes_dataset.py
+FilePath: /butd_detr/src/unlabeled_arkitscenes_dataset.py
 email: xushaocong@stu.xmu.edu.cn
 '''
 
@@ -53,10 +53,10 @@ from IPython import embed
 
 
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-ROOT_DIR = os.path.dirname(BASE_DIR)
-sys.path.append(ROOT_DIR)
-sys.path.append(BASE_DIR)
+# BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# ROOT_DIR = os.path.dirname(BASE_DIR)
+# sys.path.append(ROOT_DIR)
+# sys.path.append(BASE_DIR)
 
 DC = ScannetDatasetConfig()
 DC18 = ScannetDatasetConfig(18)
@@ -215,7 +215,7 @@ class UnlabeledARKitSceneDataset(LabeledARKitSceneDataset):
             "teacher_box":teacher_box.astype(np.float32),
             #! no teacher box because no  detected results, so we can only test on det setting 
             "augmentations":augmentations,
-            "supervised_mask":np.array(2).astype(np.int64),#*  2 表示有标签 但是没有point_instance_label
+            "supervised_mask":np.array(0).astype(np.int64),#*  2 表示有标签 但是没有point_instance_label
         })
 
 
