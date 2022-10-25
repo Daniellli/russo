@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 21:28:11
-LastEditTime: 2022-10-24 15:42:23
+LastEditTime: 2022-10-25 09:35:47
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/join_dataset.py
@@ -166,7 +166,6 @@ class JointDataset(Dataset):
             annos = self.load_nr3d_annos_v2()
         elif dset == 'scanrefer': 
             annos= self.load_scanrefer_annos()
-
         else :
             raise Exception 
 

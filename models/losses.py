@@ -255,14 +255,15 @@ return {*}
 '''
 def compute_kps_loss(data_dict, topk):
     #!===============
-    supervised_mask  = int(data_dict['supervised_mask']==1).int()
+    
+    supervised_mask  = (data_dict['supervised_mask']==1).int()
     supervised_inds = torch.nonzero(supervised_mask).squeeze(1).long()
 
     use_ref_score_loss = True
     ref_use_obj_mask= True
     #!===============
 
-    box_label_mask = data_dict['box_label_mask'][supervised_inds,:,:]
+    box_label_mask = data_dict['box_label_mask'][supervised_inds,:]
     seed_inds = data_dict['seed_inds'].long()[supervised_inds,:]  # B, K
     seed_xyz = data_dict['seed_xyz'][supervised_inds,:,:]  # B, K, 3
     seeds_obj_cls_logits = data_dict['seeds_obj_cls_logits'][supervised_inds,:,:]  # B, 1, K
@@ -324,14 +325,14 @@ def compute_kps_loss(data_dict, topk):
         point_ref_mask = torch.gather(point_ref_mask, 1, seed_inds)
 
         if 'ref_query_points_sample_inds' in data_dict.keys():
-            query_points_sample_inds = data_dict['query_points_sample_inds'].long()
+            query_points_sample_inds = data_dict['query_points_sample_inds'].long()[supervised_inds,:]
             point_ref_mask = torch.gather(point_ref_mask, 1, query_points_sample_inds)
 
             if ref_use_obj_mask:
 
                 obj_mask = torch.gather(objectness_label, 1, query_points_sample_inds)
                 point_ref_mask = point_ref_mask * obj_mask
-        kps_ref_score = data_dict['kps_ref_score']      # [B, 1, N]
+        kps_ref_score = data_dict['kps_ref_score'][supervised_inds,:,:]      # [B, 1, N]
         cls_weights = torch.ones((B, kps_ref_score.shape[-1])).cuda().float()
         cls_normalizer = cls_weights.sum(dim=1, keepdim=True).float()
         cls_weights /= torch.clamp(cls_normalizer, min=1.0)

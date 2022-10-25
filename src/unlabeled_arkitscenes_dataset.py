@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-21 09:41:47
-LastEditTime: 2022-10-25 09:13:07
+LastEditTime: 2022-10-25 09:39:51
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/unlabeled_arkitscenes_dataset.py
@@ -52,10 +52,10 @@ from IPython import embed
 
 
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-ROOT_DIR = os.path.dirname(BASE_DIR)
-sys.path.append(ROOT_DIR)
-sys.path.append(BASE_DIR)
+# BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# ROOT_DIR = os.path.dirname(BASE_DIR)
+# sys.path.append(ROOT_DIR)
+# sys.path.append(BASE_DIR)
 
 DC = ScannetDatasetConfig()
 DC18 = ScannetDatasetConfig(18)
@@ -154,7 +154,7 @@ def dump_pc_colored(point_clouds, dump_name="./dump/tmp.txt", colors=None):
         f.write(OUT)
 
 
-class ARKitSceneDataset(Dataset):
+class UnlabeledARKitSceneDataset(Dataset):
 
 
     def __init__(self, num_points=50000,data_root='datasets/ARKitScenes',
@@ -797,7 +797,7 @@ class ARKitSceneDataset(Dataset):
             "teacher_box":teacher_box.astype(np.float32),
             #! no teacher box because no  detected results, so we can only test on det setting 
             "augmentations":augmentations,
-            "supervised_mask":np.array(2).astype(np.int64),#*  2 表示有标签 但是没有point_instance_label
+            "supervised_mask":np.array(0).astype(np.int64),#*  2 表示有标签 但是没有point_instance_label
         })
 
 
@@ -887,7 +887,7 @@ def get_positive_map(tokenized, tokens_positive):
 
 
 if __name__ == "__main__":
-    dset = ARKitSceneDataset( augment=True,data_root='datasets/arkitscenes',butd_cls = True)
+    dset = UnlabeledARKitSceneDataset( augment=True,data_root='datasets/arkitscenes',butd_cls = True)
 
     
     from tqdm import tqdm

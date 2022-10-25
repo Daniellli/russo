@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-03 22:00:15
-LastEditTime: 2022-10-25 09:16:58
+LastEditTime: 2022-10-25 09:45:05
 LastEditors: xushaocong
 Description:  修改get_datasets , 换成可以添加使用数据集比例的dataloader
 FilePath: /butd_detr/omni_train.py
@@ -75,7 +75,8 @@ import random
 from my_script.consistant_loss import get_consistency_loss
 
 
-from models import HungarianMatcher, SetCriterion, compute_hungarian_loss,compute_labeled_hungarian_loss
+# from models import HungarianMatcher, SetCriterion, compute_hungarian_loss,compute_labeled_hungarian_loss
+from models import HungarianMatcher, SetCriterion,compute_labeled_hungarian_loss
 def parse_option():
     """Parse cmd arguments."""
     parser = argparse.ArgumentParser()
@@ -940,30 +941,32 @@ class TrainTester(BaseTrainTester):
                 tmp.update({ k:v for  idx, (k,v) in enumerate(scheduler.milestones.items()) if idx != 0})
                 scheduler.milestones = tmp
 
-            #* eval student model 
-            performance = self.evaluate_one_epoch(
-                args.start_epoch, test_loader,
-                model, criterion, set_criterion, args
-            )
-            
-            if performance is not None :
-                logger.info(','.join(['student_%s:%.04f'%(k,round(v,4)) for k,v in performance.items()]))
-                is_best,snew_performance = save_res(save_dir,args.start_epoch-1,performance,best_performce)
 
-                if is_best:
-                    best_performce = snew_performance
+            if args.eval:
+                #* eval student model 
+                performance = self.evaluate_one_epoch(
+                    args.start_epoch, test_loader,
+                    model, criterion, set_criterion, args
+                )
+                
+                if performance is not None :
+                    logger.info(','.join(['student_%s:%.04f'%(k,round(v,4)) for k,v in performance.items()]))
+                    is_best,snew_performance = save_res(save_dir,args.start_epoch-1,performance,best_performce)
 
-            #* eval teacher model 
-            ema_performance = self.evaluate_one_epoch(
-                args.start_epoch, test_loader,
-                ema_model, criterion, set_criterion, args
-            )
+                    if is_best:
+                        best_performce = snew_performance
 
-            if ema_performance is not None :
-                logger.info(','.join(['teacher_%s:%.04f'%(k,round(v,4)) for k,v in ema_performance.items()]))
-                is_best,tnew_performance = save_res(ema_save_dir,args.start_epoch-1,ema_performance,ema_best_performce)
-                if is_best:
-                    ema_best_performce= tnew_performance
+                #* eval teacher model 
+                ema_performance = self.evaluate_one_epoch(
+                    args.start_epoch, test_loader,
+                    ema_model, criterion, set_criterion, args
+                )
+
+                if ema_performance is not None :
+                    logger.info(','.join(['teacher_%s:%.04f'%(k,round(v,4)) for k,v in ema_performance.items()]))
+                    is_best,tnew_performance = save_res(ema_save_dir,args.start_epoch-1,ema_performance,ema_best_performce)
+                    if is_best:
+                        ema_best_performce= tnew_performance
                     
 
         
