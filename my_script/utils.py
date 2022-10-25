@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 20:04:19
-LastEditTime: 2022-10-25 18:56:22
+LastEditTime: 2022-10-25 20:26:01
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/my_script/utils.py
@@ -133,6 +133,11 @@ def parse_semi_supervise_option():
     parser.add_argument('--save-input-output',action='store_true', help="save-input-output")
     parser.add_argument('--use-tkps',action='store_true', help="use-tkps")
     parser.add_argument('--lr_decay_intermediate',action='store_true')
+
+
+    parser.add_argument('--ema-decay', default=0.999, type=float,help=' EMA decay parameter ')
+
+    
 
 
     args, _ = parser.parse_known_args()

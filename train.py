@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-03 22:00:15
-LastEditTime: 2022-10-25 18:27:04
+LastEditTime: 2022-10-25 20:25:32
 LastEditors: xushaocong
 Description:  修改get_datasets , 换成可以添加使用数据集比例的dataloader
 FilePath: /butd_detr/train.py
@@ -366,8 +366,7 @@ class SemiSuperviseTrainTester(TrainTester):
             #* update  teacher model 
             #* epoch start from 1 by default , so have to minus one 
             global_step = (batch_idx+1) + (epoch -args.start_epoch) *total_iteration
-            # alpha = 0.999
-            alpha = 0.99
+            alpha = args.ema_decay
             self.update_ema_variables(model,ema_model,alpha,global_step)
             #*===================================================
 
@@ -468,7 +467,6 @@ class SemiSuperviseTrainTester(TrainTester):
                 scheduler.milestones = tmp
 
             #* eval student model 
-
             if args.eval:
                 performance = self.evaluate_one_epoch(
                     args.start_epoch, test_loader,

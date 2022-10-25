@@ -2,7 +2,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-22 01:33:28
- # @LastEditTime: 2022-10-25 19:34:07
+ # @LastEditTime: 2022-10-25 20:27:04
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/omni_supervise_train.sh
@@ -31,20 +31,21 @@ export PYTHONWARNINGS='ignore:semaphore_tracker:UserWarning'
 # gpu_num=7
 # b_size=12
 
-gpu_ids="7"
-gpu_num=1
+gpu_ids="3,4,5,6,7";
+gpu_num=5;
 b_size=12
+
 
 port=29522
 val_freq=1;
-print_freq=1;
+print_freq=100;
 save_freq=$val_freq;
 #* for debug 
 
 
 #* for  semi supervision architecture  : step2
-b_size='4,4';
-# resume_mode_path="pretrain/pretrain_nr3d_sr3d_sr3dplus_scanrefer_5491_39.pth"
+b_size='8,4';
+resume_mode_path="pretrain/pretrain_nr3d_sr3d_sr3dplus_scanrefer_5491_39_cls.pth"
 
 
 #* for not mask 
@@ -63,7 +64,6 @@ test_data=nr3d
 DATA_ROOT=datasets/
 
 
-
 TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
     omni_supervise_train.py --num_decoder_layers 6 \
     --use_color \
@@ -72,7 +72,7 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --val_freq $val_freq --batch_size $b_size --save_freq $save_freq --print_freq $print_freq \
     --lr_backbone=1e-3 --lr=1e-4 \
     --dataset $train_data --test_dataset $test_data \
-    --detect_intermediate \
+    --detect_intermediate --joint_det \
     --use_soft_token_loss --use_contrastive_align \
     --log_dir ./logs/bdetr \
     --pp_checkpoint $DATA_ROOT/gf_detector_l6o256.pth \
@@ -84,12 +84,15 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --query_consistency_weight $query_consistency_weight \
     --text_consistency_weight $text_consistency_weight \
     --rampup_length $rampup_length \
-    --debug \
+    --upload-wandb \
+    --checkpoint_path $resume_mode_path \
+    --ema-decay 0.999 \
     2>&1 | tee -a logs/train_test_cls.log
-    # --upload-wandb \
-    # --checkpoint_path $resume_mode_path \
 
-#  --joint_det
+    
+    
+
+
 
 # --lr_decay_intermediate \
 # --labeled_ratio $labeled_ratio \
