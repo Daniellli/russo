@@ -1,10 +1,10 @@
 '''
 Author: xushaocong
 Date: 2022-10-03 22:00:15
-LastEditTime: 2022-10-25 18:26:12
+LastEditTime: 2022-10-25 18:27:26
 LastEditors: xushaocong
 Description:  修改get_datasets , 换成可以添加使用数据集比例的dataloader
-FilePath: /butd_detr/pretrain.py
+FilePath: /butd_detr/omni_supervise_train.py
 email: xushaocong@stu.xmu.edu.cn
 '''
 # ------------------------------------------------------------------------
@@ -20,52 +20,31 @@ email: xushaocong@stu.xmu.edu.cn
 """Main script for language modulation."""
 
 import os
-
-import numpy as np
 import torch
 import torch.distributed as dist
-
-from main_utils import parse_option, BaseTrainTester
-from train_dist_mod import TrainTester
-from src.joint_labeled_dataset import JointLabeledDataset
+from train import SemiSuperviseTrainTester
 from src.joint_semi_supervise_dataset import JointSemiSupervisetDataset
-
-
-
-
-
-from IPython import embed
+from src.unlabeled_arkitscenes_dataset import UnlabeledARKitSceneDataset
 import ipdb
 st = ipdb.set_trace
-import scipy.io as scio
 import sys 
-
-from utils.box_util import get_3d_box
-import json
 import wandb
 from loguru import logger 
-from my_script.utils import parse_option
-
-
+from my_script.utils import * 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(BASE_DIR)
-
-
-
 import os.path as osp
 import time
+from my_script.utils import parse_semi_supervise_option,save_res
 
 
-class PretrainTrainTester(TrainTester):
+class OmniSuperviseTrainTester(SemiSuperviseTrainTester):
     """Train/test a language grounder."""
 
     def __init__(self, args):
         """Initialize."""
         super().__init__(args)
-
-            
-            
-
+        
     @staticmethod
     def get_datasets(args):
         """Initialize datasets."""
@@ -76,22 +55,28 @@ class PretrainTrainTester(TrainTester):
         if args.joint_det:
             dataset_dict['scannet'] = 10
 
+        # labeled_ratio = 0.2
+        # logger.info(f"labeled_ratio:{labeled_ratio}")
         print('Loading datasets:', sorted(list(dataset_dict.keys())))
-        train_dataset = JointLabeledDataset(
+        
+        labeled_dataset = JointSemiSupervisetDataset(
             dataset_dict=dataset_dict,
-            test_dataset=args.test_dataset, #? only test set need ? 
-            split='train' if not args.debug else 'val',
+            test_dataset=args.test_dataset,
+            split='train',
             use_color=args.use_color, use_height=args.use_height,
             overfit=args.debug,
             data_path=args.data_root,
-            detect_intermediate=args.detect_intermediate,#? 
-            use_multiview=args.use_multiview, #? 
-            butd=args.butd, #? 
-            butd_gt=args.butd_gt,#? 
-            butd_cls=args.butd_cls,#? 
-            augment_det=args.augment_det,#? 
-            labeled_ratio=args.labeled_ratio
+            detect_intermediate=args.detect_intermediate,
+            use_multiview=args.use_multiview,
+            butd=args.butd,
+            butd_gt=args.butd_gt,
+            butd_cls=args.butd_cls
         )
+        
+
+        arkitscenes_dataset = UnlabeledARKitSceneDataset(
+            augment=True,data_root='datasets/arkitscenes',
+            butd_cls=args.butd_cls)
         
         test_dataset = JointSemiSupervisetDataset(
             dataset_dict=dataset_dict,
@@ -106,14 +91,14 @@ class PretrainTrainTester(TrainTester):
             butd_gt=args.butd_gt,
             butd_cls=args.butd_cls
         )
-        
-        return train_dataset, test_dataset
 
+        
+        return labeled_dataset,arkitscenes_dataset, test_dataset
 
 
 if __name__ == '__main__':
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
-    opt = parse_option()
+    opt = parse_semi_supervise_option()
     
     # logger.info(f"gpu ids == {opt.gpu_ids}")
     # logger.info(os.environ["CUDA_VISIBLE_DEVICES"] )
@@ -126,7 +111,8 @@ if __name__ == '__main__':
 
     torch.backends.cudnn.deterministic = True
     
-    train_tester = PretrainTrainTester(opt)
+    # torch.cuda.set_device(opt.local_rank)
+    train_tester = OmniSuperviseTrainTester(opt)
 
     if opt.upload_wandb and opt.local_rank==0:
         run=wandb.init(project="BUTD_DETR")

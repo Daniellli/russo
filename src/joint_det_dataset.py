@@ -97,16 +97,11 @@ class Joint3DDataset(Dataset):
         self.multiview_data = {}
         
         model_path=osp.join(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__))))),'.cache/huggingface/transformers/roberta')
-
         self.tokenizer = RobertaTokenizerFast.from_pretrained(model_path)
         
         if os.path.exists('data/cls_results.json'):
             with open('data/cls_results.json') as fid:
                 self.cls_results = json.load(fid)  # {scan_id: [class0, ...]}
-        # if os.path.exists('data/cls_demo_results.json'):
-        #     with open('data/cls_demo_results.json') as fid:
-        #         self.cls_results = json.load(fid)  # {scan_id: [class0, ...]}
-        
 
         # load
         print('Loading %s files, take a breath!' % split)
@@ -116,30 +111,40 @@ class Joint3DDataset(Dataset):
         self.scans = list(self.scans)[0]
         if self.split != 'train':
             self.annos = self.load_annos(test_dataset)
+            logger.info(f" for test , {test_dataset} : {len(self.annos) }  annotations loaded ")
         else:
             self.annos = []
             for dset, cnt in dataset_dict.items():
                 if cnt > 0:
                     _annos = self.load_annos(dset)
                     self.annos += (_annos * cnt)
+                    logger.info(f" {dset} : {len(_annos) }  annotations loaded ,after loading this datasets, total number of datasets become: {len(self.annos)}")
 
-        if self.visualize:
-            wandb.init(project="vis", name="debug")
 
+        
+    
     def load_annos(self, dset):
         """Load annotations of given dataset."""
-        loaders = {
-            'nr3d': self.load_nr3d_annos,
-            'sr3d': self.load_sr3d_annos,
-            'sr3d+': self.load_sr3dplus_annos,
-            'scanrefer': self.load_scanrefer_annos,
-            'scannet': self.load_scannet_annos
-        }
-        annos = loaders[dset]()
+        annos = None
+        if dset == "sr3d":
+            annos  = self.load_sr3d_annos()
+        elif dset == 'sr3d+':
+            annos  = self.load_sr3dplus_annos()
+        elif dset == 'scannet':
+            annos  = self.load_scannet_annos()
+        elif dset == 'nr3d': 
+            annos = self.load_nr3d_annos()
+        elif dset == 'scanrefer': 
+            annos= self.load_scanrefer_annos()
+
+        else :
+            raise Exception 
+
         if self.overfit:
-            # annos = annos[:128]
             annos = annos[:128]
+        
         return annos
+
 
     def load_sr3dplus_annos(self):
         """Load annotations of sr3d/sr3d+."""
@@ -397,6 +402,8 @@ class Joint3DDataset(Dataset):
             if augmentations['xz_flip']:
                 pc[:, 1] = -pc[:, 1]
         else:
+            augmentations['yz_flip'] =False
+            augmentations['xz_flip'] =False
             theta_z = (2*np.random.rand() - 1) * 5
         augmentations['theta_z'] = theta_z
         pc[:, :3] = rot_z(pc[:, :3], theta_z)

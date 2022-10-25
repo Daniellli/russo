@@ -2,7 +2,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-22 01:33:28
- # @LastEditTime: 2022-10-24 00:07:15
+ # @LastEditTime: 2022-10-25 17:44:45
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/omni_supervise.sh
@@ -72,8 +72,9 @@ train_data="sr3d nr3d scanrefer sr3d+"
 test_data=nr3d
 DATA_ROOT=datasets/
 
+
 TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
-    omni_train.py --num_decoder_layers 6 \
+    omni_supervise_train.py --num_decoder_layers 6 \
     --use_color \
     --weight_decay 0.0005 \
     --data_root $DATA_ROOT \

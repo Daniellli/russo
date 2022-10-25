@@ -18,9 +18,10 @@ import torch.distributed as dist
 
 from main_utils import parse_option, BaseTrainTester
 from data.model_util_scannet import ScannetDatasetConfig
-from src.joint_det_dataset import Joint3DDataset
+from src.joint_det_dataset import Joint3DDataset,points2box
 from src.grounding_evaluator import GroundingEvaluator, GroundingGTEvaluator
-from models import BeaUTyDETR
+# from models import BeaUTyDETR
+from models import BeaUTyDETRTKPS
 from models import APCalculator, parse_predictions, parse_groundtruths
 
 
@@ -37,8 +38,7 @@ from loguru import logger
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(BASE_DIR)
 
-
-
+from my_script.utils import save_for_vis,parse_option
 import os.path as osp
 import time
 
@@ -54,7 +54,6 @@ class TrainTester(BaseTrainTester):
             self.vis_save_path = osp.join("vis_results",time.strftime("%Y:%m:%d",time.gmtime(time.time()))+"_"+str(int(time.time())))
             os.makedirs(self.vis_save_path)
 
-        self.DEBUG = args.save_input_output
             
             
 
@@ -83,39 +82,21 @@ class TrainTester(BaseTrainTester):
             butd_cls=args.butd_cls,#? 
             augment_det=args.augment_det#? 
         )
-        #!+==============================================
-        if args.scanrefer_test:
-            test_dataset = Joint3DDataset(
-                dataset_dict=dataset_dict,
-                test_dataset=args.test_dataset,
-                split='test', #* load test data 
-                use_color=args.use_color, use_height=args.use_height,
-                overfit=args.debug,
-                data_path=args.data_root,
-                detect_intermediate=args.detect_intermediate,
-                use_multiview=args.use_multiview,
-                butd=args.butd,
-                butd_gt=args.butd_gt,
-                butd_cls=args.butd_cls
-            )
-        else :
-            test_dataset = Joint3DDataset(
-                dataset_dict=dataset_dict,
-                test_dataset=args.test_dataset,
-                split='val' if not args.eval_train else 'train',
-                use_color=args.use_color, use_height=args.use_height,
-                overfit=args.debug,
-                data_path=args.data_root,
-                detect_intermediate=args.detect_intermediate,
-                use_multiview=args.use_multiview,
-                butd=args.butd,
-                butd_gt=args.butd_gt,
-                butd_cls=args.butd_cls
-            )
-
-        #!+=============================================
-
-        #* 
+        
+        test_dataset = Joint3DDataset(
+            dataset_dict=dataset_dict,
+            test_dataset=args.test_dataset,
+            split='val' if not args.eval_train else 'train',
+            use_color=args.use_color, use_height=args.use_height,
+            overfit=args.debug,
+            data_path=args.data_root,
+            detect_intermediate=args.detect_intermediate,
+            use_multiview=args.use_multiview,
+            butd=args.butd,
+            butd_gt=args.butd_gt,
+            butd_cls=args.butd_cls
+        )
+            
         return train_dataset, test_dataset
 
     @staticmethod
@@ -132,7 +113,20 @@ class TrainTester(BaseTrainTester):
             num_class = 19
 
 
-        model = BeaUTyDETR(
+        # model = BeaUTyDETR(
+        #     num_class=num_class,
+        #     num_obj_class=485,
+        #     input_feature_dim=num_input_channel,
+        #     num_queries=args.num_target, #? 
+        #     num_decoder_layers=args.num_decoder_layers,
+        #     self_position_embedding=args.self_position_embedding,
+        #     contrastive_align_loss=args.use_contrastive_align,
+        #     butd=args.butd or args.butd_gt or args.butd_cls, #* 是否使用gt来负责这个visual grounding 而不是 detected bbox 
+        #     pointnet_ckpt=args.pp_checkpoint,  #* pretrained model
+        #     self_attend=args.self_attend
+        # )
+
+        model = BeaUTyDETRTKPS(
             num_class=num_class,
             num_obj_class=485,
             input_feature_dim=num_input_channel,
@@ -142,7 +136,8 @@ class TrainTester(BaseTrainTester):
             contrastive_align_loss=args.use_contrastive_align,
             butd=args.butd or args.butd_gt or args.butd_cls, #* 是否使用gt来负责这个visual grounding 而不是 detected bbox 
             pointnet_ckpt=args.pp_checkpoint,  #* pretrained model
-            self_attend=args.self_attend
+            self_attend=args.self_attend,
+            use_tkps=args.use_tkps,
         )
 
         return model
@@ -279,6 +274,146 @@ class TrainTester(BaseTrainTester):
                 #!===================
 
         return ans
+
+
+    
+    '''
+    description:  评估并且存储评估结果用于上传ScanRefer server for evaluation   ,
+    for_vis: 是否存储可视化需要的数据 
+    return {*}
+    '''
+    @torch.no_grad()
+    def evaluate_one_epoch_save_for_eval(self, epoch, test_loader,
+                           model, criterion, set_criterion, args,for_vis = False):
+        """
+        Eval grounding after a single epoch.
+
+        Some of the args:
+            model: a nn.Module that returns end_points (dict)
+            criterion: a function that returns (loss, end_points)
+        """
+        if args.test_dataset == 'scannet':
+            return self.evaluate_one_epoch_det(
+                epoch, test_loader, model,
+                criterion, set_criterion, args
+            )
+        stat_dict = {}
+        model.eval()  # set model to eval mode (for bn and dp)
+
+
+        
+        if args.num_decoder_layers > 0:
+            prefixes = ['last_', 'proposal_']
+            prefixes = ['last_']
+            prefixes.append('proposal_')
+        else:
+            prefixes = ['proposal_']  # only proposal
+        prefixes += [f'{i}head_' for i in range(args.num_decoder_layers - 1)]
+        
+        if args.butd_cls:
+            evaluator = GroundingGTEvaluator(prefixes=prefixes)
+        else:
+            evaluator = GroundingEvaluator(
+                only_root=True, thresholds=[0.25, 0.5],
+                topks=[1, 5, 10], prefixes=prefixes
+            )
+        # Main eval branch
+
+        pred_bboxes = []
+        CONFIG_DICT = {
+            'remove_empty_box': False, 'use_3d_nms': True,
+            'nms_iou': 0.25, 'use_old_type_nms': False, 'cls_nms': True,
+            'per_class_proposal': True, 'conf_thresh': 0.0,
+            'dataset_config': ScannetDatasetConfig(18),
+            'hungarian_loss': True
+        }
+
+        for batch_idx, batch_data in enumerate(test_loader):#* the length of batch data == 26 , 
+
+            stat_dict, end_points = self._main_eval_branch(
+                batch_idx, batch_data, test_loader, model, stat_dict,
+                criterion, set_criterion, args
+            )
+            #!==== generate result for upload evaluation server , scanrefer ===============================
+
+            
+            prefix = 'last_'
+            #* return format :  pred_cls, pred_box and conf (0-1)
+            #* box 是8个定点
+            batch_pred_map_cls = parse_predictions(
+                end_points, CONFIG_DICT, prefix,
+                size_cls_agnostic=True)
+
+            for idx,batch_res in  enumerate(batch_pred_map_cls):
+
+                score = np.array([x[2] for x in batch_res])
+                batch_res=  np.array(batch_res)
+                max_idx = np.argmax(score)#* 只取confidence 最大的, 不管是什么哪个target  , 这个对应的是target id , 也就是第几个目标
+                obj_id=batch_res[max_idx][:,0] #?
+                boxes =batch_res[max_idx][:,1]
+
+                pred_data = {
+                    "scene_id": end_points['scan_ids'][idx],
+                    "object_id": obj_id,
+                    "ann_id": end_points['ann_id'][idx],#* 训练的时候没用到, 所以dataloader没有加载
+                    "bbox": boxes.tolist(),
+                    "unique_multiple":  end_points["is_unique"][idx].item()==False, #* return true means multiple 
+                    "others": 1 if end_points["target_cid"][idx] == 17 else 0
+                }
+
+                pred_bboxes.append(pred_data)
+                
+                #* save for vis , get top k for  vis 
+                
+                if for_vis:
+                    topk = 10
+                    max_indexes = np.argsort(score)[-topk:]
+                    # score[max_indexes][::-1]#* 倒序的 转 正序的
+
+                    obj_id=batch_res[max_indexes][:,0] #?
+                    boxes =batch_res[max_indexes][:,1]
+                    boxes = np.array([ box.tolist() for box in boxes])
+                    boxes = points2box(boxes)
+                    save_for_vis(boxes,batch_data['point_clouds'][idx],self.vis_save_path,end_points['scan_ids'][idx],flag='student')
+                    save_for_vis(batch_data['all_bboxes'][idx][batch_data['all_bbox_label_mask'][idx]].cpu().numpy(),batch_data['point_clouds'][idx],self.vis_save_path,end_points['scan_ids'][idx],flag='student2')
+                    save_for_vis((torch.cat([batch_data['size_gts'],batch_data['center_label']],axis=-1)[idx][batch_data['box_label_mask'][idx].bool()]).cpu().numpy()
+                                    ,batch_data['point_clouds'][idx],self.vis_save_path,end_points['scan_ids'][idx],flag='teacher')
+
+
+            #!=================================================================================
+            if evaluator is not None:
+                for prefix in prefixes:
+                    evaluator.evaluate(end_points, prefix)
+                    
+        evaluator.synchronize_between_processes()
+        
+        #* dump for upload evaluation server ========================================
+        logger.info("dumping...")
+        pred_path = os.path.join(args.log_dir, "pred.json")
+        with open(pred_path, "w") as f:
+            json.dump(pred_bboxes, f, indent=4)
+        logger.info("done!")
+        #*===========================================================================
+
+        ans = None
+        if dist.get_rank() == 0:
+            if evaluator is not None:
+                evaluator.print_stats()
+                ans = {}
+                if args.butd_cls: #* 给定 GT, 进行分类 
+                    prefix ='last_' #* last layer 
+                    mode ='bbf'  #* Box given span (contrastive)
+                    ans['Acc'] = evaluator.dets[(prefix, mode)] / evaluator.gts[(prefix, mode)]
+
+                else:
+                    prefix ='last_' #* last layer 
+                    mode ='bbf'  #* Box given span (contrastive)
+                    topk=1
+                    for t in evaluator.thresholds:
+                        ans[f'Acc@{t}-top1'] = evaluator.dets[(prefix, t, topk, mode)]/max(evaluator.gts[(prefix, t, topk, mode)], 1)
+
+        return ans
+
 
     @torch.no_grad()
     def evaluate_one_epoch_det(self, epoch, test_loader,

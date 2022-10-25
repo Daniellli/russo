@@ -2,7 +2,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-24 00:27:51
- # @LastEditTime: 2022-10-24 15:38:41
+ # @LastEditTime: 2022-10-25 18:33:39
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/pretrain.sh
@@ -22,12 +22,12 @@ test_data=sr3d
 DATA_ROOT=datasets/
 
 
-gpu_ids="0,1,2,3,8";
-gpu_num=5;
+gpu_ids="6";
+gpu_num=1;
 b_size=12
 
 
-port=29526
+port=29530
 save_freq=1;
 val_freq=1;
 print_freq=100;
@@ -36,6 +36,7 @@ save_freq=$val_freq;
 
 resume_mode_path=logs/bdetr/scanrefer/1666543243/ckpt_epoch_80_best.pth;
 #* for  semi supervision architecture  : step1 
+labeled_ratio=0.2
 TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
     pretrain.py --num_decoder_layers 6 \
     --use_color \
@@ -54,6 +55,8 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --labeled_ratio $labeled_ratio \
     --checkpoint_path $resume_mode_path \
     --lr_decay_intermediate \
+    --lr_decay_epochs 90 95 \
+    --debug \
     2>&1 | tee -a logs/train_test_cls.log
 
 
@@ -61,4 +64,4 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
 
 # --checkpoint_path $resume_mode_path \
 #     --lr_decay_intermediate \
-# --lr_decay_epochs 25 26 \
+

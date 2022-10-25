@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-22 10:41:31
-LastEditTime: 2022-10-23 22:52:39
+LastEditTime: 2022-10-25 17:34:44
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/labeled_arkitscenes_dataset.py
@@ -23,8 +23,6 @@ import os
 import os.path as osp 
 import random
 import sys
-import json
-import IPython
 import numpy as np
 from torch.utils.data import Dataset
 from tqdm import tqdm
@@ -41,24 +39,15 @@ from six.moves import cPickle
 
 
 from data.model_util_scannet import ScannetDatasetConfig,rotate_aligned_boxes
-from my_script.utils import print_attr_shape,make_dirs
+from my_script.utils import make_dirs
 import my_script.pc_utils  as pc_util
-#* debug 
-# import pc_utils  as pc_util
-
-
-
+from my_script.pc_utils import write_pc_as_ply, write_ply
 
 from loguru import logger 
-import trimesh
 
-
-
-from src.joint_det_dataset import rot_x,rot_y,rot_z,box2points,points2box
+from src.joint_det_dataset import rot_x,rot_y,rot_z,box2points,points2box,pickle_data,unpickle_data,get_positive_map
 import torch
 from transformers import RobertaTokenizerFast
-from IPython import embed
-
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -79,6 +68,7 @@ NUM_CLASSES = 485
 
 
 
+
 def is_valid_mapping_name(data_root,mapping_name):
     mapping_file = os.path.join(data_root, "data", "annotations", f"{mapping_name}.json")
     if os.stat(mapping_file).st_size < 60:
@@ -86,87 +76,15 @@ def is_valid_mapping_name(data_root,mapping_name):
     return True
 
 
-def convert_oriented_box_to_trimesh_fmt(box, color=None):
-        
-        def heading2rotmat(heading_angle):
-            rotmat = np.zeros((3,3))
-            rotmat[2,2] = 1
-            cosval = np.cos(heading_angle)
-            sinval = np.sin(heading_angle)
-            rotmat[0:2,0:2] = np.array([[cosval, -sinval],[sinval, cosval]])
-            return rotmat
-        
-        ctr = box[:3]
-        lengths = box[3:6]
-        trns = np.eye(4)
-        trns[0:3, 3] = ctr
-        trns[3,3] = 1.0            
-        trns[0:3,0:3] = heading2rotmat(box[6])
-        
-        if color is None:
-            color = (1, 1, 1, 0.3)
-        
-        box_trimesh_fmt = trimesh.creation.box(lengths, trns, visual=trimesh.visual.ColorVisuals(
-            face_colors=list((color for k in range(12)))
-        ))
-        return box_trimesh_fmt    
-
-def write_oriented_bbox(scene_bbox, out_filename, colors=None, single=False):
-    """Export oriented (around Z axis) scene bbox to meshes
-    Args:
-        scene_bbox: (N x 7 numpy array): xyz pos of center and 3 lengths (dx,dy,dz)
-            and heading angle around Z axis.
-            Y forward, X right, Z upward. heading angle of positive X is 0,
-            heading angle of positive Y is 90 degrees.
-        out_filename: (string) filename
-        colors: a 4-tuple (rgbd)
-    """
-    scene = trimesh.scene.Scene()
-    
-    if len(scene_bbox) > 0:
-                
-        zeros = np.zeros(shape=(scene_bbox.shape[0], 1))
-        scene_bbox = np.concatenate([scene_bbox, zeros], axis=1)
-        
-        if colors is None:
-            colors = []
-            for i in range(len(scene_bbox)):
-                colors.append((0.7, 0.7, 0.7, 0.3))
-                
-
-        for box, color in zip(scene_bbox, colors):
-            scene.add_geometry(convert_oriented_box_to_trimesh_fmt(box, color=color))
-        
-        mesh_list = trimesh.util.concatenate(scene.dump())
-        # save to ply file    
-        mesh_list.export(out_filename, file_type='ply')
-
-    else:
-        with open(out_filename, "w+") as f:
-            f.write("")
-    
-    return
 
 
-def dump_pc_colored(point_clouds, dump_name="./dump/tmp.txt", colors=None):
-    OUT = ""
-    with open(dump_name, "w+") as f:
-        if colors is None:
-            for i in range(point_clouds.shape[0]):
-                OUT += f"{point_clouds[i][0]} {point_clouds[i][1]} {point_clouds[i][2]} 0.0 0.0 0.0 0.2 0.2 0.2 1.0\n"
-
-        else:
-            for i in range(point_clouds.shape[0]):
-                OUT += f"{point_clouds[i][0]} {point_clouds[i][1]} {point_clouds[i][2]} 0.0 0.0 0.0 {colors[i][0]} {colors[i][1]} {colors[i][2]} 1.0\n"
-
-        f.write(OUT)
-
-
-class ARKitSceneDataset(Dataset):
+class LabeledARKitSceneDataset(Dataset):
 
 
     def __init__(self, num_points=50000,data_root='datasets/ARKitScenes',
         augment=False,debug=False,butd_cls = False ):
+        
+
         
         #* set some parameters
         self.data_root = data_root
@@ -842,63 +760,6 @@ def save_(data,scene_name,save_root,has_color= True,flag = "debug"):
     np.savetxt(os.path.join(debug_path, scene_name,'%s_box_%s.txt'%(scene_name,flag)),
             data['all_bboxes'][data['all_bbox_label_mask']],fmt='%s')
 
-
-
-def pickle_data(file_name, *args):
-    """Use (c)Pickle to save multiple objects in a single file."""
-    out_file = open(file_name, 'wb')
-    cPickle.dump(len(args), out_file, protocol=2)
-    for item in args:
-        cPickle.dump(item, out_file, protocol=2)
-    out_file.close()
-
-
-def unpickle_data(file_name, python2_to_3=False):
-    """Restore data previously saved with pickle_data()."""
-    in_file = open(file_name, 'rb')
-    if python2_to_3:
-        size = cPickle.load(in_file, encoding='latin1')
-    else:
-        size = cPickle.load(in_file)
-
-    for _ in range(size):
-        if python2_to_3:
-            yield cPickle.load(in_file, encoding='latin1')
-        else:
-            yield cPickle.load(in_file)
-    in_file.close()
-
-
-
-def get_positive_map(tokenized, tokens_positive):
-    """Construct a map of box-token associations."""
-    positive_map = torch.zeros((len(tokens_positive), 256), dtype=torch.float)
-    for j, tok_list in enumerate(tokens_positive):
-        (beg, end) = tok_list
-        beg = int(beg)
-        end = int(end)
-        beg_pos = tokenized.char_to_token(beg)
-        end_pos = tokenized.char_to_token(end - 1)
-        if beg_pos is None:
-            try:
-                beg_pos = tokenized.char_to_token(beg + 1)
-                if beg_pos is None:
-                    beg_pos = tokenized.char_to_token(beg + 2)
-            except:
-                beg_pos = None
-        if end_pos is None:
-            try:
-                end_pos = tokenized.char_to_token(end - 2)
-                if end_pos is None:
-                    end_pos = tokenized.char_to_token(end - 3)
-            except:
-                end_pos = None
-        if beg_pos is None or end_pos is None:
-            continue
-        positive_map[j, beg_pos:end_pos + 1].fill_(1)
-
-    positive_map = positive_map / (positive_map.sum(-1)[:, None] + 1e-12)
-    return positive_map.numpy()
 
 
 
