@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-21 09:41:47
-LastEditTime: 2022-10-25 18:56:19
+LastEditTime: 2022-10-25 19:21:10
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/unlabeled_arkitscenes_dataset.py
@@ -39,7 +39,8 @@ import my_script.pc_utils  as pc_util
 
 
 
-from labeled_arkitscenes_dataset import LabeledARKitSceneDataset
+from src.labeled_arkitscenes_dataset import LabeledARKitSceneDataset
+
 
 from loguru import logger 
 import trimesh
@@ -85,8 +86,8 @@ class UnlabeledARKitSceneDataset(LabeledARKitSceneDataset):
 
     def __init__(self, num_points=50000,data_root='datasets/ARKitScenes',
         augment=False,debug=False,butd_cls = False ):
-        
-        super(UnlabeledARKitSceneDataset,self).__init__(
+
+        super().__init__(
             num_points,data_root,augment,debug,butd_cls)
 
 
@@ -95,9 +96,6 @@ class UnlabeledARKitSceneDataset(LabeledARKitSceneDataset):
         
         scan_name = list(self.annos.keys())[idx]
         anno  = self.annos[scan_name]
-        
-        
-        
         
         #* load pc
         scan_dir = os.path.join(anno['data_path'], scan_name, f"{scan_name}_offline_prepared_data_2")

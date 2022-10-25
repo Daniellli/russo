@@ -2,10 +2,10 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-22 01:33:28
- # @LastEditTime: 2022-10-25 17:44:45
+ # @LastEditTime: 2022-10-25 19:34:07
  # @LastEditors: xushaocong
  # @Description: 
- # @FilePath: /butd_detr/my_script/omni_supervise.sh
+ # @FilePath: /butd_detr/my_script/omni_supervise_train.sh
  # email: xushaocong@stu.xmu.edu.cn
 ### 
  # @Author: xushaocong
@@ -31,30 +31,20 @@ export PYTHONWARNINGS='ignore:semaphore_tracker:UserWarning'
 # gpu_num=7
 # b_size=12
 
-gpu_ids="3,4,5,6,7"
-gpu_num=5
+gpu_ids="7"
+gpu_num=1
 b_size=12
-
-# gpu_ids="0,1,2,3"
-# gpu_num=4
-# b_size=44
-
-# gpu_ids="1,2,3"
-# gpu_num=3;
-# b_size=20;
-
-
 
 port=29522
 val_freq=1;
-print_freq=100;
+print_freq=1;
 save_freq=$val_freq;
 #* for debug 
 
 
 #* for  semi supervision architecture  : step2
-b_size='8,4';
-resume_mode_path="pretrain/pretrain_nr3d_sr3d_sr3dplus_scanrefer_5491_39.pth"
+b_size='4,4';
+# resume_mode_path="pretrain/pretrain_nr3d_sr3d_sr3dplus_scanrefer_5491_39.pth"
 
 
 #* for not mask 
@@ -65,12 +55,13 @@ query_consistency_weight=1;
 text_consistency_weight=1;
 
 rampup_length=30;
-epoch=600;
+epoch=400;
 
 # train_data="sr3d nr3d scanrefer scannet sr3d+"
 train_data="sr3d nr3d scanrefer sr3d+"
 test_data=nr3d
 DATA_ROOT=datasets/
+
 
 
 TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
@@ -81,7 +72,7 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --val_freq $val_freq --batch_size $b_size --save_freq $save_freq --print_freq $print_freq \
     --lr_backbone=1e-3 --lr=1e-4 \
     --dataset $train_data --test_dataset $test_data \
-    --detect_intermediate --joint_det \
+    --detect_intermediate \
     --use_soft_token_loss --use_contrastive_align \
     --log_dir ./logs/bdetr \
     --pp_checkpoint $DATA_ROOT/gf_detector_l6o256.pth \
@@ -92,16 +83,13 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --token_consistency_weight $token_consistency_weight \
     --query_consistency_weight $query_consistency_weight \
     --text_consistency_weight $text_consistency_weight \
-    --upload-wandb \
-    --checkpoint_path $resume_mode_path \
     --rampup_length $rampup_length \
+    --debug \
     2>&1 | tee -a logs/train_test_cls.log
-    
+    # --upload-wandb \
+    # --checkpoint_path $resume_mode_path \
 
-
-
-
-
+#  --joint_det
 
 # --lr_decay_intermediate \
 # --labeled_ratio $labeled_ratio \

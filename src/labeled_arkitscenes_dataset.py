@@ -1,11 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-22 10:41:31
-<<<<<<< HEAD
-LastEditTime: 2022-10-25 18:56:22
-=======
-LastEditTime: 2022-10-25 09:18:09
->>>>>>> f6d54c16c9417810615e7a2ea5802fff9f00e302
+LastEditTime: 2022-10-25 19:20:59
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/labeled_arkitscenes_dataset.py

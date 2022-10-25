@@ -1,10 +1,10 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-22 10:36:35
- # @LastEditTime: 2022-10-25 18:33:55
+ # @LastEditTime: 2022-10-25 19:49:34
  # @LastEditors: xushaocong
  # @Description: 
- # @FilePath: /butd_detr/my_script/full_supervise.sh
+ # @FilePath: /butd_detr/my_script/omni_full_supervse_train.sh
  # email: xushaocong@stu.xmu.edu.cn
 ### 
 
@@ -12,29 +12,22 @@
 # gpu_num=7
 # b_size=12
 
-# gpu_ids="0,1,2,3"
-# gpu_num=4
-# b_size=16
 
-
-gpu_ids="6"
+gpu_ids="7"
 gpu_num=1
-b_size=12
+
+
 
 port=29530
-val_freq=1;
-print_freq=0;
+val_freq=5;
+print_freq=100;
 save_freq=$val_freq;
-#* for debug 
 
-
-#* for  semi supervision architecture  : step2
 b_size='8,4';
 # resume_mode_path="pretrain/butd_no_tkps_5284_sr3d_nr3d_scanrefer_sr3dplus_74.pth"
 epoch=400;
-# train_data="sr3d nr3d scanrefer scannet sr3d+"
-#todo 将scanrefer 和 joint datasets 整合起来
 
+# train_data="sr3d nr3d scanrefer scannet sr3d+"
 train_data="sr3d nr3d scanrefer sr3d+"
 test_data=scanrefer
 DATA_ROOT=datasets/
@@ -52,14 +45,13 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --pp_checkpoint $DATA_ROOT/gf_detector_l6o256.pth \
     --butd_cls --self_attend \
     --max_epoch $epoch --upload-wandb \
-    --debug \
     2>&1 | tee -a logs/train_test_cls.log
+
+
 
 
 # --checkpoint_path $resume_mode_path \
 # --lr_decay_intermediate \
-# --labeled_ratio $labeled_ratio \
 # --lr_decay_epochs 25 26 \
-
 
     

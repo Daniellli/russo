@@ -1,7 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-23 11:57:16
- # @LastEditTime: 2022-10-25 18:10:47
+ # @LastEditTime: 2022-10-25 19:42:22
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/train.sh
@@ -25,9 +25,9 @@ DATA_ROOT=datasets/
 # gpu_ids="0,1,2,3,8";
 # gpu_num=5;
 # b_size=12
-gpu_ids="6";
+gpu_ids="7";
 gpu_num=1;
-b_size=12
+b_size=8
 
 
 
@@ -53,7 +53,7 @@ port=29522
 
 #* for  semi supervision architecture  : step2
 # b_size='4,8';
-b_size='8,4';
+b_size='4,4';
 resume_model_path=pretrain/pretrain_ramdom%20anno_41.pth;
 
 
@@ -76,11 +76,11 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --token_consistency_weight $token_consistency_weight \
     --query_consistency_weight $query_consistency_weight \
     --text_consistency_weight $text_consistency_weight \
-    --checkpoint_path $resume_model_path \
     --labeled_ratio $labeled_ratio \
     --rampup_length $rampup_length --debug \
     2>&1 | tee -a logs/train_test_cls.log
 
+# --checkpoint_path $resume_model_path \
     
 
 

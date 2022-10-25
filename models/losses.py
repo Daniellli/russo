@@ -171,75 +171,75 @@ param {*} end_points
 param {*} topk
 return {*}
 '''
-def compute_points_obj_cls_loss_hard_topk(end_points, topk):
-    #!==============================================================
-    # supervised_mask  = end_points['supervised_mask']
-    # supervised_inds = torch.nonzero(supervised_mask).squeeze(1).long()
-    #!==============================================================
+# def compute_points_obj_cls_loss_hard_topk(end_points, topk):
+#     #!==============================================================
+#     supervised_mask  = (end_points['supervised_mask']==1).int()
+#     supervised_inds = torch.nonzero(supervised_mask).squeeze(1).long()
+#     #!==============================================================
 
-    box_label_mask = end_points['box_label_mask']#* referred target  box  mask ,or the set of anchor object and target object 
-    seed_inds = end_points['seed_inds'].long()  #* B, K
-    seed_xyz = end_points['seed_xyz']  #* B, K, 3
-    seeds_obj_cls_logits = end_points['seeds_obj_cls_logits']  #* B, 1, K, 
+#     box_label_mask = end_points['box_label_mask']#* referred target  box  mask ,or the set of anchor object and target object 
+#     seed_inds = end_points['seed_inds'].long()  #* B, K
+#     seed_xyz = end_points['seed_xyz']  #* B, K, 3
+#     seeds_obj_cls_logits = end_points['seeds_obj_cls_logits']  #* B, 1, K, 
 
-    gt_center = end_points['center_label'][:, :, :3]  # B, G, 3
-    gt_size = end_points['size_gts'][:, :, :3]  # B, G, 3
-    B = gt_center.shape[0]  #* batch size
-    K = seed_xyz.shape[1]  #* number if points from p++ output
-    G = gt_center.shape[1]  #* number of gt boxes (with padding)
+#     gt_center = end_points['center_label'][:, :, :3]  # B, G, 3
+#     gt_size = end_points['size_gts'][:, :, :3]  # B, G, 3
+#     B = gt_center.shape[0]  #* batch size
+#     K = seed_xyz.shape[1]  #* number if points from p++ output
+#     G = gt_center.shape[1]  #* number of gt boxes (with padding)
 
-    #* Assign each point to a GT object, GT object mean referred gt object  
-    point_instance_label = end_points['point_instance_label']  #* B, num_points, for referred target  box  mask  or the set of anchor object and target object ,不是目标点的会被赋予-1 ,  如果是目标的会被赋予对应目标的index
-    obj_assignment = torch.gather(point_instance_label, 1, seed_inds)  #* B, K; 根据pointnet++输出的point index 将对应的点取出来 ,     
-    obj_assignment[obj_assignment < 0] = G - 1  #* bg points to last gt #* bg 赋予 G-1 的值, 也就是 box index range的最后一个值
-    obj_assignment_one_hot = torch.zeros((B, K, G)).to(seed_xyz.device) 
-    obj_assignment_one_hot.scatter_(2, obj_assignment.unsqueeze(-1), 1) #* 将与obj_assignment对应位置的元素对应的 obj_assignment_one_hot位置赋予1 
+#     #* Assign each point to a GT object, GT object mean referred gt object  
+#     point_instance_label = end_points['point_instance_label']  #* B, num_points, for referred target  box  mask  or the set of anchor object and target object ,不是目标点的会被赋予-1 ,  如果是目标的会被赋予对应目标的index
+#     obj_assignment = torch.gather(point_instance_label, 1, seed_inds)  #* B, K; 根据pointnet++输出的point index 将对应的点取出来 ,     
+#     obj_assignment[obj_assignment < 0] = G - 1  #* bg points to last gt #* bg 赋予 G-1 的值, 也就是 box index range的最后一个值
+#     obj_assignment_one_hot = torch.zeros((B, K, G)).to(seed_xyz.device) 
+#     obj_assignment_one_hot.scatter_(2, obj_assignment.unsqueeze(-1), 1) #* 将与obj_assignment对应位置的元素对应的 obj_assignment_one_hot位置赋予1 
 
-    # *Normalized distances of points and gt centroids;计算 pointnet++ 输出的点的xyz 与gt center之间的欧式距离,   
-    delta_xyz = seed_xyz.unsqueeze(2) - gt_center.unsqueeze(1)  # (B, K, G, 3)
-    delta_xyz = delta_xyz / (gt_size.unsqueeze(1) + 1e-6)  # (B, K, G, 3)
-    new_dist = torch.sum(delta_xyz ** 2, dim=-1)
-    euclidean_dist1 = torch.sqrt(new_dist + 1e-6)  # BxKxG
-    euclidean_dist1 = (
-        euclidean_dist1 * obj_assignment_one_hot
-        + 100 * (1 - obj_assignment_one_hot)
-    )  # BxKxG
-    euclidean_dist1 = euclidean_dist1.transpose(1, 2).contiguous()  # BxGxK
+#     # *Normalized distances of points and gt centroids;计算 pointnet++ 输出的点的xyz 与gt center之间的欧式距离,   
+#     delta_xyz = seed_xyz.unsqueeze(2) - gt_center.unsqueeze(1)  # (B, K, G, 3)
+#     delta_xyz = delta_xyz / (gt_size.unsqueeze(1) + 1e-6)  # (B, K, G, 3)
+#     new_dist = torch.sum(delta_xyz ** 2, dim=-1)
+#     euclidean_dist1 = torch.sqrt(new_dist + 1e-6)  # BxKxG
+#     euclidean_dist1 = (
+#         euclidean_dist1 * obj_assignment_one_hot
+#         + 100 * (1 - obj_assignment_one_hot)
+#     )  # BxKxG
+#     euclidean_dist1 = euclidean_dist1.transpose(1, 2).contiguous()  # BxGxK
 
-    #* Find the points that lie closest to each gt centroid
-    topk_inds = (
-        torch.topk(euclidean_dist1, topk, largest=False)[1]
-        * box_label_mask[:, :, None]
-        + (box_label_mask[:, :, None] - 1)
-    )  # BxGxtopk
-    topk_inds = topk_inds.long()  # BxGxtopk
-    topk_inds = topk_inds.view(B, -1).contiguous()  # B, Gxtopk
-    batch_inds = torch.arange(B)[:, None].repeat(1, G*topk).to(seed_xyz.device)
-    batch_topk_inds = torch.stack([
-        batch_inds,
-        topk_inds
-    ], -1).view(-1, 2).contiguous()
+#     #* Find the points that lie closest to each gt centroid
+#     topk_inds = (
+#         torch.topk(euclidean_dist1, topk, largest=False)[1]
+#         * box_label_mask[:, :, None]
+#         + (box_label_mask[:, :, None] - 1)
+#     )  # BxGxtopk
+#     topk_inds = topk_inds.long()  # BxGxtopk
+#     topk_inds = topk_inds.view(B, -1).contiguous()  # B, Gxtopk
+#     batch_inds = torch.arange(B)[:, None].repeat(1, G*topk).to(seed_xyz.device)
+#     batch_topk_inds = torch.stack([
+#         batch_inds,
+#         topk_inds
+#     ], -1).view(-1, 2).contiguous()
 
-    #* Topk points closest to each centroid are marked as true objects, 与质心最近的topk个目标标记为true object 
-    objectness_label = torch.zeros((B, K + 1)).long().to(seed_xyz.device)
-    objectness_label[batch_topk_inds[:, 0], batch_topk_inds[:, 1]] = 1
-    objectness_label = objectness_label[:, :K]
-    objectness_label_mask = torch.gather(point_instance_label, 1, seed_inds)
-    objectness_label[objectness_label_mask < 0] = 0
+#     #* Topk points closest to each centroid are marked as true objects, 与质心最近的topk个目标标记为true object 
+#     objectness_label = torch.zeros((B, K + 1)).long().to(seed_xyz.device)
+#     objectness_label[batch_topk_inds[:, 0], batch_topk_inds[:, 1]] = 1
+#     objectness_label = objectness_label[:, :K]
+#     objectness_label_mask = torch.gather(point_instance_label, 1, seed_inds)
+#     objectness_label[objectness_label_mask < 0] = 0
 
-    #* Compute objectness loss,  计算seeds_obj_cls_logits 和true object 之间的focal loss
-    criterion = SigmoidFocalClassificationLoss()
-    cls_weights = (objectness_label >= 0).float()
-    cls_normalizer = cls_weights.sum(dim=1, keepdim=True).float()
-    cls_weights /= torch.clamp(cls_normalizer, min=1.0)
-    cls_loss_src = criterion(
-        seeds_obj_cls_logits.view(B, K, 1),
-        objectness_label.unsqueeze(-1),
-        weights=cls_weights
-    )
-    objectness_loss = cls_loss_src.sum() / B
+#     #* Compute objectness loss,  计算seeds_obj_cls_logits 和true object 之间的focal loss
+#     criterion = SigmoidFocalClassificationLoss()
+#     cls_weights = (objectness_label >= 0).float()
+#     cls_normalizer = cls_weights.sum(dim=1, keepdim=True).float()
+#     cls_weights /= torch.clamp(cls_normalizer, min=1.0)
+#     cls_loss_src = criterion(
+#         seeds_obj_cls_logits.view(B, K, 1),
+#         objectness_label.unsqueeze(-1),
+#         weights=cls_weights
+#     )
+#     objectness_loss = cls_loss_src.sum() / B
 
-    return objectness_loss
+#     return objectness_loss
 
 
 
@@ -254,14 +254,14 @@ param {*} args
 return {*}
 '''
 def compute_kps_loss(data_dict, topk):
-    #!===============
     
     supervised_mask  = (data_dict['supervised_mask']==1).int()
     supervised_inds = torch.nonzero(supervised_mask).squeeze(1).long()
-
     use_ref_score_loss = True
     ref_use_obj_mask= True
-    #!===============
+    
+
+    
 
     box_label_mask = data_dict['box_label_mask'][supervised_inds,:]
     seed_inds = data_dict['seed_inds'].long()[supervised_inds,:]  # B, K
@@ -373,7 +373,7 @@ def compute_labeled_points_obj_cls_loss_hard_topk(end_points, topk):
 
     # supervised_mask  = end_points['supervised_mask'] 
     #* 0 是没有标签的, 2 是没有 point_instance_label
-    supervised_mask = ((end_points['supervised_mask']  != 0 )  & ( end_points['supervised_mask']  != 2)).int()
+    supervised_mask = (end_points['supervised_mask'] ==1).int()
     supervised_inds = torch.nonzero(supervised_mask).squeeze(1).long()    
     
 
@@ -783,8 +783,7 @@ def compute_labeled_hungarian_loss(end_points, num_decoder_layers, set_criterion
                            query_points_obj_topk=5):
     """Compute Hungarian matching loss containing CE, bbox and giou."""
     #!================================================================
-    DEBUG = False
-    supervised_mask  = (end_points['supervised_mask']==1).int()
+    supervised_mask  =end_points['supervised_mask']
     supervised_inds = torch.nonzero(supervised_mask).squeeze(1).long()
     #!================================================================
     
@@ -813,8 +812,6 @@ def compute_labeled_hungarian_loss(end_points, num_decoder_layers, set_criterion
 
     for prefix in prefixes:
         output = {}
-
-        #!+==========================================================
         if 'proj_tokens' in end_points:
             output['proj_tokens'] = end_points['proj_tokens'][supervised_inds,:,:]
             output['proj_queries'] = end_points[f'{prefix}proj_queries'][supervised_inds,:,:]
@@ -830,16 +827,10 @@ def compute_labeled_hungarian_loss(end_points, num_decoder_layers, set_criterion
         output['pred_logits'] = pred_logits
         output["pred_boxes"] = pred_bbox
 
-        #!+==========================================================
-
-
-
         # Compute all the requested losses
         #!================================================================
-        if DEBUG:
-            losses = compute_loss_and_save_match_res_(output, target,set_criterion,end_points['scan_ids'],prefix)
-        else :
-            losses, _ = set_criterion(output, target)
+        # losses = compute_loss_and_save_match_res_(output, target,set_criterion,end_points['scan_ids'],prefix)
+        losses, _ = set_criterion(output, target)
         #!================================================================
 
 
@@ -875,6 +866,7 @@ def compute_labeled_hungarian_loss(end_points, num_decoder_layers, set_criterion
     end_points['query_points_generation_loss'] = query_points_generation_loss
     end_points['loss_constrastive_align'] = loss_contrastive_align
     end_points['loss'] = loss
+
     return loss, end_points
 
 
