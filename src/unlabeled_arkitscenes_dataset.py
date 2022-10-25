@@ -1,28 +1,10 @@
 '''
 Author: xushaocong
-Date: 2022-10-23 22:52:09
-LastEditTime: 2022-10-23 23:06:40
+Date: 2022-10-21 09:41:47
+LastEditTime: 2022-10-25 09:13:07
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/unlabeled_arkitscenes_dataset.py
-email: xushaocong@stu.xmu.edu.cn
-'''
-'''
-Author: xushaocong
-Date: 2022-10-22 10:41:31
-LastEditTime: 2022-10-23 00:38:52
-LastEditors: xushaocong
-Description: 
-FilePath: /butd_detr/src/labeled_arkitscenes_dataset.py
-email: xushaocong@stu.xmu.edu.cn
-'''
-'''
-Author: xushaocong
-Date: 2022-10-21 09:41:47
-LastEditTime: 2022-10-22 02:01:51
-LastEditors: xushaocong
-Description: 
-FilePath: /butd_detr/src/arkitscenes_dataset.py
 email: xushaocong@stu.xmu.edu.cn
 '''
 

@@ -1,28 +1,10 @@
 '''
 Author: xushaocong
-Date: 2022-10-22 01:38:43
-LastEditTime: 2022-10-24 16:10:29
-LastEditors: xushaocong
-Description: 
-FilePath: /butd_detr/omni_train.py
-email: xushaocong@stu.xmu.edu.cn
-'''
-'''
-Author: xushaocong
-Date: 2022-10-04 19:55:17
-LastEditTime: 2022-10-22 01:37:27
-LastEditors: xushaocong
-Description: 
-FilePath: /butd_detr/train.py
-email: xushaocong@stu.xmu.edu.cn
-'''
-'''
-Author: xushaocong
 Date: 2022-10-03 22:00:15
-LastEditTime: 2022-10-04 17:28:33
+LastEditTime: 2022-10-25 09:16:58
 LastEditors: xushaocong
 Description:  修改get_datasets , 换成可以添加使用数据集比例的dataloader
-FilePath: /butd_detr/train_dist_mod_2.py
+FilePath: /butd_detr/omni_train.py
 email: xushaocong@stu.xmu.edu.cn
 '''
 # ------------------------------------------------------------------------
@@ -48,12 +30,14 @@ from main_utils import BaseTrainTester
 from data.model_util_scannet import ScannetDatasetConfig
 
 from src.join_dataset import JointDataset
-from src.unlabeled_arkitscenes_dataset import ARKitSceneDataset
-
+from src.join_labeled_dataset import JointLabeledDataset
+from src.join_unlabeled_dataset import JointUnlabeledDataset
+from src.unlabeled_arkitscenes_dataset import UnlabeledARKitSceneDataset
 
 
 from src.grounding_evaluator import GroundingEvaluator, GroundingGTEvaluator
 from models import BeaUTyDETR
+from models import BeaUTyDETRTKPS
 from models import APCalculator, parse_predictions, parse_groundtruths
 
 
@@ -194,6 +178,12 @@ def parse_option():
 
     parser.add_argument('--lr_decay_intermediate',action='store_true')
 
+
+    
+    parser.add_argument('--use-tkps',action='store_true', help="use-tkps")
+    
+
+
     args, _ = parser.parse_known_args()
     args.eval = args.eval or args.eval_train
 
@@ -264,11 +254,12 @@ class TrainTester(BaseTrainTester):
             butd_gt=args.butd_gt,
             butd_cls=args.butd_cls
         )
-        
 
-        arkitscenes_dataset = ARKitSceneDataset(
-            augment=True,data_root='datasets/arkitscenes',
-            butd_cls=args.butd_cls)
+        arkitscenes_dataset = UnlabeledARKitSceneDataset(augment=True,data_root='datasets/arkitscenes')
+
+        # arkitscenes_dataset = ARKitSceneDataset(
+        #     augment=True,data_root='datasets/arkitscenes',
+        #     butd_cls=args.butd_cls)
         
         test_dataset = JointDataset(
             dataset_dict=dataset_dict,
@@ -301,7 +292,21 @@ class TrainTester(BaseTrainTester):
             num_class = 19
 
 
-        model = BeaUTyDETR(
+        # model = BeaUTyDETR(
+        #     num_class=num_class,
+        #     num_obj_class=485,
+        #     input_feature_dim=num_input_channel,
+        #     num_queries=args.num_target, #? 
+        #     num_decoder_layers=args.num_decoder_layers,
+        #     self_position_embedding=args.self_position_embedding,
+        #     contrastive_align_loss=args.use_contrastive_align,
+        #     butd=args.butd or args.butd_gt or args.butd_cls, #* 是否使用gt来负责这个visual grounding 而不是 detected bbox 
+        #     pointnet_ckpt=args.pp_checkpoint,  #* pretrained model
+        #     self_attend=args.self_attend
+        # )
+
+
+        model = BeaUTyDETRTKPS(
             num_class=num_class,
             num_obj_class=485,
             input_feature_dim=num_input_channel,
@@ -311,7 +316,8 @@ class TrainTester(BaseTrainTester):
             contrastive_align_loss=args.use_contrastive_align,
             butd=args.butd or args.butd_gt or args.butd_cls, #* 是否使用gt来负责这个visual grounding 而不是 detected bbox 
             pointnet_ckpt=args.pp_checkpoint,  #* pretrained model
-            self_attend=args.self_attend
+            self_attend=args.self_attend,
+            use_tkps=args.use_tkps,
         )
 
         return model

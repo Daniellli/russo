@@ -255,23 +255,26 @@ return {*}
 '''
 def compute_kps_loss(data_dict, topk):
     #!===============
-    # supervised_mask  = data_dict['supervised_mask']
-    # supervised_inds = torch.nonzero(supervised_mask).squeeze(1).long()
+    supervised_mask  = int(data_dict['supervised_mask']==1).int()
+    supervised_inds = torch.nonzero(supervised_mask).squeeze(1).long()
+
     use_ref_score_loss = True
     ref_use_obj_mask= True
     #!===============
 
-    box_label_mask = data_dict['box_label_mask']
-    seed_inds = data_dict['seed_inds'].long()  # B, K
-    seed_xyz = data_dict['seed_xyz']  # B, K, 3
-    seeds_obj_cls_logits = data_dict['seeds_obj_cls_logits']  # B, 1, K
-    gt_center = data_dict['center_label'][:, :, 0:3]  # B, K2, 3
-    gt_size = data_dict['size_gts'][:, :, 0:3]  # B, K2, 3
+    box_label_mask = data_dict['box_label_mask'][supervised_inds,:,:]
+    seed_inds = data_dict['seed_inds'].long()[supervised_inds,:]  # B, K
+    seed_xyz = data_dict['seed_xyz'][supervised_inds,:,:]  # B, K, 3
+    seeds_obj_cls_logits = data_dict['seeds_obj_cls_logits'][supervised_inds,:,:]  # B, 1, K
+    gt_center = data_dict['center_label'][supervised_inds, :, 0:3]  # B, K2, 3
+    gt_size = data_dict['size_gts'][supervised_inds, :, 0:3]  # B, K2, 3
     B = gt_center.shape[0]
     K = seed_xyz.shape[1]
     K2 = gt_center.shape[1]
 
-    point_instance_label = data_dict['point_instance_label']  # B, num_points
+    point_instance_label = data_dict['point_instance_label'][supervised_inds,:]  # B, num_points
+
+
     object_assignment = torch.gather(point_instance_label, 1, seed_inds)  # B, num_seed
     object_assignment[object_assignment < 0] = K2 - 1  # set background points to the last gt bbox
     object_assignment_one_hot = torch.zeros((B, K, K2)).to(seed_xyz.device)
@@ -315,7 +318,8 @@ def compute_kps_loss(data_dict, topk):
         #*====================================
         # point_ref_mask = data_dict['point_ref_mask'] #* 3D SPS 每个sample 默认只有一个目标 by default
 
-        point_ref_mask = data_dict['point_instance_label'] #! error
+        # point_ref_mask = data_dict['point_instance_label'] #! error
+        point_ref_mask = point_instance_label #! error
         point_ref_mask = (point_ref_mask!=-1)*1 #* -1 表示背景, 其他都表示referred target
         point_ref_mask = torch.gather(point_ref_mask, 1, seed_inds)
 
@@ -336,10 +340,8 @@ def compute_kps_loss(data_dict, topk):
 
         # objectness_loss += kps_ref_loss.sum() / B
         #!====================
-        
         data_dict['kps_ref_loss'] = kps_ref_loss.sum() / B
         data_dict['query_kp_loss'] = objectness_loss.clone()
-
         objectness_loss += data_dict['kps_ref_loss']
         #!====================
 
@@ -367,15 +369,12 @@ param {*} topk
 return {*}
 '''
 def compute_labeled_points_obj_cls_loss_hard_topk(end_points, topk):
-    #!==============================================================
 
     # supervised_mask  = end_points['supervised_mask'] 
     #* 0 是没有标签的, 2 是没有 point_instance_label
     supervised_mask = ((end_points['supervised_mask']  != 0 )  & ( end_points['supervised_mask']  != 2)).int()
-    supervised_inds = torch.nonzero(supervised_mask).squeeze(1).long()
-
+    supervised_inds = torch.nonzero(supervised_mask).squeeze(1).long()    
     
-    #!==============================================================
 
     box_label_mask = end_points['box_label_mask'][supervised_inds,:]
 
@@ -774,104 +773,6 @@ class SetCriterion(nn.Module):
         return losses, indices
 
 
-def compute_hungarian_loss(end_points, num_decoder_layers, set_criterion,
-                           query_points_obj_topk=5):
-    """Compute Hungarian matching loss containing CE, bbox and giou."""
-
-    #!================================================================
-    DEBUG = False
-    #!================================================================
-    
-    prefixes = ['last_'] + [f'{i}head_' for i in range(num_decoder_layers - 1)]
-    prefixes = ['proposal_'] + prefixes #* proposal 是第一个, last 是最后一个 
-
-    #* Ground-truth
-    gt_center = end_points['center_label'][:, :, 0:3]  # B, G, 3
-    gt_size = end_points['size_gts']  # (B,G,3)
-    gt_labels = end_points['sem_cls_label']  # (B, G)
-    gt_bbox = torch.cat([gt_center, gt_size], dim=-1)  # cxcyczwhd
-    positive_map = end_points['positive_map']
-    box_label_mask = end_points['box_label_mask']
-    target = [
-        {
-            "labels": gt_labels[b, box_label_mask[b].bool()],
-            "boxes": gt_bbox[b, box_label_mask[b].bool()],#* 
-            "positive_map": positive_map[b, box_label_mask[b].bool()] #* 分布? 用于计算 token 和query 的soft token loss 
-        }#* 每个box 最多对应在 256个token中只能有一个响应的地方,  
-        for b in range(gt_labels.shape[0]) 
-    ]
-
-    loss_ce, loss_bbox, loss_giou, loss_contrastive_align = 0, 0, 0, 0
-    for prefix in prefixes:
-        output = {}
-        if 'proj_tokens' in end_points:
-            output['proj_tokens'] = end_points['proj_tokens']
-            output['proj_queries'] = end_points[f'{prefix}proj_queries']
-            output['tokenized'] = end_points['tokenized']
-
-        #* Get predicted boxes and labels, why the K equals to 256,n_class equals to 256, Q equals to 256
-        pred_center = end_points[f'{prefix}center']  # B, K, 3
-        pred_size = end_points[f'{prefix}pred_size']  # (B,K,3) (l,w,h)
-        pred_bbox = torch.cat([pred_center, pred_size], dim=-1)
-        pred_logits = end_points[f'{prefix}sem_cls_scores']  # (B, Q, n_class)
-        output['pred_logits'] = pred_logits
-        output["pred_boxes"] = pred_bbox
-
-        
-
-        # Compute all the requested losses
-        if DEBUG:
-            losses = compute_loss_and_save_match_res_(output, target,set_criterion,end_points['scan_ids'],prefix)
-        else :
-            losses, _ = set_criterion(output, target)
-        
-
-
-        for loss_key in losses.keys():
-            end_points[f'{prefix}_{loss_key}'] = losses[loss_key]
-        loss_ce += losses.get('loss_ce', 0)
-        loss_bbox += losses['loss_bbox']
-        loss_giou += losses.get('loss_giou', 0)
-        if 'proj_tokens' in end_points:
-            loss_contrastive_align += losses['loss_contrastive_align']
-
-
-    #!================================================================
-    if "ref_query_points_sample_inds" in end_points.keys():
-        query_points_generation_loss, end_points =compute_kps_loss(end_points, query_points_obj_topk)
-
-    elif 'seeds_obj_cls_logits' in end_points.keys():
-        query_points_generation_loss = compute_points_obj_cls_loss_hard_topk(
-            end_points, query_points_obj_topk
-        )
-    else:
-        query_points_generation_loss = 0.0    
-
-    #!================================================================
-
-
-
-    # loss
-    loss = (
-        8 * query_points_generation_loss
-        + 1.0 / (num_decoder_layers + 1) * (
-            loss_ce
-            + 5 * loss_bbox
-            + loss_giou
-            + loss_contrastive_align
-        )
-    )
-    end_points['loss_ce'] = loss_ce
-    end_points['loss_bbox'] = loss_bbox
-    end_points['loss_giou'] = loss_giou
-    end_points['query_points_generation_loss'] = query_points_generation_loss
-    end_points['loss_constrastive_align'] = loss_contrastive_align
-    end_points['loss'] = loss
-    return loss, end_points
-
-
-
-
 
 '''
 description:  根据supervised_mask 计算loss , 也就是只对labeled 的数据计算loss 
@@ -908,11 +809,11 @@ def compute_labeled_hungarian_loss(end_points, num_decoder_layers, set_criterion
     ]
 
     loss_ce, loss_bbox, loss_giou, loss_contrastive_align = 0, 0, 0, 0
+
     for prefix in prefixes:
         output = {}
+
         #!+==========================================================
-        
-        
         if 'proj_tokens' in end_points:
             output['proj_tokens'] = end_points['proj_tokens'][supervised_inds,:,:]
             output['proj_queries'] = end_points[f'{prefix}proj_queries'][supervised_inds,:,:]
@@ -928,11 +829,7 @@ def compute_labeled_hungarian_loss(end_points, num_decoder_layers, set_criterion
         output['pred_logits'] = pred_logits
         output["pred_boxes"] = pred_bbox
 
-        # for k,v in output.items():
-        #     print(v.shape)
-
         #!+==========================================================
-
 
 
 
@@ -953,13 +850,13 @@ def compute_labeled_hungarian_loss(end_points, num_decoder_layers, set_criterion
         if 'proj_tokens' in end_points:
             loss_contrastive_align += losses['loss_contrastive_align']
 
-    if 'seeds_obj_cls_logits' in end_points.keys():
-
+    if "ref_query_points_sample_inds" in end_points.keys():
+        query_points_generation_loss, end_points =compute_kps_loss(end_points, query_points_obj_topk)
+    elif 'seeds_obj_cls_logits' in end_points.keys():
         query_points_generation_loss = compute_labeled_points_obj_cls_loss_hard_topk(
-            end_points, query_points_obj_topk
-        )
+            end_points, query_points_obj_topk)
     else:
-        query_points_generation_loss = 0.0
+        query_points_generation_loss = 0.0  
 
     # loss
     loss = (

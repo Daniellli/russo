@@ -26,7 +26,8 @@ import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel
 import wandb
 
-from models import HungarianMatcher, SetCriterion, compute_hungarian_loss
+# from models import HungarianMatcher, SetCriterion, compute_hungarian_loss
+from models import HungarianMatcher, SetCriterion, compute_labeled_hungarian_loss
 from utils import get_scheduler, setup_logger
 
 
@@ -358,7 +359,8 @@ class BaseTrainTester:
             matcher=matcher,
             losses=losses, eos_coef=0.1, temperature=0.07
         )
-        criterion = compute_hungarian_loss
+        # criterion = compute_hungarian_loss
+        criterion= compute_labeled_hungarian_loss
 
         return criterion, set_criterion
 

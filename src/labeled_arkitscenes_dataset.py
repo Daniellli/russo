@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-22 10:41:31
-LastEditTime: 2022-10-23 22:52:39
+LastEditTime: 2022-10-25 09:18:09
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/labeled_arkitscenes_dataset.py
@@ -162,7 +162,7 @@ def dump_pc_colored(point_clouds, dump_name="./dump/tmp.txt", colors=None):
         f.write(OUT)
 
 
-class ARKitSceneDataset(Dataset):
+class LabeledARKitSceneDataset(Dataset):
 
 
     def __init__(self, num_points=50000,data_root='datasets/ARKitScenes',
@@ -206,7 +206,7 @@ class ARKitSceneDataset(Dataset):
         self.tokenizer = RobertaTokenizerFast.from_pretrained(model_path)
         self.scene_name = all_scene_name
         
-        logger.info(f"ARKitSceneDataset : {len(self.annos)} sample loaded, scene_name number : {len(all_scene_name)} ")
+        logger.info(f"LabeledARKitSceneDataset : {len(self.annos)} sample loaded, scene_name number : {len(all_scene_name)} ")
         
     def __get_scene_name(self,split):
         data_split_path = None
@@ -903,7 +903,7 @@ def get_positive_map(tokenized, tokens_positive):
 
 
 if __name__ == "__main__":
-    dset = ARKitSceneDataset( augment=True,data_root='datasets/arkitscenes',butd_cls = True)
+    dset = LabeledARKitSceneDataset( augment=True,data_root='datasets/arkitscenes',butd_cls = True)
 
     
     from tqdm import tqdm

@@ -2,7 +2,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-23 00:39:49
- # @LastEditTime: 2022-10-23 22:50:40
+ # @LastEditTime: 2022-10-25 09:17:30
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/end2end_train2.sh
@@ -10,7 +10,7 @@
 ### 
  # @Author: xushaocong
  # @Date: 2022-10-14 16:25:42
- # @LastEditTime: 2022-10-23 22:39:14
+ # @LastEditTime: 2022-10-25 08:30:28
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/end2end_train.sh
@@ -20,13 +20,25 @@
 
 
 # train_data="sr3d nr3d scanrefer scannet sr3d+"
-train_data='sr3d nr3d scanrefer sr3d+'
-test_data=nr3d
+train_data="sr3d nr3d scanrefer sr3d+"
+test_data=scanrefer
 DATA_ROOT=datasets/
 
-gpu_ids="0,1,2,3,8"
-gpu_num=5;
-b_size=12;
+# gpu_ids="0,1,2,5"
+# gpu_num=4
+# b_size=12
+
+gpu_ids="0,1,2,3,4,5,6,7"
+gpu_num=8
+b_size=8
+
+# gpu_ids="0,1,2,3"
+# gpu_num=4
+# b_size=44
+
+# gpu_ids="0,1,2,3"
+# gpu_num=4;
+# b_size=16;
 
 
 port=29526
@@ -39,9 +51,9 @@ print_freq=100;
 resume_model='pretrain/pretrain_nr3d_sr3d_sr3dplus_scanrefer_5491_39.pth'
 # topk=16;
 
-# resume_mode_path=logs/bdetr/scanrefer/1666377121/ckpt_epoch_105_best.pth;
+resume_mode_path=logs/bdetr/sr3d,nr3d,scanrefer,sr3d+/1666456233/ckpt_epoch_40_best.pth;
 #* for  semi supervision architecture  : step1 
-topk=7;
+topk=8;
 TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
     end2end_mod.py --num_decoder_layers 6 \
     --use_color \
@@ -56,16 +68,22 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --pp_checkpoint $DATA_ROOT/gf_detector_l6o256.pth \
     --butd_cls --self_attend \
     --max_epoch 400 \
-    --checkpoint_path $resume_model \
+    --upload-wandb \
+    --use-tkps \
+    --query_points_obj_topk $topk \
+    --checkpoint_path $resume_mode_path \
+    --lr_decay_intermediate \
     2>&1 | tee -a logs/train_test_cls.log
 
-# --lr_decay_intermediate \
-    
-# --upload-wandb \
-# --use-tkps \
-# --lr_decay_intermediate \
-# --query_points_obj_topk $topk \
-# --butd --self_attend --augment_det \
+
+
+
+
+# --butd 
+# --lr_decay_epochs 25 26 \
+
+
+
 
 
 # --checkpoint_path $resume_model \
