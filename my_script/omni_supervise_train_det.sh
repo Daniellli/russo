@@ -2,7 +2,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-26 21:42:30
- # @LastEditTime: 2022-10-26 21:44:16
+ # @LastEditTime: 2022-10-26 21:47:51
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/omni_supervise_train_det.sh
@@ -67,7 +67,8 @@ epoch=400;
 train_data="sr3d nr3d scanrefer sr3d+"
 test_data=scanrefer
 DATA_ROOT=datasets/
-ma_decay=0.99;
+ema_decay=0.99;
+topk=8;
 
 TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
     omni_supervise_train.py --num_decoder_layers 6 \
@@ -93,6 +94,7 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --use-tkps \
     --checkpoint_path $resume_mode_path \
     --ema-decay $ema_decay \
+    --query_points_obj_topk $topk \
     2>&1 | tee -a logs/train_test_cls.log
 
     
