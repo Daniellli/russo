@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-22 10:41:31
-LastEditTime: 2022-10-25 19:20:59
+LastEditTime: 2022-10-26 21:08:21
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/labeled_arkitscenes_dataset.py
@@ -320,7 +320,7 @@ class LabeledARKitSceneDataset(Dataset):
         target_bboxes[:, 0:3] = target_bboxes[:, 0:3] - offset[None, ...]
 
         #* 下移 h/2 
-        target_bboxes[:,2] = target_bboxes[:,2]  - target_bboxes[:,-1]/2
+        # target_bboxes[:,2] = target_bboxes[:,2]  - target_bboxes[:,-1]/2
 
         return point_cloud,target_bboxes
 
