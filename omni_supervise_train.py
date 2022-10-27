@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-03 22:00:15
-LastEditTime: 2022-10-25 18:27:26
+LastEditTime: 2022-10-27 14:42:28
 LastEditors: xushaocong
 Description:  修改get_datasets , 换成可以添加使用数据集比例的dataloader
 FilePath: /butd_detr/omni_supervise_train.py
@@ -75,7 +75,7 @@ class OmniSuperviseTrainTester(SemiSuperviseTrainTester):
         
 
         arkitscenes_dataset = UnlabeledARKitSceneDataset(
-            augment=True,data_root='datasets/arkitscenes',
+            augment=True,data_root='datasets/ARKitScenes',
             butd_cls=args.butd_cls)
         
         test_dataset = JointSemiSupervisetDataset(
