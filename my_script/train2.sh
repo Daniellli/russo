@@ -2,7 +2,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-24 10:21:18
- # @LastEditTime: 2022-10-24 20:30:13
+ # @LastEditTime: 2022-10-27 23:11:36
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/train2.sh

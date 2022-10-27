@@ -1,8 +1,17 @@
 ###
 ###
  # @Author: xushaocong
+ # @Date: 2022-10-27 23:35:36
+ # @LastEditTime: 2022-10-27 23:39:05
+ # @LastEditors: xushaocong
+ # @Description: 
+ # @FilePath: /butd_detr/my_script/omni_supervise_train_det_10.sh
+ # email: xushaocong@stu.xmu.edu.cn
+### 
+###
+ # @Author: xushaocong
  # @Date: 2022-10-26 21:42:30
- # @LastEditTime: 2022-10-27 23:38:33
+ # @LastEditTime: 2022-10-27 22:24:22
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/omni_supervise_train_det.sh
@@ -55,7 +64,8 @@ save_freq=$val_freq;
 #* for  semi supervision architecture  : step2
 b_size='12,4';
 
-resume_mode_path="pretrain/pretrain_sr3d_nr3d_sr3dplus_5170_no_butd_use_tkps_det_53.pth"
+# resume_mode_path="pretrain/pretrain_sr3d_nr3d_sr3dplus_5170_no_butd_use_tkps_det_53.pth"
+resume_mode_path="logs/bdetr/sr3d,nr3d,scanrefer,sr3d+/1666795601/student_ckpt_epoch_62_best.pth"
 
 
 
@@ -66,7 +76,7 @@ token_consistency_weight=1;
 query_consistency_weight=1;
 text_consistency_weight=1;
 
-rampup_length=100;
+rampup_length=30;
 epoch=400;
 
 train_data="sr3d nr3d scanrefer sr3d+"
@@ -74,6 +84,7 @@ test_data=scanrefer
 DATA_ROOT=datasets/
 ema_decay=0.99;
 topk=8;
+
 unlabel_datasets_root=datasets/arkitscenes;
 
 TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
@@ -88,7 +99,7 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --use_soft_token_loss --use_contrastive_align \
     --log_dir ./logs/bdetr \
     --pp_checkpoint $DATA_ROOT/gf_detector_l6o256.pth \
-    --self_attend \
+    --self_attend --augment_det \
     --max_epoch $epoch \
     --size_consistency_weight $size_consistency_weight \
     --center_consistency_weight $center_consistency_weight \
@@ -105,8 +116,11 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     2>&1 | tee -a logs/train_test_cls.log
 
 
+ 
 
 
+
+# --augment_det
 
 
 

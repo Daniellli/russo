@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-22 10:41:31
-LastEditTime: 2022-10-27 15:00:43
+LastEditTime: 2022-10-27 23:07:29
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/labeled_arkitscenes_dataset.py
@@ -107,8 +107,10 @@ class LabeledARKitSceneDataset(Dataset):
 
             #* filter according to the scannet clss label 
             #* cache annotation 
-            # filename = osp.join(osp.dirname(self.data_root),f"{split}._arkitscenes.pkl")
-            filename = osp.join(self.data_root,f"{split}_arkitscenes.pkl")
+            #!+=============================================================================
+            filename = osp.join(osp.dirname(self.data_root),f"{split}._arkitscenes.pkl")
+            # filename = osp.join(self.data_root,f"{split}_arkitscenes.pkl")
+            #!+=============================================================================
             
             if not osp.exists(filename):
                 annos= self.filter_bad_scene_and_cache(filename,scene_name_list,data_split_path)

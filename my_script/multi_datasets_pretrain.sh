@@ -2,10 +2,10 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-23 00:39:49
- # @LastEditTime: 2022-10-25 20:02:20
+ # @LastEditTime: 2022-10-27 23:33:44
  # @LastEditors: xushaocong
  # @Description: 
- # @FilePath: /butd_detr/my_script/end2end_train.sh
+ # @FilePath: /butd_detr/my_script/multi_datasets_pretrain.sh
  # email: xushaocong@stu.xmu.edu.cn
 ### 
  # @Author: xushaocong
@@ -20,26 +20,26 @@
 
 
 # train_data="sr3d nr3d scanrefer scannet sr3d+"
-train_data=scanrefer
-test_data=scanrefer
+train_data="scanrefer sr3d+"
+test_data=scanrefer;
 DATA_ROOT=datasets/
 
-gpu_ids="0,1,2,3,8,9"
-gpu_num=6
-b_size=12
+
+gpu_ids="0,1,2,3"
+gpu_num=4
+b_size=16
 
 
-port=29526
 
-save_freq=1;
-val_freq=1;
+port=29511
+save_freq=5;
+val_freq=5;
 print_freq=100;
 
 # train_dist_mod.py
-# resume_model='pretrain/pretrain_nr3d_sr3d_sr3dplus_scanrefer_5491_39.pth'
-resume_model_path=logs/bdetr/scanrefer/1666610747/ckpt_epoch_155_best.pth;
-
+# resume_model_path=logs/bdetr/scanrefer/1666610747/ckpt_epoch_155_best.pth;
 #* for  semi supervision architecture  : step1 
+
 topk=8;
 TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
     train_dist_mod.py --num_decoder_layers 6 \
@@ -56,13 +56,21 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --self_attend --augment_det \
     --max_epoch 400 --use-tkps \
     --query_points_obj_topk $topk \
-    --checkpoint_path $resume_model_path \
-    --lr_decay_intermediate \
-    --lr_decay_epochs 160 175 \
+    --upload-wandb \
     2>&1 | tee -a logs/train_test_cls.log
 
 
-# --upload-wandb 
+
+
+
+
+
+# --checkpoint_path $resume_model_path \
+# --lr_decay_intermediate \
+# --lr_decay_epochs 160 175 \
+
+
+
 # --butd 
 # --lr_decay_epochs 25 26 \
 

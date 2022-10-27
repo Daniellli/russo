@@ -2,7 +2,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-24 00:27:51
- # @LastEditTime: 2022-10-25 18:56:22
+ # @LastEditTime: 2022-10-27 23:13:08
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/pretrain.sh
@@ -35,6 +35,7 @@ save_freq=$val_freq;
 
 
 resume_mode_path=logs/bdetr/scanrefer/1666543243/ckpt_epoch_80_best.pth;
+
 #* for  semi supervision architecture  : step1 
 labeled_ratio=0.2
 TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \

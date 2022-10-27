@@ -1,7 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-22 10:36:35
- # @LastEditTime: 2022-10-26 21:03:20
+ # @LastEditTime: 2022-10-27 23:11:08
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/omni_full_supervse_train.sh
@@ -26,6 +26,7 @@ epoch=400;
 train_data="sr3d nr3d scanrefer sr3d+"
 test_data=sr3d
 DATA_ROOT=datasets/
+unlabel_datasets_root=datasets/arkitscenes
 
 TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
     omni_full_supervse_train.py --num_decoder_layers 6 \
@@ -43,9 +44,14 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --checkpoint_path $resume_mode_path \
     --lr_decay_intermediate \
     --lr_decay_epochs 51 61 \
-    --eval \
+    --unlabel-dataset-root $unlabel_datasets_root \
     2>&1 | tee -a logs/train_test_cls.log
 
+
+
+
+
+# --eval \
 
 
 

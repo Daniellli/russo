@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 20:04:19
-LastEditTime: 2022-10-25 20:26:01
+LastEditTime: 2022-10-27 23:12:48
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/my_script/utils.py
@@ -29,6 +29,7 @@ from collections import OrderedDict
 def parse_semi_supervise_option():
     """Parse cmd arguments."""
     parser = argparse.ArgumentParser()
+
     # Model
     parser.add_argument('--num_target', type=int, default=256,
                         help='Proposal number')
@@ -49,24 +50,25 @@ def parse_semi_supervise_option():
     parser.add_argument('--detect_intermediate', action='store_true')
     parser.add_argument('--joint_det', action='store_true')
 
-    
+
 
     # Data
     parser.add_argument('--batch_size', type=str, default="2,8",
                         help='Batch Size during training')
     parser.add_argument('--dataset', type=str, default=['sr3d'],
                         nargs='+', help='list of datasets to train on')
+    
+
     parser.add_argument('--test_dataset', default='sr3d')
+    #!+=======
+    parser.add_argument('--unlabel-dataset-root', default='')
+    #!+=======
     parser.add_argument('--data_root', default='./')
     parser.add_argument('--use_height', action='store_true',
                         help='Use height signal in input.')
     parser.add_argument('--use_color', action='store_true',
                         help='Use RGB color in input.')
     parser.add_argument('--use_multiview', action='store_true')
-    
-
-
-
     parser.add_argument('--butd', action='store_true')
     parser.add_argument('--butd_gt', action='store_true')
     parser.add_argument('--butd_cls', action='store_true')
@@ -133,7 +135,6 @@ def parse_semi_supervise_option():
     parser.add_argument('--save-input-output',action='store_true', help="save-input-output")
     parser.add_argument('--use-tkps',action='store_true', help="use-tkps")
     parser.add_argument('--lr_decay_intermediate',action='store_true')
-
 
     parser.add_argument('--ema-decay', default=0.999, type=float,help=' EMA decay parameter ')
 

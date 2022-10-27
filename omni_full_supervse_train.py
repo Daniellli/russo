@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-03 22:00:15
-LastEditTime: 2022-10-26 09:16:54
+LastEditTime: 2022-10-27 23:12:36
 LastEditors: xushaocong
 Description:  将 ARKitScenes 也作为有标签数据进行监督 , 也就是用mean teacher 
 
@@ -103,7 +103,7 @@ class OmniFullSuperviseTrainTester(TrainTester):
         )
 
         arkitscene_datasets = LabeledARKitSceneDataset(augment=True,
-            data_root='datasets/arkitscenes', 
+            data_root=args.unlabel_dataset_root, 
             butd_cls=args.butd_cls)
 
 
