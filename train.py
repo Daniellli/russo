@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-03 22:00:15
-LastEditTime: 2022-10-25 20:25:32
+LastEditTime: 2022-10-27 22:27:24
 LastEditors: xushaocong
 Description:  修改get_datasets , 换成可以添加使用数据集比例的dataloader
 FilePath: /butd_detr/train.py
@@ -544,8 +544,8 @@ class SemiSuperviseTrainTester(TrainTester):
 
                 if ema_performance is not None :
                     logger.info(','.join(['teacher_%s:%.04f'%(k,round(v,4)) for k,v in ema_performance.items()]))
-                    is_best,tnew_performance = save_res(ema_save_dir,epoch,ema_performance,ema_best_performce)
-                    if is_best:
+                    ema_is_best,tnew_performance = save_res(ema_save_dir,epoch,ema_performance,ema_best_performce)
+                    if ema_is_best:
                         ema_best_performce =  tnew_performance
                         save_checkpoint(args, epoch, ema_model, optimizer, scheduler ,is_best=True,prefix='teacher_')     
                 
@@ -560,7 +560,7 @@ class SemiSuperviseTrainTester(TrainTester):
 
                     if ema_performance is not None :
                         wandb.log({'teacher_%s'%(k):round(v,4) for k,v in ema_performance.items()})
-                        if is_best:
+                        if ema_is_best:
                             wandb.log({'%s'%('teacher_best_'+k):round(v,4) for k,v in ema_performance.items()})
 
 

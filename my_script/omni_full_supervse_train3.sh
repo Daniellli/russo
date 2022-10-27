@@ -2,7 +2,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-26 21:04:08
- # @LastEditTime: 2022-10-26 21:04:16
+ # @LastEditTime: 2022-10-26 21:58:10
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/omni_full_supervse_train3.sh
@@ -30,7 +30,7 @@ gpu_ids="0,1,2,3"
 gpu_num=4
 
 
-port=29535
+port=29540
 val_freq=1;
 print_freq=100;
 save_freq=$val_freq;
