@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-03 22:00:15
-LastEditTime: 2022-10-27 22:27:24
+LastEditTime: 2022-10-27 23:05:09
 LastEditors: xushaocong
 Description:  修改get_datasets , 换成可以添加使用数据集比例的dataloader
 FilePath: /butd_detr/train.py
@@ -491,6 +491,7 @@ class SemiSuperviseTrainTester(TrainTester):
                     is_best,tnew_performance = save_res(ema_save_dir,args.start_epoch-1,ema_performance,ema_best_performce)
                     if is_best:
                         ema_best_performce= tnew_performance
+                exit(0)
 
 
 
