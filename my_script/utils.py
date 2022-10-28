@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 20:04:19
-LastEditTime: 2022-10-27 23:12:48
+LastEditTime: 2022-10-28 20:04:59
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/my_script/utils.py
@@ -136,7 +136,7 @@ def parse_semi_supervise_option():
     parser.add_argument('--use-tkps',action='store_true', help="use-tkps")
     parser.add_argument('--lr_decay_intermediate',action='store_true')
 
-    parser.add_argument('--ema-decay', default=0.999, type=float,help=' EMA decay parameter ')
+    parser.add_argument('--ema-decay', default=None, type=float,help=' EMA decay parameter ')
 
     
 
@@ -232,6 +232,7 @@ def parse_option():
     parser.add_argument("--debug", action='store_true',
                         help="try to overfit few samples")
     parser.add_argument('--eval', default=False, action='store_true')
+    parser.add_argument('--eval--scanrefer', default=False, action='store_true',help=' generate the pred.json for the ')
     parser.add_argument('--eval_train', action='store_true')
     parser.add_argument('--pp_checkpoint', default=None)
     parser.add_argument('--reduce_lr', action='store_true')

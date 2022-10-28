@@ -1,7 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-23 11:57:16
- # @LastEditTime: 2022-10-25 19:42:22
+ # @LastEditTime: 2022-10-28 20:05:22
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/train.sh
@@ -25,9 +25,8 @@ DATA_ROOT=datasets/
 # gpu_ids="0,1,2,3,8";
 # gpu_num=5;
 # b_size=12
-gpu_ids="7";
+gpu_ids="0";
 gpu_num=1;
-b_size=8
 
 
 
@@ -56,7 +55,7 @@ port=29522
 b_size='4,4';
 resume_model_path=pretrain/pretrain_ramdom%20anno_41.pth;
 
-
+ema_decay=0.99
 TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
     train.py --num_decoder_layers 6 \
     --use_color \
@@ -77,7 +76,8 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --query_consistency_weight $query_consistency_weight \
     --text_consistency_weight $text_consistency_weight \
     --labeled_ratio $labeled_ratio \
-    --rampup_length $rampup_length --debug \
+    --rampup_length $rampup_length \
+    --ema-decay $ema_decay \
     2>&1 | tee -a logs/train_test_cls.log
 
 # --checkpoint_path $resume_model_path \

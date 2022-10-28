@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-03 22:00:15
-LastEditTime: 2022-10-27 23:05:09
+LastEditTime: 2022-10-28 20:16:24
 LastEditors: xushaocong
 Description:  修改get_datasets , 换成可以添加使用数据集比例的dataloader
 FilePath: /butd_detr/train.py
@@ -52,6 +52,10 @@ import random
 from my_script.consistant_loss import get_consistency_loss
 from my_script.utils import parse_semi_supervise_option,save_res,make_dirs
 
+from IPython import embed
+
+
+
 
 class SemiSuperviseTrainTester(TrainTester):
     """Train/test a language grounder."""
@@ -83,70 +87,70 @@ class SemiSuperviseTrainTester(TrainTester):
         return weight * sigmoid_rampup(epoch,args)
 
 
-    @staticmethod
-    def get_datasets(args):
-        """Initialize datasets."""
-        dataset_dict = {}  # dict to use multiple datasets
-        for dset in args.dataset:
-            dataset_dict[dset] = 1
 
-        if args.joint_det:
-            dataset_dict['scannet'] = 10
+            
+      
+    '''
+    description: 获取一个数据集
+    data_root: 数据根目录
+    train_dataset_dict: 这次用于训练的所有数据集, e.g.: sr3d,nr3d....
+    test_datasets: 测试数据集
+    split: train or val 
+    use_color : 是否使用颜色
+    use_height: 是否使用height
+    detect_intermediate: 是否对utterance里的名词都作为监督信号,  
+    use_multiview : 是否使用多视角数据
+    butd:  ??? 好像没用!
+    butd_gt :  是否将gt scene box 赋予 detected box 
+    butd_cls : 在classification task , 需要将detected box 转成 scene gt box  , 这是这个任务的特点
+    augment_det : 是否对detected box 以30% 概率将detected box 替换成 无效的box(随机box)
+    debug : 是否overfit 
+    return {*}
+    '''    
+    def get_dataset(self,data_root,train_dataset_dict,test_datasets,split,use_color,use_height,
+                    detect_intermediate,use_multiview,butd,butd_gt,butd_cls,
+                    augment_det=False,debug=False,labeled_ratio=None):
 
-        # labeled_ratio = 0.2
-        # logger.info(f"labeled_ratio:{labeled_ratio}")
-        print('Loading datasets:', sorted(list(dataset_dict.keys())))
-        
-        labeled_dataset = JointLabeledDataset(
-            dataset_dict=dataset_dict,
-            test_dataset=args.test_dataset, #? only test set need ? 
-            split='train' ,
-            use_color=args.use_color, use_height=args.use_height,
-            overfit=args.debug,
-            data_path=args.data_root,
-            detect_intermediate=args.detect_intermediate,#? 
-            use_multiview=args.use_multiview, #? 
-            butd=args.butd, #? 
-            butd_gt=args.butd_gt,#? 
-            butd_cls=args.butd_cls,#? 
-            augment_det=args.augment_det,#? 
-            labeled_ratio=args.labeled_ratio
-        )
-        
-        
-        unlabeled_dataset = JointUnlabeledDataset(
-            dataset_dict=dataset_dict,
-            test_dataset=args.test_dataset, #? only test set need ? 
-            split='train',
-            use_color=args.use_color, use_height=args.use_height,
-            overfit=args.debug,
-            data_path=args.data_root,
-            detect_intermediate=args.detect_intermediate,#? 
-            use_multiview=args.use_multiview, #? 
-            butd=args.butd, #? 
-            butd_gt=args.butd_gt,#? 
-            butd_cls=args.butd_cls,#? 
-            augment_det=args.augment_det,#? 
-            labeled_ratio=args.labeled_ratio
-        )
-        
-        test_dataset = JointSemiSupervisetDataset(
-            dataset_dict=dataset_dict,
-            test_dataset=args.test_dataset,
-            split='val' if not args.eval_train else 'train',
-            use_color=args.use_color, use_height=args.use_height,
-            overfit=args.debug,
-            data_path=args.data_root,
-            detect_intermediate=args.detect_intermediate,
-            use_multiview=args.use_multiview,
-            butd=args.butd,
-            butd_gt=args.butd_gt,
-            butd_cls=args.butd_cls
+        return JointLabeledDataset(
+            dataset_dict=train_dataset_dict,
+            test_dataset=test_datasets,
+            split=split,
+            use_color=use_color, use_height=use_height,
+            overfit=debug,
+            data_path=data_root,
+            detect_intermediate=detect_intermediate,
+            use_multiview=use_multiview,
+            butd=butd, 
+            butd_gt=butd_gt,
+            butd_cls=butd_cls,
+            augment_det=augment_det ,
+            labeled_ratio=labeled_ratio
         )
 
-        
-        return labeled_dataset,unlabeled_dataset, test_dataset
-        
+    
+
+    def get_unlabeled_dataset(self,data_root,train_dataset_dict,test_datasets,split,use_color,use_height,
+                    detect_intermediate,use_multiview,butd,butd_gt,butd_cls,
+                    augment_det=False,debug=False,labeled_ratio=None):
+
+        return JointUnlabeledDataset(
+            dataset_dict=train_dataset_dict,
+            test_dataset=test_datasets,
+            split=split,
+            use_color=use_color, use_height=use_height,
+            overfit=debug,
+            data_path=data_root,
+            detect_intermediate=detect_intermediate,
+            use_multiview=use_multiview,
+            butd=butd, 
+            butd_gt=butd_gt,
+            butd_cls=butd_cls,
+            augment_det=augment_det ,
+            labeled_ratio=labeled_ratio
+        )
+
+    
+
 
     @staticmethod
     def _get_teacher_inputs(batch_data):
@@ -159,67 +163,6 @@ class SemiSuperviseTrainTester(TrainTester):
         }
 
 
-
-    def get_loaders(self, args):
-        """Initialize data loaders."""
-        def seed_worker(worker_id):
-            worker_seed = torch.initial_seed() % 2**32
-            np.random.seed(worker_seed)
-            random.seed(worker_seed)
-            np.random.seed(np.random.get_state()[1][0] + worker_id)
-
-        #* do not need to load train set when args.evals == True 
-        # Datasets
-        labeled_dataset,unlabeled_dataset, test_dataset = self.get_datasets(args)
-        
-        #* 存在一个问题就是val 的数据抽取的不合法,在group_free_pred_bboxes_val 找不到对应的数据
-        
-        g = torch.Generator()
-        g.manual_seed(0)
-
-        batch_size_list = np.array(args.batch_size.split(',')).astype(np.int64)
-
-        labeled_sampler = DistributedSampler(labeled_dataset)
-        labeled_loader = DataLoader(
-            labeled_dataset,
-            batch_size=int(batch_size_list[0]),
-            shuffle=False,
-            num_workers=args.num_workers,
-            worker_init_fn=seed_worker,
-            pin_memory=True,
-            sampler=labeled_sampler,
-            drop_last=True,
-            generator=g
-        )
-
-        unlabeled_sampler = DistributedSampler(unlabeled_dataset)
-        unlabeled_loader = DataLoader(
-            unlabeled_dataset,
-            batch_size=int(batch_size_list[1]),
-            shuffle=False,
-            num_workers=args.num_workers,
-            worker_init_fn=seed_worker,
-            pin_memory=True,
-            sampler=unlabeled_sampler,
-            drop_last=True,
-            generator=g
-        )
-        
-
-        test_sampler = DistributedSampler(test_dataset, shuffle=False)
-        test_loader = DataLoader(
-            test_dataset,
-            batch_size=int(batch_size_list.sum()),
-            shuffle=False,
-            num_workers=args.num_workers,
-            worker_init_fn=seed_worker,
-            pin_memory=True,
-            sampler=test_sampler,
-            drop_last=False,
-            generator=g
-        )
-        logger.info(f"the iter num  labeled_loader needs :{len(labeled_loader)}, the iter num  unlabeled_loader needs :{len(unlabeled_loader)}, the iter num  test_loader needs :{len(test_loader)},  ")
-        return labeled_loader,unlabeled_loader, test_loader
 
 
             
@@ -412,7 +355,47 @@ class SemiSuperviseTrainTester(TrainTester):
 
         """Run main training/testing pipeline."""
         # Get loaders
-        labeled_loader,unlabeled_loader, test_loader = self.get_loaders(args)
+        dataset_dict = {}  # dict to use multiple datasets
+        for dset in args.dataset:
+            dataset_dict[dset] = 1
+
+        if args.joint_det:
+            dataset_dict['scannet'] = 10
+
+
+
+        print('Loading datasets:', sorted(list(dataset_dict.keys())))
+        labeled_dataset = self.get_dataset(args.data_root,dataset_dict,args.test_dataset,
+                        'train' if not args.debug else 'val', 
+                        args.use_color,args.use_height,args.detect_intermediate,
+                        args.use_multiview,args.butd,args.butd_gt,
+                        args.butd_cls,args.augment_det,args.debug,
+                        labeled_ratio=args.labeled_ratio)
+
+
+
+        unlabeled_datasets  = self.get_unlabeled_dataset(args.data_root,dataset_dict,args.test_dataset,
+                        'train' if not args.debug else 'val', 
+                        args.use_color,args.use_height,args.detect_intermediate,
+                        args.use_multiview,args.butd,args.butd_gt,
+                        args.butd_cls,args.augment_det,args.debug,
+                        labeled_ratio=args.labeled_ratio)
+        
+        test_dataset = self.get_dataset(args.data_root,dataset_dict,args.test_dataset,
+                        'val' if not args.eval_train else 'train',
+                         args.use_color,args.use_height,args.detect_intermediate,
+                         args.use_multiview,args.butd,args.butd_gt,
+                         args.butd_cls,debug = args.debug)
+
+
+
+
+        batch_size_list = np.array(args.batch_size.split(',')).astype(np.int64)
+        labeled_loader = self.get_dataloader(labeled_dataset,int(batch_size_list[0]),args.num_workers,shuffle = True)
+        unlabeled_loader = self.get_dataloader(unlabeled_datasets,int(batch_size_list[1]),args.num_workers,shuffle = True)
+        test_loader = self.get_dataloader(test_dataset,int(batch_size_list.sum().astype(np.int64)),args.num_workers,shuffle = False)
+
+
         logger.info(f"length of  labeled dataset: {len(labeled_loader.dataset)} \t  length of  unlabeled dataset: {len(unlabeled_loader.dataset)} \t length of testing dataset: {len(test_loader.dataset)}")
         
         # Get model

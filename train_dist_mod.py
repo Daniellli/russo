@@ -55,49 +55,43 @@ class TrainTester(BaseTrainTester):
             os.makedirs(self.vis_save_path)
 
             
-            
+        
 
-    @staticmethod
-    def get_datasets(args):
-        """Initialize datasets."""
-        dataset_dict = {}  # dict to use multiple datasets
-        for dset in args.dataset:
-            dataset_dict[dset] = 1
+    '''
+    description: 获取一个数据集
+    data_root: 数据根目录
+    train_dataset_dict: 这次用于训练的所有数据集, e.g.: sr3d,nr3d....
+    test_datasets: 测试数据集
+    split: train or val 
+    use_color : 是否使用颜色
+    use_height: 是否使用height
+    detect_intermediate: 是否对utterance里的名词都作为监督信号,  
+    use_multiview : 是否使用多视角数据
+    butd:  ??? 好像没用!
+    butd_gt :  是否将gt scene box 赋予 detected box 
+    butd_cls : 在classification task , 需要将detected box 转成 scene gt box  , 这是这个任务的特点
+    augment_det : 是否对detected box 以30% 概率将detected box 替换成 无效的box(随机box)
+    debug : 是否overfit 
+    return {*}
+    '''    
+    def get_dataset(self,data_root,train_dataset_dict,test_datasets,split,use_color,use_height,
+                    detect_intermediate,use_multiview,butd,butd_gt,butd_cls,augment_det=False,debug=False):
 
-        if args.joint_det:
-            dataset_dict['scannet'] = 10
-
-        print('Loading datasets:', sorted(list(dataset_dict.keys())))
-        train_dataset = Joint3DDataset(
-            dataset_dict=dataset_dict,
-            test_dataset=args.test_dataset, #? only test set need ? 
-            split='train' if not args.debug else 'val',
-            use_color=args.use_color, use_height=args.use_height,
-            overfit=args.debug,
-            data_path=args.data_root,
-            detect_intermediate=args.detect_intermediate,#? 
-            use_multiview=args.use_multiview, #? 
-            butd=args.butd, #? 
-            butd_gt=args.butd_gt,#? 
-            butd_cls=args.butd_cls,#? 
-            augment_det=args.augment_det#? 
+        return Joint3DDataset(
+            dataset_dict=train_dataset_dict,
+            test_dataset=test_datasets,
+            split=split,
+            use_color=use_color, use_height=use_height,
+            overfit=debug,
+            data_path=data_root,
+            detect_intermediate=detect_intermediate,
+            use_multiview=use_multiview,
+            butd=butd, 
+            butd_gt=butd_gt,
+            butd_cls=butd_cls,
+            augment_det=augment_det 
         )
         
-        test_dataset = Joint3DDataset(
-            dataset_dict=dataset_dict,
-            test_dataset=args.test_dataset,
-            split='val' if not args.eval_train else 'train',
-            use_color=args.use_color, use_height=args.use_height,
-            overfit=args.debug,
-            data_path=args.data_root,
-            detect_intermediate=args.detect_intermediate,
-            use_multiview=args.use_multiview,
-            butd=args.butd,
-            butd_gt=args.butd_gt,
-            butd_cls=args.butd_cls
-        )
-            
-        return train_dataset, test_dataset
 
     @staticmethod
     def get_model(args):
@@ -567,6 +561,10 @@ if __name__ == '__main__':
         run.name = "test_"+run.name
         for k, v in opt.__dict__.items():
             setattr(wandb.config,k,v)
+
+    if opt.eval:
+        train_tester.evaluation(opt)
+        exit(0)
 
     ckpt_path = train_tester.main(opt)
     
