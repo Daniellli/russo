@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 20:04:19
-LastEditTime: 2022-10-30 15:17:40
+LastEditTime: 2022-10-30 17:00:39
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/my_script/utils.py
@@ -126,11 +126,11 @@ def parse_semi_supervise_option():
     parser.add_argument('--query_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
     parser.add_argument('--text_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
     parser.add_argument('--rampup_length', type=float, default=None, help='rampup_length')
-    parser.add_argument('--labeled_ratio', default=0.2, type=float,help=' labeled datasets ratio ')
+    parser.add_argument('--labeled_ratio', default=None, type=float,help=' labeled datasets ratio ')
     
     #* others 
     parser.add_argument('--gpu-ids', default='7', type=str)
-    parser.add_argument('--vis-save-path', default='', type=str)
+    parser.add_argument('--vis-save-path', default=None, type=str)
     parser.add_argument('--upload-wandb',action='store_true', help="upload to wandb or not ?")
     parser.add_argument('--save-input-output',action='store_true', help="save-input-output")
     parser.add_argument('--use-tkps',action='store_true', help="use-tkps")
@@ -242,9 +242,9 @@ def parse_option():
 
     #* mine args 
     parser.add_argument('--gpu-ids', default='7', type=str)
-    parser.add_argument('--vis-save-path', default='', type=str)
+    parser.add_argument('--vis-save-path', default=None, type=str)
     parser.add_argument('--upload-wandb',action='store_true', help="upload to wandb or not ?")
-    parser.add_argument('--labeled_ratio', default=0.2, type=float,help=' labeled datasets ratio ')
+    parser.add_argument('--labeled_ratio', default=None, type=float,help=' labeled datasets ratio ')
     parser.add_argument('--use-tkps',action='store_true', help="use-tkps")
     parser.add_argument('--lr_decay_intermediate',action='store_true')
 

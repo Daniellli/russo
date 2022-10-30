@@ -2,7 +2,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-26 21:42:30
- # @LastEditTime: 2022-10-30 16:37:16
+ # @LastEditTime: 2022-10-30 16:53:51
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/omni_supervise_train_det.sh
@@ -39,23 +39,23 @@ export PYTHONWARNINGS='ignore:semaphore_tracker:UserWarning'
 # gpu_ids="0,1,2,3,4,5,6,7";
 # gpu_num=8;
 
-gpu_ids="0,1,7";
-gpu_num=1;
+gpu_ids="4,5,6,7";
+gpu_num=4;
 
 
 
 port=29522
 val_freq=1;
-print_freq=1;
+print_freq=100;
 save_freq=$val_freq;
 
 #* for debug
 
 
 #* for  semi supervision architecture  : step2
-b_size='2,1';
+b_size='8,4';
 
-resume_mode_path="pretrained/scanrefer_det_52.2.pth"
+resume_mode_path="pretrain/scanrefer_no_butd_use_tkps_5191_112.pth"
 
 
 
@@ -101,10 +101,12 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --ema-decay $ema_decay \
     --query_points_obj_topk $topk \
     --unlabel-dataset-root $unlabel_datasets_root \
+    --checkpoint_path $resume_mode_path \
+    --upload-wandb \
     2>&1 | tee -a logs/train_test_cls.log
 
-# --checkpoint_path $resume_mode_path \
-# --upload-wandb \
+
+
 
 
 # --lr_decay_intermediate \
