@@ -87,55 +87,50 @@ class BaseTrainTester:
             self.logger.info(str(vars(args)))
             
 
-    @staticmethod
-    def get_datasets(args):
+    
+    def get_dataset(self):
         """Initialize datasets."""
-        train_dataset = None
-        test_dataset = None
-        return train_dataset, test_dataset
+        raise NotImplementedError
+        # train_dataset = None
+        # test_dataset = None
+        # return train_dataset, test_dataset
 
-    def get_loaders(self, args):
-        """Initialize data loaders."""
-        def seed_worker(worker_id):
-            worker_seed = torch.initial_seed() % 2**32
-            np.random.seed(worker_seed)
-            random.seed(worker_seed)
-            np.random.seed(np.random.get_state()[1][0] + worker_id)
 
-        #* do not need to load train set when args.evals == True 
-        # Datasets
-        train_dataset, test_dataset = self.get_datasets(args)
-        #* 存在一个问题就是val 的数据抽取的不合法,在group_free_pred_bboxes_val 找不到对应的数
-        
+    def seed_worker(self,worker_id):
+        worker_seed = torch.initial_seed() % 2**32
+        np.random.seed(worker_seed)
+        random.seed(worker_seed)
+        np.random.seed(np.random.get_state()[1][0] + worker_id)
+    
+
+    
+
+    '''
+    description:  封装一个datasets
+    param {*} self
+    param {*} datasets
+    param {*} shuffle : 如果是test set 就需要等于false
+    
+    return {*}
+    '''
+    def get_dataloader(self,datasets,bs,num_works,shuffle=True):
         g = torch.Generator()
         g.manual_seed(0)
         
-        train_sampler = DistributedSampler(train_dataset)
-        train_loader = DataLoader(
-            train_dataset,
-            batch_size=args.batch_size,
+        data_sampler = DistributedSampler(datasets,shuffle= shuffle)
+        dataloader = DataLoader(
+            datasets,
+            batch_size=bs,
             shuffle=False,
-            num_workers=args.num_workers,
-            worker_init_fn=seed_worker,
+            num_workers=num_works,
+            worker_init_fn=self.seed_worker,
             pin_memory=True,
-            sampler=train_sampler,
+            sampler=data_sampler,
             drop_last=True,
             generator=g
         )
-        
-        test_sampler = DistributedSampler(test_dataset, shuffle=False)
-        test_loader = DataLoader(
-            test_dataset,
-            batch_size=args.batch_size,
-            shuffle=False,
-            num_workers=args.num_workers,
-            worker_init_fn=seed_worker,
-            pin_memory=True,
-            sampler=test_sampler,
-            drop_last=False,
-            generator=g
-        )
-        return train_loader, test_loader
+        return dataloader
+    
 
     @staticmethod
     def get_model(args):
@@ -189,6 +184,73 @@ class BaseTrainTester:
                                 weight_decay=args.weight_decay)
         return optimizer
 
+
+    def evaluation(self,args):
+
+        assert os.path.isfile(args.checkpoint_path)
+        if args.checkpoint_path is None :
+            logger.error("not checkpoint found ")
+            return 
+
+
+
+        torch.cuda.set_device(args.local_rank)
+        logger.info(f"args.local_rank == {args.local_rank}")
+
+
+        
+        """Run main training/testing pipeline."""
+        test_dataset = self.get_dataset(args.data_root,{},args.test_dataset,
+                        'val' if not args.eval_train else 'train',
+                         args.use_color,args.use_height,args.detect_intermediate,
+                         args.use_multiview,args.butd,args.butd_gt,
+                         args.butd_cls,debug = args.debug)
+
+
+        test_loader = self.get_dataloader(test_dataset,args.batch_size,args.num_workers,shuffle=False)
+        
+
+        # Get model
+        model = self.get_model(args)
+   
+
+        # Get criterion
+        criterion, set_criterion = self.get_criterion(args)
+
+        
+        # Move model to devices
+        if torch.cuda.is_available():
+            model = model.cuda(args.local_rank)
+        model = DistributedDataParallel(
+            model, device_ids=[args.local_rank],
+            broadcast_buffers=True  # , find_unused_parameters=True
+        )
+        
+        
+        #* file and variable for saving the eval res 
+        best_performce = 0
+        save_dir = osp.join(args.log_dir,'performance.txt')
+        if osp.exists(save_dir):
+            os.remove(save_dir)
+
+        #* 2.eval and save res to a txt file 
+        load_checkpoint(args, model, None, None)
+
+
+        #* eval student model 
+        performance = self.evaluate_one_epoch(
+            args.start_epoch, test_loader,
+            model, criterion, set_criterion, args
+        )
+
+        if performance is not None :
+            logger.info(','.join(['student_%s:%.04f'%(k,round(v,4)) for k,v in performance.items()]))
+            is_best,snew_performance = save_res(save_dir,args.start_epoch-1,performance,best_performce)
+
+
+
+                
+
     def main(self, args):
 
         torch.cuda.set_device(args.local_rank)
@@ -197,7 +259,34 @@ class BaseTrainTester:
         
         """Run main training/testing pipeline."""
         # Get loaders
-        train_loader, test_loader = self.get_loaders(args)
+
+        dataset_dict = {}  # dict to use multiple datasets
+        for dset in args.dataset:
+            dataset_dict[dset] = 1
+
+        if args.joint_det:
+            dataset_dict['scannet'] = 10
+
+        print('Loading datasets:', sorted(list(dataset_dict.keys())))
+        train_dataset = self.get_dataset(args.data_root,dataset_dict,args.test_dataset,
+                        'train' if not args.debug else 'val', 
+                        args.use_color,args.use_height,args.detect_intermediate,
+                        args.use_multiview,args.butd,args.butd_gt,
+                        args.butd_cls,args.augment_det,args.debug)
+
+        train_loader = self.get_dataloader(train_dataset,args.batch_size,args.num_workers,shuffle=True)
+
+
+        test_dataset = self.get_dataset(args.data_root,dataset_dict,args.test_dataset,
+                        'val' if not args.eval_train else 'train',
+                         args.use_color,args.use_height,args.detect_intermediate,
+                         args.use_multiview,args.butd,args.butd_gt,
+                         args.butd_cls,debug = args.debug)
+
+
+        test_loader = self.get_dataloader(test_dataset,args.batch_size,args.num_workers,shuffle=False)
+        
+
         n_data = len(train_loader.dataset)
         self.logger.info(f"length of training dataset: {n_data}")
         n_data = len(test_loader.dataset)
@@ -265,6 +354,8 @@ class BaseTrainTester:
 
                     if is_best:
                         best_performce = snew_performance
+                
+                
              
         
 

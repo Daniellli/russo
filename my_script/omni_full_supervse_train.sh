@@ -1,15 +1,19 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-22 10:36:35
- # @LastEditTime: 2022-10-27 23:11:08
+ # @LastEditTime: 2022-10-28 20:29:07
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/omni_full_supervse_train.sh
  # email: xushaocong@stu.xmu.edu.cn
 ### 
 
-gpu_ids="0,1,2,3"
-gpu_num=4
+# gpu_ids="0,1,2,3"
+# gpu_num=4
+
+gpu_ids="0,1,7"
+gpu_num=3
+
 
 
 port=29530
@@ -18,8 +22,10 @@ print_freq=100;
 save_freq=$val_freq;
 
 
-b_size='14,2';
-resume_mode_path="pretrain/full_supervise_nr3d_sr3d_sr3dplus_scanrefer_arkitscenes_5112_cls.pth"
+b_size='4,2';
+# resume_mode_path="pretrain/full_supervise_nr3d_sr3d_sr3dplus_scanrefer_arkitscenes_5112_cls.pth"
+resume_mode_path="pretrain/pretrain_%20_4773_sr3d_cls.pth"
+
 epoch=400;
 
 
