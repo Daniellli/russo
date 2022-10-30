@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-03 22:00:15
-LastEditTime: 2022-10-29 00:07:10
+LastEditTime: 2022-10-30 15:23:51
 LastEditors: xushaocong
 Description:  修改get_datasets , 换成可以添加使用数据集比例的dataloader
 FilePath: /butd_detr/train.py
@@ -129,9 +129,17 @@ class SemiSuperviseTrainTester(TrainTester):
 
     
 
+    '''
+    description: 
+    unlabel_dataset_root : 是omni supervise 加载 arkitscens 数据集用的
+    return {*}
+    '''
     def get_unlabeled_dataset(self,data_root,train_dataset_dict,test_datasets,split,use_color,use_height,
                     detect_intermediate,use_multiview,butd,butd_gt,butd_cls,
-                    augment_det=False,debug=False,labeled_ratio=None):
+                    augment_det=False,debug=False,labeled_ratio=None,unlabel_dataset_root=None):
+
+        logger.info(f"unlabeled datasets,ratio {labeled_ratio} , has been loaded ")
+
 
         return JointUnlabeledDataset(
             dataset_dict=train_dataset_dict,
@@ -507,13 +515,15 @@ class SemiSuperviseTrainTester(TrainTester):
                         labeled_ratio=args.labeled_ratio)
 
 
-
+        #* 可能根据labeled_ratio 也可能根据unlabel_dataset_root 加载arkitscenes 
+        #* 取决于 是被train.py 调用还是  omni_supervise_train.py 调用
         unlabeled_datasets  = self.get_unlabeled_dataset(args.data_root,dataset_dict,args.test_dataset,
                         'train' if not args.debug else 'val', 
                         args.use_color,args.use_height,args.detect_intermediate,
                         args.use_multiview,args.butd,args.butd_gt,
                         args.butd_cls,args.augment_det,args.debug,
-                        labeled_ratio=args.labeled_ratio)
+                        labeled_ratio=args.labeled_ratio,unlabel_dataset_root=args.unlabel_dataset_root)
+                
         
         test_dataset = self.get_dataset(args.data_root,dataset_dict,args.test_dataset,
                         'val' if not args.eval_train else 'train',
@@ -792,9 +802,10 @@ class SemiSuperviseTrainTester(TrainTester):
 
             #* update lr decay milestones
             if args.lr_decay_intermediate:    
-                tmp = {scheduler._step_count+len(labeled_loader):1 } #* 一个epoch 后decay learning rate 
-                tmp.update({ k:v for  idx, (k,v) in enumerate(scheduler.milestones.items()) if idx != 0})
-                scheduler.milestones = tmp
+                # tmp = {scheduler._step_count+len(labeled_loader):1 } #* 一个epoch 后decay learning rate 
+                # tmp.update({ k:v for  idx, (k,v) in enumerate(scheduler.milestones.items()) if idx != 0})
+                # scheduler.milestones = tmp
+                scheduler.milestones ={len(labeled_loader)*(l-args.warmup_epoch) : 1 for l in args.lr_decay_epochs}
 
             #* eval student model 
             if args.eval:

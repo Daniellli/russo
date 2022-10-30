@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-03 22:00:15
-LastEditTime: 2022-10-28 20:24:35
+LastEditTime: 2022-10-30 14:57:12
 LastEditors: xushaocong
 Description:  将 ARKitScenes 也作为有标签数据进行监督 , 也就是用mean teacher 
 
@@ -300,9 +300,12 @@ class OmniFullSuperviseTrainTester(TrainTester):
             #* load model 之后 schedule 也变了 , 变成上次训练的,这次的就不见了, 重新加载
             if args.lr_decay_intermediate:
                 
-                tmp = {scheduler._step_count+len(labeled_loader):1 } #* 一个epoch 后decay learning rate 
-                tmp.update({ k:v for  idx, (k,v) in enumerate(scheduler.milestones.items()) if idx != 0})
-                scheduler.milestones = tmp
+                # tmp = {scheduler._step_count+len(labeled_loader):1 } #* 一个epoch 后decay learning rate 
+                # tmp.update({ k:v for  idx, (k,v) in enumerate(scheduler.milestones.items()) if idx != 0})
+                # scheduler.milestones = tmp
+                scheduler.milestones ={len(labeled_loader)*(l-args.warmup_epoch) : 1 for l in args.lr_decay_epochs}
+
+
 
             #* eval student model 
             if args.eval:

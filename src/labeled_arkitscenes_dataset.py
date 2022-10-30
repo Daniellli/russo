@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-22 10:41:31
-LastEditTime: 2022-10-27 23:07:29
+LastEditTime: 2022-10-30 15:41:10
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/labeled_arkitscenes_dataset.py
@@ -734,7 +734,9 @@ class LabeledARKitSceneDataset(Dataset):
             "teacher_box":teacher_box.astype(np.float32),
             #! no teacher box because no  detected results, so we can only test on det setting 
             "augmentations":augmentations,
+            #!+=======
             "supervised_mask":np.array(2).astype(np.int64),#*  2 表示有标签 但是没有point_instance_label
+            #!+=======
             
         })
 

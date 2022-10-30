@@ -2,7 +2,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-26 21:42:30
- # @LastEditTime: 2022-10-27 23:38:33
+ # @LastEditTime: 2022-10-30 16:37:16
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/omni_supervise_train_det.sh
@@ -39,23 +39,23 @@ export PYTHONWARNINGS='ignore:semaphore_tracker:UserWarning'
 # gpu_ids="0,1,2,3,4,5,6,7";
 # gpu_num=8;
 
-gpu_ids="0,1,2,3";
-gpu_num=4;
+gpu_ids="0,1,7";
+gpu_num=1;
 
 
 
 port=29522
 val_freq=1;
-print_freq=100;
+print_freq=1;
 save_freq=$val_freq;
 
 #* for debug
 
 
 #* for  semi supervision architecture  : step2
-b_size='12,4';
+b_size='2,1';
 
-resume_mode_path="pretrain/pretrain_sr3d_nr3d_sr3dplus_5170_no_butd_use_tkps_det_53.pth"
+resume_mode_path="pretrained/scanrefer_det_52.2.pth"
 
 
 
@@ -69,12 +69,13 @@ text_consistency_weight=1;
 rampup_length=100;
 epoch=400;
 
-train_data="sr3d nr3d scanrefer sr3d+"
+train_data=scanrefer
 test_data=scanrefer
 DATA_ROOT=datasets/
 ema_decay=0.99;
 topk=8;
 unlabel_datasets_root=datasets/arkitscenes;
+
 
 TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
     omni_supervise_train.py --num_decoder_layers 6 \
@@ -96,23 +97,17 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --query_consistency_weight $query_consistency_weight \
     --text_consistency_weight $text_consistency_weight \
     --rampup_length $rampup_length \
-    --upload-wandb \
     --use-tkps \
-    --checkpoint_path $resume_mode_path \
     --ema-decay $ema_decay \
     --query_points_obj_topk $topk \
     --unlabel-dataset-root $unlabel_datasets_root \
     2>&1 | tee -a logs/train_test_cls.log
 
-
-
-
-
+# --checkpoint_path $resume_mode_path \
+# --upload-wandb \
 
 
 # --lr_decay_intermediate \
 # --labeled_ratio $labeled_ratio \
 # --lr_decay_epochs 25 26 \
 
-
-    

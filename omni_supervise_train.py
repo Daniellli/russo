@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-03 22:00:15
-LastEditTime: 2022-10-27 23:11:53
+LastEditTime: 2022-10-30 15:20:18
 LastEditors: xushaocong
 Description:  修改get_datasets , 换成可以添加使用数据集比例的dataloader
 FilePath: /butd_detr/omni_supervise_train.py
@@ -45,56 +45,28 @@ class OmniSuperviseTrainTester(SemiSuperviseTrainTester):
         """Initialize."""
         super().__init__(args)
         
-    @staticmethod
-    def get_datasets(args):
-        """Initialize datasets."""
-        dataset_dict = {}  # dict to use multiple datasets
-        for dset in args.dataset:
-            dataset_dict[dset] = 1
 
-        if args.joint_det:
-            dataset_dict['scannet'] = 10
 
-        # labeled_ratio = 0.2
-        # logger.info(f"labeled_ratio:{labeled_ratio}")
-        print('Loading datasets:', sorted(list(dataset_dict.keys())))
-        
-        labeled_dataset = JointSemiSupervisetDataset(
-            dataset_dict=dataset_dict,
-            test_dataset=args.test_dataset,
-            split='train',
-            use_color=args.use_color, use_height=args.use_height,
-            overfit=args.debug,
-            data_path=args.data_root,
-            detect_intermediate=args.detect_intermediate,
-            use_multiview=args.use_multiview,
-            butd=args.butd,
-            butd_gt=args.butd_gt,
-            butd_cls=args.butd_cls
-        )
+    
+    '''
+    description:  重写get_unlabeled_dataset function, 很多参数都用不上, 
+     但是为了和train.py 公用一个main(), 保留了这些没用的参数
+    return {*}
+    '''
+    def get_unlabeled_dataset(self,data_root,train_dataset_dict,test_datasets,split,use_color,use_height,
+                    detect_intermediate,use_multiview,butd,butd_gt,butd_cls,
+                    augment_det=False,debug=False,labeled_ratio=None,unlabel_dataset_root=None):
         
 
-        arkitscenes_dataset = UnlabeledARKitSceneDataset(
-            augment=True,
-            data_root=args.unlabel_dataset_root,
-            butd_cls=args.butd_cls)
+        logger.info(f"unlabeld datasets: arkitscenes has been loaded ")
         
-        test_dataset = JointSemiSupervisetDataset(
-            dataset_dict=dataset_dict,
-            test_dataset=args.test_dataset,
-            split='val' if not args.eval_train else 'train',
-            use_color=args.use_color, use_height=args.use_height,
-            overfit=args.debug,
-            data_path=args.data_root,
-            detect_intermediate=args.detect_intermediate,
-            use_multiview=args.use_multiview,
-            butd=args.butd,
-            butd_gt=args.butd_gt,
-            butd_cls=args.butd_cls
-        )
+        return  UnlabeledARKitSceneDataset(augment=True,
+            data_root=unlabel_dataset_root,
+            butd_cls=butd_cls)
+    
 
-        
-        return labeled_dataset,arkitscenes_dataset, test_dataset
+
+
 
 
 if __name__ == '__main__':

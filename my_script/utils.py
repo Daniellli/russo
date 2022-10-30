@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 20:04:19
-LastEditTime: 2022-10-29 00:01:18
+LastEditTime: 2022-10-30 15:17:40
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/my_script/utils.py
@@ -61,7 +61,7 @@ def parse_semi_supervise_option():
 
     parser.add_argument('--test_dataset', default='sr3d')
     #!+=======
-    parser.add_argument('--unlabel-dataset-root', default='')
+    parser.add_argument('--unlabel-dataset-root', default=None)
     #!+=======
     parser.add_argument('--data_root', default='./')
     parser.add_argument('--use_height', action='store_true',
