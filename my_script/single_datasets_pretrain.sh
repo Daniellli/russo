@@ -2,10 +2,10 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-24 00:27:51
- # @LastEditTime: 2022-10-27 23:13:08
+ # @LastEditTime: 2022-10-30 10:11:33
  # @LastEditors: xushaocong
  # @Description: 
- # @FilePath: /butd_detr/my_script/pretrain.sh
+ # @FilePath: /butd_detr/my_script/single_datasets_pretrain.sh
  # email: xushaocong@stu.xmu.edu.cn
 ### 
 
@@ -22,9 +22,10 @@ test_data=sr3d
 DATA_ROOT=datasets/
 
 
-gpu_ids="6";
-gpu_num=1;
+gpu_ids="1,2,4,5,6,8,9";
+gpu_num=7;
 b_size=12
+
 
 
 port=29530
@@ -34,12 +35,16 @@ print_freq=100;
 save_freq=$val_freq;
 
 
-resume_mode_path=logs/bdetr/scanrefer/1666543243/ckpt_epoch_80_best.pth;
+# resume_mode_path=logs/bdetr/sr3d/1667007312/ckpt_epoch_20_best.pth;
+# resume_mode_path=logs/bdetr/sr3d/1667038294/ckpt_epoch_32_best.pth;
+resume_mode_path=logs/bdetr/sr3d/1667060778/ckpt_epoch_60_best.pth;
 
-#* for  semi supervision architecture  : step1 
-labeled_ratio=0.2
+
+
+#* for  semi supervision architecture  : step1 x
+# labeled_ratio=0.2
 TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
-    pretrain.py --num_decoder_layers 6 \
+    train_dist_mod.py --num_decoder_layers 6 \
     --use_color \
     --weight_decay 0.0005 \
     --data_root $DATA_ROOT \
@@ -52,29 +57,23 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --pp_checkpoint $DATA_ROOT/gf_detector_l6o256.pth \
     --butd_cls --self_attend \
     --max_epoch 400 \
-    --upload-wandb \
-    --labeled_ratio $labeled_ratio \
     --checkpoint_path $resume_mode_path \
-    --lr_decay_epochs 101 105 \
+    --lr_decay_epochs 61 66 \
     --lr_decay_intermediate \
-    --lr_decay_epochs 90 95 \
-    --debug \
     2>&1 | tee -a logs/train_test_cls.log
 
-    
+
+
+# --upload-wandb \
+# --labeled_ratio $labeled_ratio \
+
+
+# --debug \
+
+
+
 
 #  --joint_det
-
 # --use-tkps \
 # --query_points_obj_topk $topk \
-
-# --dbeug \
-
-
-
-
-
-
-# --checkpoint_path $resume_mode_path \
-#     --lr_decay_intermediate \
 

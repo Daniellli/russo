@@ -1,7 +1,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-23 11:57:16
- # @LastEditTime: 2022-10-28 20:05:22
+ # @LastEditTime: 2022-10-29 00:04:50
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/train.sh
@@ -22,11 +22,9 @@ train_data=sr3d
 test_data=sr3d
 DATA_ROOT=datasets/
 
-# gpu_ids="0,1,2,3,8";
-# gpu_num=5;
-# b_size=12
-gpu_ids="0";
-gpu_num=1;
+gpu_ids="1,2,4,5,6";
+gpu_num=5;
+b_size=12
 
 
 
@@ -40,7 +38,7 @@ text_consistency_weight=1;
 
 
 
-labeled_ratio=0.2;
+# labeled_ratio=0.2;
 val_freq=1;
 print_freq=1;
 save_freq=$val_freq;
@@ -51,9 +49,9 @@ port=29522
 
 
 #* for  semi supervision architecture  : step2
-# b_size='4,8';
-b_size='4,4';
-resume_model_path=pretrain/pretrain_ramdom%20anno_41.pth;
+b_size='4,8';
+# b_size=12;
+resume_model_path=pretrained/bdetr_sr3d_cls_67.1.pth;
 
 ema_decay=0.99
 TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
@@ -75,12 +73,13 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --token_consistency_weight $token_consistency_weight \
     --query_consistency_weight $query_consistency_weight \
     --text_consistency_weight $text_consistency_weight \
-    --labeled_ratio $labeled_ratio \
     --rampup_length $rampup_length \
     --ema-decay $ema_decay \
+    --checkpoint_path $resume_model_path \
+    --ema-full-supervise \
     2>&1 | tee -a logs/train_test_cls.log
+# --labeled_ratio $labeled_ratio \
 
-# --checkpoint_path $resume_model_path \
     
 
 

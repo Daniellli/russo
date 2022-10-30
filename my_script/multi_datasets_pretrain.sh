@@ -2,7 +2,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-23 00:39:49
- # @LastEditTime: 2022-10-30 00:32:33
+ # @LastEditTime: 2022-10-30 14:49:08
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/multi_datasets_pretrain.sh
@@ -21,19 +21,20 @@
 
 # train_data="sr3d nr3d scanrefer scannet sr3d+"
 # train_data="scanrefer sr3d+"
-train_data="nr3d sr3d+"
+train_data="nr3d sr3d"
 test_data=nr3d;
 DATA_ROOT=datasets/
 
-gpu_ids="0,1,2,3,4,5,6,7"
-gpu_num=8
-b_size=8
+gpu_ids="1,2,4,5,6,8,9";
+gpu_num=7;
+b_size=12
+
 
 
 
 port=29511
-save_freq=1;
-val_freq=1;
+save_freq=5;
+val_freq=5;
 print_freq=100;
 
 # train_dist_mod.py
@@ -55,13 +56,19 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --pp_checkpoint $DATA_ROOT/gf_detector_l6o256.pth \
     --butd_cls --self_attend \
     --max_epoch 400 \
-    --upload-wandb \
-    --checkpoint_path $resume_model_path \
-    --lr_decay_intermediate \
-    --lr_decay_epochs 76 86 \
     2>&1 | tee -a logs/train_test_cls.log
 
 
+
+
+
+
+
+
+
+# --checkpoint_path $resume_model_path \
+# --lr_decay_intermediate \
+# --lr_decay_epochs 76 86 \
 
 
 # --augment_det

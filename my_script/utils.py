@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 20:04:19
-LastEditTime: 2022-10-28 20:04:59
+LastEditTime: 2022-10-29 00:01:18
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/my_script/utils.py
@@ -137,6 +137,9 @@ def parse_semi_supervise_option():
     parser.add_argument('--lr_decay_intermediate',action='store_true')
 
     parser.add_argument('--ema-decay', default=None, type=float,help=' EMA decay parameter ')
+
+
+    parser.add_argument('--ema-full-supervise', action='store_true',help='ema-full-supervise ')
 
     
 
