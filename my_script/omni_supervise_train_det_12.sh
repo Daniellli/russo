@@ -62,20 +62,20 @@ save_freq=$val_freq;
 
 
 #* for  semi supervision architecture  : step2
-b_size='12,4';
+b_size='4,8';
 
 resume_mode_path="pretrain/pretrain_sr3d_nr3d_sr3dplus_5170_no_butd_use_tkps_det_53.pth"
 
 
 
 #* for not mask
-size_consistency_weight=1e-3;
-center_consistency_weight=1e-1;
-token_consistency_weight=1;
-query_consistency_weight=1;
-text_consistency_weight=1;
+size_consistency_weight=1e-5;
+center_consistency_weight=1e-2;
+token_consistency_weight=1e-1;
+query_consistency_weight=1e-1;
+text_consistency_weight=1e-4;
 
-rampup_length=30;
+rampup_length=100;
 epoch=400;
 
 train_data="sr3d nr3d scanrefer sr3d+"

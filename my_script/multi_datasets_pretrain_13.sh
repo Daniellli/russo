@@ -2,7 +2,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-23 00:39:49
- # @LastEditTime: 2022-10-30 14:49:08
+ # @LastEditTime: 2022-10-27 23:33:44
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/multi_datasets_pretrain.sh
@@ -24,20 +24,20 @@ train_data="scanrefer sr3d"
 test_data=scanrefer;
 DATA_ROOT=datasets/
 
-gpu_ids="1,2,4,5,6,8,9";
-gpu_num=7;
-b_size=12
 
+gpu_ids="0,1,2,3"
+gpu_num=4
+b_size=16
 
 
 
 port=29511
-save_freq=5;
-val_freq=5;
+save_freq=1;
+val_freq=1;
 print_freq=100;
 
 # train_dist_mod.py
-resume_model_path=logs/bdetr/nr3d,sr3d+/1666886362/ckpt_epoch_75_best.pth;
+# resume_model_path=logs/bdetr/scanrefer/1666610747/ckpt_epoch_155_best.pth;
 #* for  semi supervision architecture  : step1 
 
 topk=8;
@@ -53,11 +53,11 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --use_soft_token_loss --use_contrastive_align \
     --log_dir ./logs/bdetr \
     --pp_checkpoint $DATA_ROOT/gf_detector_l6o256.pth \
-    --butd_cls --self_attend \
-    --max_epoch 400 \
+    --self_attend --augment_det \
+    --max_epoch 400 --use-tkps \
+    --query_points_obj_topk $topk \
+    --upload-wandb \
     2>&1 | tee -a logs/train_test_cls.log
-
-
 
 
 
@@ -67,16 +67,21 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
 
 # --checkpoint_path $resume_model_path \
 # --lr_decay_intermediate \
-# --lr_decay_epochs 76 86 \
-
-
-# --augment_det
-# --query_points_obj_topk $topk 
-# --use-tkps 
+# --lr_decay_epochs 160 175 \
 
 
 
+# --butd 
+# --lr_decay_epochs 25 26 \
 
+
+
+
+
+# --checkpoint_path $resume_model \
+#     --lr_decay_intermediate \
+
+# --butd_cls --self_attend \
 
 # --dbeug \
 # --consistency_weight 1e-4 \

@@ -31,8 +31,8 @@ export PYTHONWARNINGS='ignore:semaphore_tracker:UserWarning'
 # gpu_num=7
 # b_size=12
 
-gpu_ids="0";
-gpu_num=1;
+gpu_ids="0,1,2,3";
+gpu_num=4;
 
 
 
@@ -45,23 +45,22 @@ save_freq=$val_freq;
 
 
 #* for  semi supervision architecture  : step2
-b_size='1,1';
+b_size='4,8';
 
 resume_mode_path="pretrain/pretrain_nr3d_sr3d_sr3dplus_scanrefer_5491_39_cls.pth"
 
 
 #* for not mask 
-size_consistency_weight=1e-3;
-center_consistency_weight=1e-1;
-token_consistency_weight=1;
-query_consistency_weight=1;
-text_consistency_weight=1;
+size_consistency_weight=1e-5;
+center_consistency_weight=1e-2;
+token_consistency_weight=1e-1;
+query_consistency_weight=1e-1;
+text_consistency_weight=1e-4;
 
 rampup_length=100;
 epoch=400;
 
-# train_data="sr3d nr3d scanrefer scannet sr3d+"
-train_data="sr3d"
+train_data="sr3d nr3d scanrefer scannet sr3d+"
 test_data=nr3d
 DATA_ROOT=datasets/
 ema_decay=0.99;
@@ -88,11 +87,12 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --rampup_length $rampup_length \
     --checkpoint_path $resume_mode_path \
     --ema-decay $ema_decay \
+    --upload-wandb \
+    --unlabel_datasets_root datasets/arkitscenes \
     2>&1 | tee -a logs/train_test_cls.log
 
     
     
-# --upload-wandb \
 
 
 # --lr_decay_intermediate \
