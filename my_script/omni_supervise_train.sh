@@ -2,7 +2,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-22 01:33:28
- # @LastEditTime: 2022-10-27 14:43:20
+ # @LastEditTime: 2022-10-31 20:54:32
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/omni_supervise_train.sh
@@ -27,12 +27,10 @@ export PYTHONWARNINGS='ignore:semaphore_tracker:UserWarning'
 
 
 
-# gpu_ids="0,2,3,4,6,7,9"
-# gpu_num=7
-# b_size=12
+gpu_ids="0,1,2,3,4,5,6,7"
+gpu_num=8
 
-gpu_ids="0";
-gpu_num=1;
+
 
 
 
@@ -45,26 +43,28 @@ save_freq=$val_freq;
 
 
 #* for  semi supervision architecture  : step2
-b_size='1,1';
+b_size='4,4';
 
-resume_mode_path="pretrain/pretrain_nr3d_sr3d_sr3dplus_scanrefer_5491_39_cls.pth"
+resume_mode_path="pretrained/bdetr_sr3d_cls_67.1.pth"
 
 
 #* for not mask 
-size_consistency_weight=1e-3;
-center_consistency_weight=1e-1;
-token_consistency_weight=1;
-query_consistency_weight=1;
-text_consistency_weight=1;
+size_consistency_weight=1e-4;
+center_consistency_weight=1e-2;
+token_consistency_weight=1e-1;
+query_consistency_weight=1e-1;
+text_consistency_weight=1e-2;
 
 rampup_length=100;
 epoch=400;
 
 # train_data="sr3d nr3d scanrefer scannet sr3d+"
-train_data="sr3d"
-test_data=nr3d
+train_data=sr3d
+test_data=sr3d
 DATA_ROOT=datasets/
 ema_decay=0.99;
+
+
 
 TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
     omni_supervise_train.py --num_decoder_layers 6 \
@@ -88,11 +88,13 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --rampup_length $rampup_length \
     --checkpoint_path $resume_mode_path \
     --ema-decay $ema_decay \
+    --unlabel-dataset-root datasets/arkitscenes \
+    --upload-wandb \
     2>&1 | tee -a logs/train_test_cls.log
 
     
     
-# --upload-wandb \
+
 
 
 # --lr_decay_intermediate \

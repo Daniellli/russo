@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-03 22:00:15
-LastEditTime: 2022-10-30 15:23:51
+LastEditTime: 2022-10-31 20:55:58
 LastEditors: xushaocong
 Description:  修改get_datasets , 换成可以添加使用数据集比例的dataloader
 FilePath: /butd_detr/train.py
@@ -77,7 +77,9 @@ class SemiSuperviseTrainTester(TrainTester):
         
         def sigmoid_rampup(current,args):
             # rampup_length =  args.max_epoch - args.start_epoch +1
-            rampup_length = 30
+            rampup_length = args.rampup_length
+            logger.info(f"rampup_length:{rampup_length}")
+            
             current=  current-args.start_epoch
             current = np.clip(current,0,rampup_length)
             phase = 1.0 - current / rampup_length
