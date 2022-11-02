@@ -26,6 +26,7 @@ from models import BeaUTyDETRTKPS
 from models import APCalculator, parse_predictions, parse_groundtruths,my_parse_predictions
 
 from src.joint_labeled_dataset import JointLabeledDataset
+from src.scanrefer_test_datasets import ScanReferTestDataset
 from IPython import embed
 import ipdb
 st = ipdb.set_trace
@@ -98,6 +99,32 @@ class TrainTester(BaseTrainTester):
             augment_det=augment_det ,
             labeled_ratio=labeled_ratio
         )
+
+
+    def get_scanrefer_dataset(self,data_root,train_dataset_dict,test_datasets,split,use_color,use_height,
+                    detect_intermediate,use_multiview,butd,butd_gt,butd_cls,augment_det=False,
+                    debug=False,labeled_ratio=None):
+
+
+        logger.info(f"labeled ratio :{labeled_ratio}")
+
+        
+        return ScanReferTestDataset(
+            dataset_dict=train_dataset_dict,
+            test_dataset=test_datasets,
+            split=split,
+            use_color=use_color, use_height=use_height,
+            overfit=debug,
+            data_path=data_root,
+            detect_intermediate=detect_intermediate,
+            use_multiview=use_multiview,
+            butd=butd, 
+            butd_gt=butd_gt,
+            butd_cls=butd_cls,
+            augment_det=augment_det ,
+            labeled_ratio=labeled_ratio
+        )
+
         
 
     @staticmethod
@@ -233,7 +260,7 @@ class TrainTester(BaseTrainTester):
     return {*}
     '''
     @torch.no_grad()
-    def evaluate_one_epoch_save_for_eval(self, epoch, test_loader,
+    def inference_for_scanrefer_benchmark(self, epoch, test_loader,
                            model, criterion, set_criterion, args,for_vis = False,debug=False):
         """
         Eval grounding after a single epoch.
@@ -250,23 +277,6 @@ class TrainTester(BaseTrainTester):
         stat_dict = {}
         model.eval()  # set model to eval mode (for bn and dp)
 
-
-        
-        if args.num_decoder_layers > 0:
-            prefixes = ['last_', 'proposal_']
-            prefixes = ['last_']
-            prefixes.append('proposal_')
-        else:
-            prefixes = ['proposal_']  # only proposal
-        prefixes += [f'{i}head_' for i in range(args.num_decoder_layers - 1)]
-        
-        if args.butd_cls:
-            evaluator = GroundingGTEvaluator(prefixes=prefixes)
-        else:
-            evaluator = GroundingEvaluator(
-                only_root=True, thresholds=[0.25, 0.5],
-                topks=[1, 5, 10], prefixes=prefixes
-            )
         # Main eval branch
 
         pred_bboxes = []
@@ -283,7 +293,7 @@ class TrainTester(BaseTrainTester):
             if debug:
                 #* 是否保存 attention 
                 #* 不保存 直接设成false , 保存需要再model 里面先设置一下debug 保存attention 
-                stat_dict, end_points = self._main_eval_branch_debug(
+                end_points = self._inference_only(
                     batch_idx, batch_data, test_loader, model, stat_dict,
                     criterion, set_criterion, args,debug=False
                 )
@@ -297,46 +307,52 @@ class TrainTester(BaseTrainTester):
             prefix = 'last_'
             #* return format :  pred_cls, pred_box and conf (0-1)
             #* box 是8个定点
-            # batch_pred_map_cls = parse_predictions(
-            #     end_points, CONFIG_DICT, prefix,
-            #     size_cls_agnostic=True)
 
             batch_pred_map_cls = my_parse_predictions(
                 end_points, CONFIG_DICT, prefix)
 
-            for idx,batch_res in  enumerate(batch_pred_map_cls):
-
-                score = np.array([x[2] for x in batch_res])
+                        
+            for idx,batch_res in  tqdm(enumerate(batch_pred_map_cls)):
+                #* 1. 获取target id 
+                #* 2. 根据target id 获取这个target 对应的 score 最大的target  
+                #* 3. 保存对应的 box等信息
                 batch_res=  np.array(batch_res)
-                # max_idx = np.argmax(score)#* 只取confidence 最大的, 不管是什么哪个target  , 这个对应的是target id , 也就是第几个目标
-                # obj_id=batch_res[max_idx][0] #?
-                # boxes =batch_res[max_idx][1]
-                # pred_data = {
-                #     "scene_id": end_points['scan_ids'][idx],
-                #     "object_id": obj_id,
-                #     "ann_id": end_points['ann_id'][idx],#* 训练的时候没用到, 所以dataloader没有加载
-                #     "bbox": boxes.tolist(),
-                #     "unique_multiple":  end_points["is_unique"][idx].item()==False, #* return true means multiple 
-                #     "others": 1 if end_points["target_cid"][idx] == 17 else 0
-                # }
-                # pred_bboxes.append(pred_data)
                 
-                #* save for vis , get top k for  vis 
-                target_save_path = osp.join(self.vis_save_path,end_points['scan_ids'][idx]+"_%d_%d"%(idx,batch_idx))
-                make_dirs(target_save_path)
+                target_id = batch_data['target_cid'].cpu().numpy().tolist()[idx]
+
+                batch_res = batch_res[batch_res[:,0]==target_id]
+                # batch_data['target_id'].cpu().numpy().tolist()
+                # batch_data['ann_id']
+                # batch_data['unique_multiple'].cpu().numpy().tolist()
 
                 
-                utterance_format="%s_%d_%d_utterance.txt"
-                save_txt(end_points['utterances'][idx],osp.join(target_save_path,utterance_format%(end_points['scan_ids'][idx],idx,batch_idx)))
+                max_idx = np.argmax(np.array([x[2] for x in batch_res])) #* 只取confidence 最大的, 不管是什么哪个target  , 这个对应的是target id , 也就是第几个目标
 
+                boxes =batch_res[max_idx][1]
+
+                pred_data = {
+                    "scene_id": end_points['scan_ids'][idx],
+                    "object_id": batch_data['target_id'].cpu().numpy().tolist()[idx],
+                    "ann_id": int(batch_data['ann_id'][idx]),
+                    "bbox": boxes.tolist(),
+                    "unique_multiple":  batch_data['unique_multiple'].cpu().numpy().tolist()[idx],
+                    "others": 1 if batch_data['target_cid'][idx] == 17 else 0
+                }
+                pred_bboxes.append(pred_data)
+                
+                
                 if for_vis:
+                    #* save for vis , get top k for  vis 
+                    target_save_path = osp.join(self.vis_save_path,end_points['scan_ids'][idx]+"_%d_%d"%(idx,batch_idx))
+                    make_dirs(target_save_path)                
+                    utterance_format="%s_%d_%d_utterance.txt"
+                    save_txt(end_points['utterances'][idx],osp.join(target_save_path,utterance_format%(end_points['scan_ids'][idx],idx,batch_idx)))
                     topk = 5
                     max_indexes = np.argsort(score)[-topk:]
                     # score[max_indexes][::-1]#* 倒序的 转 正序的
                     # obj_id=batch_res[max_indexes][:,0] #?
                     boxes =batch_res[max_indexes][:,1]
                     boxes = np.array([ box.tolist() for box in boxes])
-                    
 
                     save_for_vis(boxes,batch_data['point_clouds'][idx],target_save_path,end_points['scan_ids'][idx],batch_idx,flag='student',idx=idx)
                     save_for_vis(batch_data['all_bboxes'][idx][batch_data['all_bbox_label_mask'][idx]].cpu().numpy(),batch_data['point_clouds'][idx],
@@ -346,38 +362,15 @@ class TrainTester(BaseTrainTester):
 
 
             #!=================================================================================
-            if evaluator is not None:
-                for prefix in prefixes:
-                    evaluator.evaluate(end_points, prefix)
-                    
-        evaluator.synchronize_between_processes()
         
         #* dump for upload evaluation server ========================================
-        # logger.info("dumping...")
-        # pred_path = os.path.join(args.log_dir, "pred.json")
-        # with open(pred_path, "w") as f:
-        #     json.dump(pred_bboxes, f, indent=4)
-        # logger.info("done!")
+        logger.info("dumping...")
+        pred_path = os.path.join(args.log_dir, "pred.json")
+        with open(pred_path, "w") as f:
+            json.dump(pred_bboxes, f, indent=4)
+        logger.info("done!")
         #*===========================================================================
 
-        ans = None
-        if dist.get_rank() == 0:
-            if evaluator is not None:
-                evaluator.print_stats()
-                ans = {}
-                if args.butd_cls: #* 给定 GT, 进行分类 
-                    prefix ='last_' #* last layer 
-                    mode ='bbf'  #* Box given span (contrastive)
-                    ans['Acc'] = evaluator.dets[(prefix, mode)] / evaluator.gts[(prefix, mode)]
-
-                else:
-                    prefix ='last_' #* last layer 
-                    mode ='bbf'  #* Box given span (contrastive)
-                    topk=1
-                    for t in evaluator.thresholds:
-                        ans[f'Acc@{t}-top1'] = evaluator.dets[(prefix, t, topk, mode)]/max(evaluator.gts[(prefix, t, topk, mode)], 1)
-
-        return ans
 
 
     @torch.no_grad()
