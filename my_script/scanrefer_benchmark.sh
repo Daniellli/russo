@@ -2,7 +2,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-23 00:39:49
- # @LastEditTime: 2022-10-28 19:08:12
+ # @LastEditTime: 2022-11-02 15:51:51
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/scanrefer_benchmark.sh
@@ -55,7 +55,7 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --butd --self_attend --augment_det \
     --max_epoch 400 \
     --checkpoint_path $resume_model_path \
-    --eval--scanrefer \
+    --eval-scanrefer \
     --eval \
     2>&1 | tee -a logs/train_test_cls.log
 

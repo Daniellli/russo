@@ -201,7 +201,7 @@ class BaseTrainTester:
         
         """Run main training/testing pipeline."""
         if args.eval_scanrefer:
-            test_dataset = self.get_dataset(args.data_root,{},args.test_dataset,
+            test_dataset = self.get_scanrefer_dataset(args.data_root,{},args.test_dataset,
                             'test',
                             args.use_color,args.use_height,args.detect_intermediate,
                             args.use_multiview,args.butd,args.butd_gt,
@@ -250,9 +250,9 @@ class BaseTrainTester:
 
         DEBUG = True
         if DEBUG:
-            performance = self.evaluate_one_epoch_save_for_eval(
+            performance = self.inference_for_scanrefer_benchmark(
                 args.start_epoch, test_loader,
-                model, criterion, set_criterion, args,for_vis=True,debug=DEBUG
+                model, criterion, set_criterion, args,for_vis=False,debug=DEBUG
             )
         else:
             performance = self.evaluate_one_epoch(
@@ -648,6 +648,35 @@ class BaseTrainTester:
             ]))
             
         return stat_dict, end_points
+
+
+
+
+    '''
+    description:  with debug 
+    return {*}
+    '''
+    def _inference_only(self, batch_idx, batch_data, test_loader, model,
+                        stat_dict,criterion, set_criterion, args,debug):
+        # Move to GPU
+        batch_data = self._to_gpu(batch_data)
+        inputs = self._get_inputs(batch_data)
+        if "train" not in inputs:
+            inputs.update({"train": False})
+        else:
+            inputs["train"] = False
+
+        # Forward pass
+        #todo 如何把debug 信息传给 model 里面的 DKS? 
+        end_points = model(inputs)#* the length of end_points  == 60, last item ==  last_sem_cls_scores
+
+        # Compute loss
+        for key in batch_data: 
+            assert (key not in end_points)
+            end_points[key] = batch_data[key]#*  the length of end_points == 86, last item ==  target_cid 
+
+            
+        return end_points
 
     
     ''' 
