@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 20:04:19
-LastEditTime: 2022-10-30 17:00:39
+LastEditTime: 2022-10-31 09:08:07
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/my_script/utils.py
@@ -710,11 +710,14 @@ param {*} has_color
 param {*} flag
 return {*}
 '''
-def save_for_vis(box,pc,save_path,scene_name,flag = "debug"):
+def save_for_vis(box,pc,save_path,scene_name,bidx,flag = "debug",idx=0,save = True):
       #* for teacher or student 
-    save_pc(pc,os.path.join(save_path, '%s_gt_%s.ply'%(scene_name,flag)))
+    if save :
+        save_pc(pc,os.path.join(save_path, '%s_%d_%d_gt_%s.ply'%(scene_name,idx,bidx,flag)))
     
-    save_box(box,os.path.join(save_path,'%s_box_%s.txt'%(scene_name,flag)) )
+    save_box(box,os.path.join(save_path,'%s_%d_%d_box_%s.txt'%(scene_name,idx,bidx,flag)) )
+
+
 
 
 

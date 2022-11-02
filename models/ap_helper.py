@@ -114,7 +114,7 @@ def parse_predictions(end_points, config_dict, prefix="", size_cls_agnostic=Fals
     for i in range(bsize):
         for j in range(num_proposal):
             heading_angle = 0 #config_dict['dataset_config'].class2angle( \
-            #     pred_heading_class[i, j].detach().cpu().numpy(), pred_heading_residual[i, j].detach().cpu().numpy())
+                #   pred_heading_class[i, j].detach().cpu().numpy(), pred_heading_residual[i, j].detach().cpu().numpy())
             if size_cls_agnostic:
                 box_size = pred_size[i, j].detach().cpu().numpy()
             else:
@@ -232,6 +232,66 @@ def parse_predictions(end_points, config_dict, prefix="", size_cls_agnostic=Fals
                                        pred_mask[i, j] == 1 and obj_prob[i, j] > config_dict['conf_thresh']])
 
     return batch_pred_map_cls
+
+
+
+def my_parse_predictions(end_points, config_dict, prefix=""):
+
+    pred_center = end_points[f'{prefix}center']  # B,num_proposal,3
+    pred_size = end_points[f'{prefix}pred_size']  # B, num_proposal, 3
+
+    pred_sem_cls = torch.argmax(end_points[f'{prefix}sem_cls_scores'][..., :-1], -1)  #* B,num_proposal,#* [B,Q_num,T_num], T_num的最后一个对应not mentioned,  所以对前面x个去argmax, 也就是最大响应分类的idx, 得到一个[B,num_proposal], 每个proposal 对应的类别
+    sem_cls_probs = softmax(end_points[f'{prefix}sem_cls_scores'].detach().cpu().numpy())  #* B,num_proposal,10,  将[B,Q_num,T_num], sota max 后得到最后一个在总的map占的比例, 应该不是10 ! 
+
+    num_proposal = pred_center.shape[1]
+    bsize = pred_center.shape[0]
+
+
+    obj_prob = (1 - sem_cls_probs[:,:,-1]) # (B,K) #* 是obj的概率
+    sem_cls_probs = sem_cls_probs[..., :-1] / obj_prob[..., None] #* 类别的概率
+
+    #* 上面作者的做法是计算每个目标是每个类别的概率, 也就是有B X 256 X num_class
+    #* class = 18  
+    
+
+    pred_corners_3d_upright_camera = torch.cat([pred_center,pred_size],axis=-1).cpu().detach().numpy()
+
+    batch_pred_map_cls = []  # a list (len: batch_size) of list (len: num of predictions per sample) of tuples of pred_cls, pred_box and conf (0-1)
+
+    for i in range(bsize):
+        cur_list = []
+        for ii in range(config_dict['dataset_config'].num_class):#* 遍历所有类别
+            try:
+                cur_list += [
+                    (ii, pred_corners_3d_upright_camera[i, j], sem_cls_probs[i, j, ii] * obj_prob[i, j])
+                    for j in range(pred_center.shape[1]) if  obj_prob[i, j] > 0.0
+                ]
+            except:
+                st()
+        batch_pred_map_cls.append(cur_list)
+
+    return batch_pred_map_cls
+        
+
+
+
+    
+
+    
+    
+    
+    
+    
+
+    
+
+
+
+
+
+    
+
+
 
 
 def parse_groundtruths(end_points, config_dict, size_cls_agnostic):

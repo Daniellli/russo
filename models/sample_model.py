@@ -13,7 +13,7 @@ sys.path.append(BASE_DIR)
 sys.path.append(os.path.join(os.getcwd(), "lib"))
 sys.path.append(os.path.join(os.getcwd(), "lib", 'pointnet2'))
 import models.pointnet2.pointnet2_utils as  pointnet2_utils
-
+from my_script.utils import make_dirs,save_pc
 
 class SamplingModule(nn.Module):
     """
@@ -90,6 +90,98 @@ class SamplingModule(nn.Module):
             raise NotImplementedError
  
         return data_dict, xyz, features
+
+    '''
+    description:  forward with attention saving 
+    param {*} self
+    param {*} xyz
+    param {*} features
+    param {*} data_dict
+    param {*} debug
+    return {*}
+    '''
+    def forward_for_debug(self, xyz, features, data_dict,debug):
+        # xyz, features, sample_inds = (None, None, None)
+        # points_obj_cls_logits = None
+        if self.sampling_method == 'fps':
+            xyz, features, sample_inds = self.fps_module(xyz, features)
+            # cluster_feature = features
+            # cluster_xyz = xyz
+            data_dict['query_points_xyz'] = xyz  # (batch_size, num_proposal, 3)
+            data_dict['query_points_feature'] = features  # (batch_size, C, num_proposal)
+            data_dict['query_points_sample_inds'] = sample_inds  # (bsz, num_proposal) # should be 0,1,...,num_proposal
+        elif self.sampling_method == 'kps':
+            points_obj_cls_logits = self.points_obj_cls(features)  # (batch_size, 1, num_seed)
+            data_dict['seeds_obj_cls_logits'] = points_obj_cls_logits
+            points_obj_cls_scores = torch.sigmoid(points_obj_cls_logits).squeeze(1)
+            sample_inds = torch.topk(points_obj_cls_scores, self.num_proposal)[1].int()
+            xyz, features, sample_inds = self.gsample_module(xyz, features, sample_inds)
+            # cluster_feature = features
+            # cluster_xyz = xyz
+            data_dict['query_points_xyz'] = xyz  # (batch_size, num_proposal, 3)
+            data_dict['query_points_feature'] = features  # (batch_size, C, num_proposal)
+            data_dict['query_points_sample_inds'] = sample_inds  # (bsz, num_proposal) # should be 0,1,...,num_proposal
+        elif self.sampling_method == 'kpsa-lang-filter':
+
+
+
+
+            points_obj_cls_logits = self.points_obj_cls(features)  #* (batch_size, 1, num_seed) , 分类每个点是否在near the object center ? 
+            data_dict['seeds_obj_cls_logits'] = points_obj_cls_logits
+            points_obj_cls_scores = torch.sigmoid(points_obj_cls_logits).squeeze(1)
+            sample_inds = torch.topk(points_obj_cls_scores, int((1024 + self.num_proposal) / 2))[1].int()#* 取得分最大的 int((1024 + self.num_proposal) / 2) 个点的index , 
+            xyz, features, sample_inds = self.sa_module(xyz, features, sample_inds)
+            #!========================================================
+            if debug:
+                save_for_attention_vis(xyz,prefix="object")
+            #!========================================================
+            # cluster_feature = features
+            # cluster_xyz = xyz
+            data_dict['query_points_xyz'] = xyz  # (batch_size, num_proposal, 3)
+            data_dict['query_points_feature'] = features  # (batch_size, C, num_proposal)
+            data_dict['query_points_sample_inds'] = sample_inds  # (bsz, num_proposal) # should be 0,1,...,num_proposal
+            ref_scores = self.match_module(features, data_dict['lang_hidden'], data_dict)#* data_dict['lang_hidden'] : [B, lang_feature_dim]
+
+            
+
+
+            ref_scores = torch.sigmoid(ref_scores).squeeze(1)   # [B, N]
+            sample_inds = torch.topk(ref_scores, self.num_proposal)[1].int()
+            xyz, features, sample_inds = self.gsample_module(xyz, features, sample_inds)
+
+            #!========================================================
+            if debug:
+                save_for_attention_vis(xyz,prefix="text")
+            #!========================================================
+            data_dict['ref_query_points_xyz'] = xyz  # (batch_size, num_proposal, 3)
+            data_dict['ref_query_points_feature'] = features  # (batch_size, C, num_proposal)
+            data_dict['ref_query_points_sample_inds'] = sample_inds  # (bsz, num_proposal) # should be 0,1,...,num_proposal
+        else:
+            raise NotImplementedError
+ 
+        return data_dict, xyz, features
+
+
+
+
+            
+
+'''
+description: 可视化  
+param {*} xyz
+return {*}
+'''
+def save_for_attention_vis(xyz,prefix="object"):
+    debug_path = "logs/debug"
+    make_dirs(debug_path)
+    batch_size =xyz.shape[0]
+    save_format='%s_tmp_%d.ply'
+    for idx in range(batch_size):
+        save_pc(xyz[idx],os.path.join(debug_path,save_format%(prefix,idx)))
+        
+
+
+
 
 class MatchModule(nn.Module):
     def __init__(self, object_dim, lang_dim, fusion_dim):

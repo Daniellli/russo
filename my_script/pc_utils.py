@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-08-22 15:05:23
-LastEditTime: 2022-10-21 10:33:48
+LastEditTime: 2022-10-30 20:52:36
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/my_script/pc_utils.py
@@ -228,13 +228,20 @@ param {*} filename
 return {*}
 '''
 def write_pc_as_ply(points, filename):
-
+    channel_num=points.shape[-1]
+    
     """ input: Nx3, write points to filename as PLY format. """
-    vertex = [(x,y,z,r*255,g*255,b*255) for x,y,z,r,g,b in points]
-    vertex = np.array(vertex, dtype=[('x', 'f4'), ('y', 'f4'),('z', 'f4'),('red', 'u1'), ('green', 'u1'),('blue', 'u1')])
+    if channel_num==6:
+        vertex = [(x,y,z,r*255,g*255,b*255) for x,y,z,r,g,b in points]
+        vertex = np.array(vertex, dtype=[('x', 'f4'), ('y', 'f4'),('z', 'f4'),('red', 'u1'), ('green', 'u1'),('blue', 'u1')])        
+    elif channel_num == 3 :
+        vertex = np.array([(x,y,z) for x,y,z in points[:,:3]], dtype=[('x', 'f4'), ('y', 'f4'),('z', 'f4')])
+    else :
+        raise Exception 
 
     el = PlyElement.describe(vertex, 'vertex', comments=['vertices'])
     PlyData([el], text=True).write(filename)
+
     
     
     

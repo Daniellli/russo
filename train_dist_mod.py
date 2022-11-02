@@ -10,6 +10,7 @@
 # ------------------------------------------------------------------------
 """Main script for language modulation."""
 
+from distutils.log import debug
 import os
 
 import numpy as np
@@ -22,9 +23,9 @@ from src.joint_det_dataset import Joint3DDataset,points2box
 from src.grounding_evaluator import GroundingEvaluator, GroundingGTEvaluator
 # from models import BeaUTyDETR
 from models import BeaUTyDETRTKPS
-from models import APCalculator, parse_predictions, parse_groundtruths
+from models import APCalculator, parse_predictions, parse_groundtruths,my_parse_predictions
 
-
+from src.joint_labeled_dataset import JointLabeledDataset
 from IPython import embed
 import ipdb
 st = ipdb.set_trace
@@ -38,7 +39,7 @@ from loguru import logger
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(BASE_DIR)
 
-from my_script.utils import save_for_vis,parse_option
+from my_script.utils import make_dirs, save_for_vis,parse_option,save_txt
 import os.path as osp
 import time
 
@@ -75,9 +76,14 @@ class TrainTester(BaseTrainTester):
     return {*}
     '''    
     def get_dataset(self,data_root,train_dataset_dict,test_datasets,split,use_color,use_height,
-                    detect_intermediate,use_multiview,butd,butd_gt,butd_cls,augment_det=False,debug=False):
+                    detect_intermediate,use_multiview,butd,butd_gt,butd_cls,augment_det=False,
+                    debug=False,labeled_ratio=None):
 
-        return Joint3DDataset(
+
+        logger.info(f"labeled ratio :{labeled_ratio}")
+
+        
+        return JointLabeledDataset(
             dataset_dict=train_dataset_dict,
             test_dataset=test_datasets,
             split=split,
@@ -89,7 +95,8 @@ class TrainTester(BaseTrainTester):
             butd=butd, 
             butd_gt=butd_gt,
             butd_cls=butd_cls,
-            augment_det=augment_det 
+            augment_det=augment_det ,
+            labeled_ratio=labeled_ratio
         )
         
 
@@ -169,8 +176,6 @@ class TrainTester(BaseTrainTester):
         stat_dict = {}
         model.eval()  # set model to eval mode (for bn and dp)
 
-
-        
         if args.num_decoder_layers > 0:
             prefixes = ['last_', 'proposal_']
             prefixes = ['last_']
@@ -188,65 +193,16 @@ class TrainTester(BaseTrainTester):
                 topks=[1, 5, 10], prefixes=prefixes
             )
         # Main eval branch
-        # DEBUG=True
-        pred_bboxes = []
         for batch_idx, batch_data in enumerate(test_loader):#* the length of batch data == 26 , 
             stat_dict, end_points = self._main_eval_branch(
                 batch_idx, batch_data, test_loader, model, stat_dict,
                 criterion, set_criterion, args
             )
-            #!==== generate result for upload evaluation server , scanrefer ===============================
-            SAVE_RES =  False
-
-            if SAVE_RES: 
-                #* end_points['last_sem_cls_scores']  : [B,query_num,distribution for tokens(256)]  
-                #* 1. 对 分布取softmax 
-                #* 2. 取最大值的index, 如果最大值的索引是255 则 需要 
-                #* 3. 对 分布取softmax 
-                prefix="last_"
-                
-                query_dist_map = end_points[f'{prefix}sem_cls_scores'].softmax(-1) #* 
-                objectness_preds_batch = torch.argmax(query_dist_map, 2).long() #* 等于255 应该是没有匹配到文本token的, 如paper解释的一样
-                pred_masks = (objectness_preds_batch !=255).float()
-                
-                # end_points['utterances']
-                # pred_ref = torch.argmax(data_dict['cluster_ref'] * pred_masks, 1) # (B,)
-                
-                for i in range(pred_masks.shape[0]):
-                    # compute the iou 
-                    #* 存在一个utterence 有多个匹配的情况!!!  不知道选哪个?   choose first one for now 
-                    if pred_masks[i].sum() !=0 :
-
-                        matched_obj_size =end_points[f'{prefix}pred_size'][i][pred_masks[i]==1][0].detach().cpu().numpy()
-                        matched_obj_center =end_points[f'{prefix}center'][i][pred_masks[i]==1][0].detach().cpu().numpy() 
-                        matched_obj_xyz =end_points[f'{prefix}base_xyz'][i][pred_masks[i]==1][0].detach().cpu().numpy() 
-
-
-                        _bbox = get_3d_box(matched_obj_size,0, matched_obj_center) #* angle 不知道
-                        
-                        pred_data = {
-                            "scene_id": end_points["scan_ids"][i],
-                            "object_id": end_points["target_id"][i],
-                            "ann_id": end_points['ann_id'][i],
-                            "bbox": _bbox.tolist(),
-                            "unique_multiple":  end_points["is_unique"][i].item()==False, #* return true means multiple 
-                            "others": 1 if end_points["target_cid"][i] == 17 else 0
-                        }
-                        pred_bboxes.append(pred_data)
-
-            #!=================================================================================
             if evaluator is not None:
                 for prefix in prefixes:
                     evaluator.evaluate(end_points, prefix)
         evaluator.synchronize_between_processes()
-        #!===================
-        #* dump for upload evaluation server 
-        logger.info("dumping...")
-        pred_path = os.path.join(args.log_dir, "pred.json")
-        with open(pred_path, "w") as f:
-            json.dump(pred_bboxes, f, indent=4)
-        logger.info("done!")
-        
+      
         ans = None
         #!===================
         if dist.get_rank() == 0:
@@ -278,7 +234,7 @@ class TrainTester(BaseTrainTester):
     '''
     @torch.no_grad()
     def evaluate_one_epoch_save_for_eval(self, epoch, test_loader,
-                           model, criterion, set_criterion, args,for_vis = False):
+                           model, criterion, set_criterion, args,for_vis = False,debug=False):
         """
         Eval grounding after a single epoch.
 
@@ -323,55 +279,68 @@ class TrainTester(BaseTrainTester):
         }
 
         for batch_idx, batch_data in enumerate(test_loader):#* the length of batch data == 26 , 
+            #todo 是否会选择带有debug 参数的_main_eval_branch
+            if debug:
+                stat_dict, end_points = self._main_eval_branch_debug(
+                    batch_idx, batch_data, test_loader, model, stat_dict,
+                    criterion, set_criterion, args,debug
+                )
+            else :
+                stat_dict, end_points = self._main_eval_branch(
+                    batch_idx, batch_data, test_loader, model, stat_dict,
+                    criterion, set_criterion, args
+                )
 
-            stat_dict, end_points = self._main_eval_branch(
-                batch_idx, batch_data, test_loader, model, stat_dict,
-                criterion, set_criterion, args
-            )
             #!==== generate result for upload evaluation server , scanrefer ===============================
-
-            
             prefix = 'last_'
             #* return format :  pred_cls, pred_box and conf (0-1)
             #* box 是8个定点
-            batch_pred_map_cls = parse_predictions(
-                end_points, CONFIG_DICT, prefix,
-                size_cls_agnostic=True)
+            # batch_pred_map_cls = parse_predictions(
+            #     end_points, CONFIG_DICT, prefix,
+            #     size_cls_agnostic=True)
+
+            batch_pred_map_cls = my_parse_predictions(
+                end_points, CONFIG_DICT, prefix)
 
             for idx,batch_res in  enumerate(batch_pred_map_cls):
 
                 score = np.array([x[2] for x in batch_res])
                 batch_res=  np.array(batch_res)
-                max_idx = np.argmax(score)#* 只取confidence 最大的, 不管是什么哪个target  , 这个对应的是target id , 也就是第几个目标
-                obj_id=batch_res[max_idx][:,0] #?
-                boxes =batch_res[max_idx][:,1]
-
-                pred_data = {
-                    "scene_id": end_points['scan_ids'][idx],
-                    "object_id": obj_id,
-                    "ann_id": end_points['ann_id'][idx],#* 训练的时候没用到, 所以dataloader没有加载
-                    "bbox": boxes.tolist(),
-                    "unique_multiple":  end_points["is_unique"][idx].item()==False, #* return true means multiple 
-                    "others": 1 if end_points["target_cid"][idx] == 17 else 0
-                }
-
-                pred_bboxes.append(pred_data)
+                # max_idx = np.argmax(score)#* 只取confidence 最大的, 不管是什么哪个target  , 这个对应的是target id , 也就是第几个目标
+                # obj_id=batch_res[max_idx][0] #?
+                # boxes =batch_res[max_idx][1]
+                # pred_data = {
+                #     "scene_id": end_points['scan_ids'][idx],
+                #     "object_id": obj_id,
+                #     "ann_id": end_points['ann_id'][idx],#* 训练的时候没用到, 所以dataloader没有加载
+                #     "bbox": boxes.tolist(),
+                #     "unique_multiple":  end_points["is_unique"][idx].item()==False, #* return true means multiple 
+                #     "others": 1 if end_points["target_cid"][idx] == 17 else 0
+                # }
+                # pred_bboxes.append(pred_data)
                 
                 #* save for vis , get top k for  vis 
+                target_save_path = osp.join(self.vis_save_path,end_points['scan_ids'][idx]+"_%d_%d"%(idx,batch_idx))
+                make_dirs(target_save_path)
+
                 
+                utterance_format="%s_%d_%d_utterance.txt"
+                save_txt(end_points['utterances'][idx],osp.join(target_save_path,utterance_format%(end_points['scan_ids'][idx],idx,batch_idx)))
+
                 if for_vis:
-                    topk = 10
+                    topk = 5
                     max_indexes = np.argsort(score)[-topk:]
                     # score[max_indexes][::-1]#* 倒序的 转 正序的
-
-                    obj_id=batch_res[max_indexes][:,0] #?
+                    # obj_id=batch_res[max_indexes][:,0] #?
                     boxes =batch_res[max_indexes][:,1]
                     boxes = np.array([ box.tolist() for box in boxes])
-                    boxes = points2box(boxes)
-                    save_for_vis(boxes,batch_data['point_clouds'][idx],self.vis_save_path,end_points['scan_ids'][idx],flag='student')
-                    save_for_vis(batch_data['all_bboxes'][idx][batch_data['all_bbox_label_mask'][idx]].cpu().numpy(),batch_data['point_clouds'][idx],self.vis_save_path,end_points['scan_ids'][idx],flag='student2')
-                    save_for_vis((torch.cat([batch_data['size_gts'],batch_data['center_label']],axis=-1)[idx][batch_data['box_label_mask'][idx].bool()]).cpu().numpy()
-                                    ,batch_data['point_clouds'][idx],self.vis_save_path,end_points['scan_ids'][idx],flag='teacher')
+                    
+
+                    save_for_vis(boxes,batch_data['point_clouds'][idx],target_save_path,end_points['scan_ids'][idx],batch_idx,flag='student',idx=idx)
+                    save_for_vis(batch_data['all_bboxes'][idx][batch_data['all_bbox_label_mask'][idx]].cpu().numpy(),batch_data['point_clouds'][idx],
+                                target_save_path,end_points['scan_ids'][idx],batch_idx,flag='student2',idx=idx,save=False)
+                    save_for_vis((torch.cat([batch_data['center_label'],batch_data['size_gts']],axis=-1)[idx][batch_data['box_label_mask'][idx].bool()]).cpu().numpy()
+                                    ,batch_data['point_clouds'][idx],target_save_path,end_points['scan_ids'][idx],batch_idx,flag='teacher',idx=idx,save=False)
 
 
             #!=================================================================================
@@ -382,11 +351,11 @@ class TrainTester(BaseTrainTester):
         evaluator.synchronize_between_processes()
         
         #* dump for upload evaluation server ========================================
-        logger.info("dumping...")
-        pred_path = os.path.join(args.log_dir, "pred.json")
-        with open(pred_path, "w") as f:
-            json.dump(pred_bboxes, f, indent=4)
-        logger.info("done!")
+        # logger.info("dumping...")
+        # pred_path = os.path.join(args.log_dir, "pred.json")
+        # with open(pred_path, "w") as f:
+        #     json.dump(pred_bboxes, f, indent=4)
+        # logger.info("done!")
         #*===========================================================================
 
         ans = None
