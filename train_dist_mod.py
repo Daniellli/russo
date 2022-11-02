@@ -45,6 +45,11 @@ import os.path as osp
 import time
 
 
+from tqdm import tqdm
+
+from src.joint_det_dataset import box2points
+
+
 class TrainTester(BaseTrainTester):
     """Train/test a language grounder."""
 
@@ -312,7 +317,7 @@ class TrainTester(BaseTrainTester):
                 end_points, CONFIG_DICT, prefix)
 
                         
-            for idx,batch_res in  tqdm(enumerate(batch_pred_map_cls)):
+            for idx,batch_res in  enumerate(batch_pred_map_cls):
                 #* 1. 获取target id 
                 #* 2. 根据target id 获取这个target 对应的 score 最大的target  
                 #* 3. 保存对应的 box等信息
@@ -328,12 +333,13 @@ class TrainTester(BaseTrainTester):
                 
                 max_idx = np.argmax(np.array([x[2] for x in batch_res])) #* 只取confidence 最大的, 不管是什么哪个target  , 这个对应的是target id , 也就是第几个目标
 
-                boxes =batch_res[max_idx][1]
+                boxes =np.squeeze(box2points(batch_res[max_idx][1][None]))
+                
 
                 pred_data = {
                     "scene_id": end_points['scan_ids'][idx],
-                    "object_id": batch_data['target_id'].cpu().numpy().tolist()[idx],
-                    "ann_id": int(batch_data['ann_id'][idx]),
+                    "object_id": batch_data['target_id'].cpu().numpy().astype(np.str0).tolist()[idx],
+                    "ann_id": batch_data['ann_id'][idx],
                     "bbox": boxes.tolist(),
                     "unique_multiple":  batch_data['unique_multiple'].cpu().numpy().tolist()[idx],
                     "others": 1 if batch_data['target_cid'][idx] == 17 else 0
@@ -368,6 +374,7 @@ class TrainTester(BaseTrainTester):
         pred_path = os.path.join(args.log_dir, "pred.json")
         with open(pred_path, "w") as f:
             json.dump(pred_bboxes, f, indent=4)
+            
         logger.info("done!")
         #*===========================================================================
 
