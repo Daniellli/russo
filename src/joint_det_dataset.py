@@ -229,8 +229,8 @@ class Joint3DDataset(Dataset):
         """Load annotations of ScanRefer."""
         _path = self.data_path + 'scanrefer/ScanRefer_filtered'
         split = self.split
-        if split in ('val', 'test'):
-            split = 'val'
+        # if split in ('val', 'test'):
+        #     split = 'val'
 
 
         with open(_path + '_%s.txt' % split) as f:

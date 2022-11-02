@@ -200,11 +200,19 @@ class BaseTrainTester:
 
         
         """Run main training/testing pipeline."""
-        test_dataset = self.get_dataset(args.data_root,{},args.test_dataset,
-                        'val' if not args.eval_train else 'train',
-                         args.use_color,args.use_height,args.detect_intermediate,
-                         args.use_multiview,args.butd,args.butd_gt,
-                         args.butd_cls,debug = args.debug)
+        if args.eval_scanrefer:
+            test_dataset = self.get_dataset(args.data_root,{},args.test_dataset,
+                            'test',
+                            args.use_color,args.use_height,args.detect_intermediate,
+                            args.use_multiview,args.butd,args.butd_gt,
+                            args.butd_cls,debug = args.debug)
+        else :
+             test_dataset = self.get_dataset(args.data_root,{},args.test_dataset,
+                            'val' if not args.eval_train else 'train',
+                            args.use_color,args.use_height,args.detect_intermediate,
+                            args.use_multiview,args.butd,args.butd_gt,
+                            args.butd_cls,debug = args.debug)
+
 
 
         test_loader = self.get_dataloader(test_dataset,args.batch_size,args.num_workers,shuffle=False)
@@ -240,7 +248,7 @@ class BaseTrainTester:
         #* eval student model 
         #!==========
 
-        DEBUG = False
+        DEBUG = True
         if DEBUG:
             performance = self.evaluate_one_epoch_save_for_eval(
                 args.start_epoch, test_loader,

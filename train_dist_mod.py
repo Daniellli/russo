@@ -281,9 +281,11 @@ class TrainTester(BaseTrainTester):
         for batch_idx, batch_data in enumerate(test_loader):#* the length of batch data == 26 , 
             #todo 是否会选择带有debug 参数的_main_eval_branch
             if debug:
+                #* 是否保存 attention 
+                #* 不保存 直接设成false , 保存需要再model 里面先设置一下debug 保存attention 
                 stat_dict, end_points = self._main_eval_branch_debug(
                     batch_idx, batch_data, test_loader, model, stat_dict,
-                    criterion, set_criterion, args,debug
+                    criterion, set_criterion, args,debug=False
                 )
             else :
                 stat_dict, end_points = self._main_eval_branch(
