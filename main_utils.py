@@ -204,7 +204,7 @@ class BaseTrainTester:
                         'val' if not args.eval_train else 'train',
                          args.use_color,args.use_height,args.detect_intermediate,
                          args.use_multiview,args.butd,args.butd_gt,
-                         args.butd_cls,debug = args.debug)
+                         args.butd_cls,debug = args.debug,labeled_ratio=args.labeled_ratio)
 
 
         test_loader = self.get_dataloader(test_dataset,args.batch_size,args.num_workers,shuffle=False)
@@ -272,7 +272,7 @@ class BaseTrainTester:
                         'train' if not args.debug else 'val', 
                         args.use_color,args.use_height,args.detect_intermediate,
                         args.use_multiview,args.butd,args.butd_gt,
-                        args.butd_cls,args.augment_det,args.debug)
+                        args.butd_cls,args.augment_det,args.debug,labeled_ratio=args.labeled_ratio)
 
         train_loader = self.get_dataloader(train_dataset,args.batch_size,args.num_workers,shuffle=True)
 
@@ -359,6 +359,7 @@ class BaseTrainTester:
         
 
         logger.info(scheduler.milestones)
+        last_best_epoch_path = None
         for epoch in range(args.start_epoch, args.max_epoch + 1):
             train_loader.sampler.set_epoch(epoch)
             tic = time.time()
@@ -383,7 +384,7 @@ class BaseTrainTester:
                     epoch, test_loader,
                     model, criterion, set_criterion, args
                 )
-
+                
                 if dist.get_rank() == 0:
                     if args.upload_wandb:
                         wandb.log(performance)
@@ -394,11 +395,20 @@ class BaseTrainTester:
                     acc_key = list(performance.keys())[0]
                     if performance is not None and performance[acc_key] > best_performce:
                         best_performce =  performance[acc_key]
-                        save_checkpoint(args, epoch, model, optimizer, scheduler ,is_best=True)            
+                        spath = save_checkpoint(args, epoch, model, optimizer, scheduler ,is_best=True)            
+
+                        if last_best_epoch_path is not None:
+                            os.remove(last_best_epoch_path)
+                        last_best_epoch_path = spath
+    
 
 
         # Training is over, evaluate
         save_checkpoint(args, 'last', model, optimizer, scheduler, True)
+        if last_best_epoch_path is not None:
+            os.remove(last_best_epoch_path)
+
+
         saved_path = os.path.join(args.log_dir, 'ckpt_epoch_last.pth')
         self.logger.info("Saved in {}".format(saved_path))
         self.evaluate_one_epoch(
