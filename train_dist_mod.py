@@ -19,6 +19,7 @@ import torch.distributed as dist
 from main_utils import parse_option, BaseTrainTester
 from data.model_util_scannet import ScannetDatasetConfig
 from src.joint_det_dataset import Joint3DDataset,points2box
+from src.joint_labeled_dataset import JointLabeledDataset
 from src.grounding_evaluator import GroundingEvaluator, GroundingGTEvaluator
 # from models import BeaUTyDETR
 from models import BeaUTyDETRTKPS
@@ -75,9 +76,10 @@ class TrainTester(BaseTrainTester):
     return {*}
     '''    
     def get_dataset(self,data_root,train_dataset_dict,test_datasets,split,use_color,use_height,
-                    detect_intermediate,use_multiview,butd,butd_gt,butd_cls,augment_det=False,debug=False):
+                    detect_intermediate,use_multiview,butd,butd_gt,butd_cls,augment_det=False,debug=False,labeled_ratio=None):
 
-        return Joint3DDataset(
+        logger.info(f"labeled ratio :{labeled_ratio}")
+        return JointLabeledDataset(
             dataset_dict=train_dataset_dict,
             test_dataset=test_datasets,
             split=split,
@@ -89,7 +91,8 @@ class TrainTester(BaseTrainTester):
             butd=butd, 
             butd_gt=butd_gt,
             butd_cls=butd_cls,
-            augment_det=augment_det 
+            augment_det=augment_det ,
+            labeled_ratio=labeled_ratio
         )
         
 
