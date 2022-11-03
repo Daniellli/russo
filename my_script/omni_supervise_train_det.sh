@@ -2,7 +2,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-26 21:42:30
- # @LastEditTime: 2022-10-30 16:53:51
+ # @LastEditTime: 2022-11-02 00:21:55
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/omni_supervise_train_det.sh
@@ -53,18 +53,18 @@ save_freq=$val_freq;
 
 
 #* for  semi supervision architecture  : step2
-b_size='8,4';
+b_size='4,4';
 
 resume_mode_path="pretrain/scanrefer_no_butd_use_tkps_5191_112.pth"
 
 
 
 #* for not mask
-size_consistency_weight=1e-3;
-center_consistency_weight=1e-1;
-token_consistency_weight=1;
-query_consistency_weight=1;
-text_consistency_weight=1;
+size_consistency_weight=1e-5;
+center_consistency_weight=1e-2;
+token_consistency_weight=1e-1;
+query_consistency_weight=1e-1;
+text_consistency_weight=1e-2;
 
 rampup_length=100;
 epoch=400;

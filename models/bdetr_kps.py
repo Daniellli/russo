@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-13 23:08:56
-LastEditTime: 2022-10-14 18:17:32
+LastEditTime: 2022-11-02 10:51:00
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/models/bdetr_kps.py
@@ -76,10 +76,8 @@ class BeaUTyDETRTKPS(nn.Module):
         self.self_position_embedding = self_position_embedding
         self.contrastive_align_loss = contrastive_align_loss
         self.butd = butd
-
         # Visual encoder
 
-        
         
         self.backbone_net = Pointnet2Backbone(
             input_feature_dim=input_feature_dim,
@@ -317,10 +315,16 @@ class BeaUTyDETRTKPS(nn.Module):
 
         #* Query Points Generation,  一个sentence 最有有256 个query与之对应, 所以这个的query是 256, B = 2 
         #!==============================================================
+        
         if self.use_tkps:
+            
             end_points, cluster_xyz, cluster_feature  = self.sampling_module(
                 points_xyz, points_features, end_points
             )
+            #todo :  如果是 debug 需要手动改成使用另一个function forward
+            # end_points, cluster_xyz, cluster_feature  = self.sampling_module.forward_for_debug(
+            #     points_xyz, points_features, end_points,debug=True,
+            # )
         else :
             end_points = self._generate_queries(
                 points_xyz, points_features, end_points
@@ -385,6 +389,7 @@ class BeaUTyDETRTKPS(nn.Module):
                 )
 
             #* Prediction
+            #* 计算 xyz,size, sem_cls_scores
             base_xyz, base_size = self.prediction_heads[i](
                 query.transpose(1, 2).contiguous(),  # (B, F, V)
                 base_xyz=cluster_xyz,

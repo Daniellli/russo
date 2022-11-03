@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-08-19 16:28:28
-LastEditTime: 2022-10-25 09:10:39
+LastEditTime: 2022-10-30 23:35:04
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/models/__init__.py
@@ -15,6 +15,6 @@ email: xushaocong@stu.xmu.edu.cn
 # ------------------------------------------------------------------------
 from .bdetr import BeaUTyDETR
 from .bdetr_kps import BeaUTyDETRTKPS
-from .ap_helper import APCalculator, parse_predictions, parse_groundtruths
+from .ap_helper import APCalculator, parse_predictions, parse_groundtruths,my_parse_predictions
 # from .losses import HungarianMatcher, SetCriterion, compute_hungarian_loss,compute_labeled_hungarian_loss
 from .losses import HungarianMatcher, SetCriterion,compute_labeled_hungarian_loss

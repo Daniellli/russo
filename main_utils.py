@@ -48,7 +48,7 @@ from IPython import embed
 #*=====================================
 from signal import signal, SIGPIPE, SIG_DFL, SIG_IGN
 signal(SIGPIPE, SIG_IGN)
-from my_script.utils import save_res,parse_option,detach_module,load_checkpoint,save_checkpoint
+from my_script.utils import make_dirs, save_res,parse_option,detach_module,load_checkpoint,save_checkpoint
 
 #*=====================================
 
@@ -200,11 +200,19 @@ class BaseTrainTester:
 
         
         """Run main training/testing pipeline."""
-        test_dataset = self.get_dataset(args.data_root,{},args.test_dataset,
-                        'val' if not args.eval_train else 'train',
-                         args.use_color,args.use_height,args.detect_intermediate,
-                         args.use_multiview,args.butd,args.butd_gt,
-                         args.butd_cls,debug = args.debug,labeled_ratio=args.labeled_ratio)
+        if args.eval_scanrefer:
+            test_dataset = self.get_scanrefer_dataset(args.data_root,{},args.test_dataset,
+                            'test',
+                            args.use_color,args.use_height,args.detect_intermediate,
+                            args.use_multiview,args.butd,args.butd_gt,
+                            args.butd_cls,debug = args.debug,labeled_ratio=args.labeled_ratio)
+        else :
+             test_dataset = self.get_dataset(args.data_root,{},args.test_dataset,
+                            'val' if not args.eval_train else 'train',
+                            args.use_color,args.use_height,args.detect_intermediate,
+                            args.use_multiview,args.butd,args.butd_gt,
+                            args.butd_cls,debug = args.debug,labeled_ratio=args.labeled_ratio)
+
 
 
         test_loader = self.get_dataloader(test_dataset,args.batch_size,args.num_workers,shuffle=False)
@@ -238,10 +246,19 @@ class BaseTrainTester:
 
 
         #* eval student model 
-        performance = self.evaluate_one_epoch(
-            args.start_epoch, test_loader,
-            model, criterion, set_criterion, args
-        )
+        #!==========
+
+        DEBUG = True
+        if DEBUG:
+            performance = self.inference_for_scanrefer_benchmark(
+                args.start_epoch, test_loader,
+                model, criterion, set_criterion, args,for_vis=False,debug=DEBUG
+            )
+        else:
+            performance = self.evaluate_one_epoch(
+                args.start_epoch, test_loader,
+                model, criterion, set_criterion, args
+            )
 
         if performance is not None :
             logger.info(','.join(['student_%s:%.04f'%(k,round(v,4)) for k,v in performance.items()]))
@@ -305,10 +322,10 @@ class BaseTrainTester:
         # Get scheduler
         scheduler = get_scheduler(optimizer, len(train_loader), args)
         
-
         # Move model to devices
         if torch.cuda.is_available():
             model = model.cuda(args.local_rank)
+
         model = DistributedDataParallel(
             model, device_ids=[args.local_rank],
             broadcast_buffers=True  # , find_unused_parameters=True
@@ -533,8 +550,7 @@ class BaseTrainTester:
     description: 
     return {*}
     '''
-    @torch.no_grad()
-    def _main_eval_branch(self, batch_idx, batch_data, test_loader, model,
+    def _main_eval_branch(self,batch_idx, batch_data, test_loader, model,
                           stat_dict,
                           criterion, set_criterion, args):
         # Move to GPU
@@ -552,7 +568,75 @@ class BaseTrainTester:
         for key in batch_data: 
             assert (key not in end_points)
             end_points[key] = batch_data[key]#*  the length of end_points == 86, last item ==  target_cid 
+        _, end_points = self._compute_loss(#*  the length of end_points == 120
+            end_points, criterion, set_criterion, args 
+        )
+        for key in end_points:
+            if 'pred_size' in key:
+                end_points[key] = torch.clamp(end_points[key], min=1e-6)
 
+
+        # Accumulate statistics and print out
+        stat_dict = self._accumulate_stats(stat_dict, end_points)
+        if (batch_idx + 1) % args.print_freq == 0:
+            self.logger.info(f'Eval: [{batch_idx + 1}/{len(test_loader)}]  ')
+            self.logger.info(''.join([
+                f'{key} {stat_dict[key] / (float(batch_idx + 1)):.4f} \t'
+                for key in sorted(stat_dict.keys())
+                if 'loss' in key and 'proposal_' not in key
+                and 'last_' not in key and 'head_' not in key
+            ]))
+            
+        return stat_dict, end_points
+
+
+
+
+
+
+    '''
+    description:  with debug 
+    return {*}
+    '''
+    def _main_eval_branch_debug(self, batch_idx, batch_data, test_loader, model,
+                        stat_dict,criterion, set_criterion, args,debug):
+        # Move to GPU
+        batch_data = self._to_gpu(batch_data)
+        inputs = self._get_inputs(batch_data)
+        if "train" not in inputs:
+            inputs.update({"train": False})
+        else:
+            inputs["train"] = False
+
+        # Forward pass
+        #todo 如何把debug 信息传给 model 里面的 DKS? 
+        end_points = model(inputs)#* the length of end_points  == 60, last item ==  last_sem_cls_scores
+
+        # Compute loss
+        for key in batch_data: 
+            assert (key not in end_points)
+            end_points[key] = batch_data[key]#*  the length of end_points == 86, last item ==  target_cid 
+
+
+        #!==================================================      
+        #* 1. rename file 
+        if  debug:
+            # self.check_input(inputs,end_points['scan_ids'])
+            prefixes = ['object','text']
+            debug_path = "logs/debug"
+            save_format='%s_tmp_%d.ply'
+            new_save_format='%s_%s_%d_%d.ply'
+
+            for prefix in prefixes:
+                print(prefix)
+                for idx, scan_name in enumerate(end_points['scan_ids']):
+                    target_save_path = osp.join(debug_path,scan_name+"_%d_%d"%(idx,batch_idx))
+                    make_dirs(target_save_path)
+
+                    new_name = osp.join(target_save_path, new_save_format%(prefix,scan_name,idx,batch_idx))
+                    old_name = osp.join(debug_path, save_format%(prefix,idx))
+                    os.rename(old_name,new_name)
+        #!==================================================
 
         _, end_points = self._compute_loss(#*  the length of end_points == 120
             end_points, criterion, set_criterion, args 
@@ -574,6 +658,35 @@ class BaseTrainTester:
             ]))
             
         return stat_dict, end_points
+
+
+
+
+    '''
+    description:  with debug 
+    return {*}
+    '''
+    def _inference_only(self, batch_idx, batch_data, test_loader, model,
+                        stat_dict,criterion, set_criterion, args,debug):
+        # Move to GPU
+        batch_data = self._to_gpu(batch_data)
+        inputs = self._get_inputs(batch_data)
+        if "train" not in inputs:
+            inputs.update({"train": False})
+        else:
+            inputs["train"] = False
+
+        # Forward pass
+        #todo 如何把debug 信息传给 model 里面的 DKS? 
+        end_points = model(inputs)#* the length of end_points  == 60, last item ==  last_sem_cls_scores
+
+        # Compute loss
+        for key in batch_data: 
+            assert (key not in end_points)
+            end_points[key] = batch_data[key]#*  the length of end_points == 86, last item ==  target_cid 
+
+            
+        return end_points
 
     
     ''' 
