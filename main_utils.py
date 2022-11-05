@@ -351,10 +351,14 @@ class BaseTrainTester:
             #* load model 之后 schedule 也变了 , 变成上次训练的,这次的就不见了, 重新加载
             if args.lr_decay_intermediate:
                 
+                logger.info(f"current step :{scheduler._step_count},last epoch {scheduler.last_epoch} , warm up epoch :{args.warmup_epoch},args.lr_decay_epochs :{args.lr_decay_epochs},len(train_loader):{len(train_loader)}")
+                
+                
                 
                 # tmp = {scheduler._step_count+len(train_loader):1 } #* 一个epoch 后decay learning rate 
                 # tmp.update({ k:v for  idx, (k,v) in enumerate(scheduler.milestones.items()) if idx != 0})
-                scheduler.milestones ={len(train_loader)*(l-args.warmup_epoch) : 1 for l in args.lr_decay_epochs}
+                
+                scheduler.milestones ={len(train_loader)*( l-args.warmup_epoch - args.start_epoch )+scheduler.last_epoch : 1 for l in args.lr_decay_epochs}
                 
 
             #* eval student model 
