@@ -270,8 +270,8 @@ def compute_kps_loss(data_dict, topk):
     gt_center = data_dict['center_label'][supervised_inds, :, 0:3]  # B, K2, 3
     gt_size = data_dict['size_gts'][supervised_inds, :, 0:3]  # B, K2, 3
     B = gt_center.shape[0]
-    K = seed_xyz.shape[1]
-    K2 = gt_center.shape[1]
+    K = seed_xyz.shape[1]#* P_seed 多少个proposal的意思, 也就是1024, 
+    K2 = gt_center.shape[1] #* 多少个 referred target的意思
 
     point_instance_label = data_dict['point_instance_label'][supervised_inds,:]  # B, num_points
 
@@ -279,20 +279,24 @@ def compute_kps_loss(data_dict, topk):
     object_assignment = torch.gather(point_instance_label, 1, seed_inds)  # B, num_seed
     object_assignment[object_assignment < 0] = K2 - 1  # set background points to the last gt bbox
     object_assignment_one_hot = torch.zeros((B, K, K2)).to(seed_xyz.device)
-    object_assignment_one_hot.scatter_(2, object_assignment.unsqueeze(-1), 1)  # (B, K, K2)
+    object_assignment_one_hot.scatter_(2, object_assignment.unsqueeze(-1), 1)  #* (B, K, K2),  按第三维进行填充, 填充object_assignment指定的位置,  填充1; 也就是将是object的点设置成1, 是一个mask
     delta_xyz = seed_xyz.unsqueeze(2) - gt_center.unsqueeze(1)  # (B, K, K2, 3)
     delta_xyz = delta_xyz / (gt_size.unsqueeze(1) + 1e-6)  # (B, K, K2, 3)
     new_dist = torch.sum(delta_xyz ** 2, dim=-1)
     euclidean_dist1 = torch.sqrt(new_dist + 1e-6)  # BxKxK2
+    #? (1 - object_assignment_one_hot) 对应的是BG ,为什么也要+100 * (1 - object_assignment_one_hot)  呢? 
     euclidean_dist1 = euclidean_dist1 * object_assignment_one_hot + 100 * (1 - object_assignment_one_hot)  # BxKxK2
     euclidean_dist1 = euclidean_dist1.transpose(1, 2).contiguous()  # BxK2xK
+    #* topk 是个hyper parameter , 这里我调成8, 
     topk_inds = torch.topk(euclidean_dist1, topk, largest=False)[1] * box_label_mask[:, :, None] + \
                 (box_label_mask[:, :, None] - 1)  # BxK2xtopk
+
     topk_inds = topk_inds.long()  # BxK2xtopk
     topk_inds = topk_inds.view(B, -1).contiguous()  # B, K2xtopk
     batch_inds = torch.arange(B).unsqueeze(1).repeat(1, K2 * topk).to(seed_xyz.device)
-    batch_topk_inds = torch.stack([batch_inds, topk_inds], -1).view(-1, 2).contiguous()
+    batch_topk_inds = torch.stack([batch_inds, topk_inds], -1).view(-1, 2).contiguous()#* 第一维度是index, 第二维度是topk对应的index
 
+    #* model 输出的 seed_idx对应的pc中, 是topk个referred target pc中点的赋予1, 不是赋予0 
     objectness_label = torch.zeros((B, K + 1), dtype=torch.long).to(seed_xyz.device)
     objectness_label[batch_topk_inds[:, 0], batch_topk_inds[:, 1]] = 1
     objectness_label = objectness_label[:, :K]
@@ -300,6 +304,7 @@ def compute_kps_loss(data_dict, topk):
     objectness_label[objectness_label_mask < 0] = 0
 
     total_num_points = B * K
+    #* 预测 是topk  referred target  正确的正确率, 也就是在这么多个点中, 有多少个样本是真的topk referred target的点,并且被model 预测对了
     data_dict[f'points_hard_topk{topk}_pos_ratio'] = \
         torch.sum(objectness_label.float()) / float(total_num_points)
     data_dict[f'points_hard_topk{topk}_neg_ratio'] = 1 - data_dict[f'points_hard_topk{topk}_pos_ratio']
@@ -329,9 +334,11 @@ def compute_kps_loss(data_dict, topk):
             point_ref_mask = torch.gather(point_ref_mask, 1, query_points_sample_inds)
 
             if ref_use_obj_mask:
-
+                
                 obj_mask = torch.gather(objectness_label, 1, query_points_sample_inds)
                 point_ref_mask = point_ref_mask * obj_mask
+
+        #* CLS 计算的score 
         kps_ref_score = data_dict['kps_ref_score'][supervised_inds,:,:]      # [B, 1, N]
         cls_weights = torch.ones((B, kps_ref_score.shape[-1])).cuda().float()
         cls_normalizer = cls_weights.sum(dim=1, keepdim=True).float()

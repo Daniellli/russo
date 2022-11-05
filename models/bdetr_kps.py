@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-13 23:08:56
-LastEditTime: 2022-11-02 10:51:00
+LastEditTime: 2022-11-02 23:50:34
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/models/bdetr_kps.py
@@ -204,35 +204,25 @@ class BeaUTyDETRTKPS(nn.Module):
         
 
 
-        
         #* Text encoder
         tokenized = self.tokenizer.batch_encode_plus(
             inputs['text'], padding="longest", return_tensors="pt"
         ).to(inputs['point_clouds'].device)
         encoded_text = self.text_encoder(**tokenized)#* tokenized['input_ids']
-        text_feats = self.text_projector(encoded_text.last_hidden_state)#* encoded_text.last_hidden_state: [B,desc_len, lan_channel_num]
+        text_feats = self.text_projector(encoded_text.last_hidden_state)#* encoded_text.last_hidden_state: [B,L, language_channel_num], lan_channel_num == 768
         # Invert attention mask that we get from huggingface
         # because its the opposite in pytorch transformer
         text_attention_mask = tokenized.attention_mask.ne(1).bool()
-        end_points['text_feats'] = text_feats
-        end_points['text_attention_mask'] = text_attention_mask
+        end_points['text_feats'] = text_feats #* [B L F], L = 41 ,F = 288
+        end_points['text_attention_mask'] = text_attention_mask #* 为true的都是padding , [B,L]
         end_points['tokenized'] = tokenized
-
-        #!+========================= for keypoint sampling 
-        end_points['lang_hidden'] = encoded_text.pooler_output
-
-        #* Visual encoder2 
         
+        end_points['lang_hidden'] = encoded_text.pooler_output #* [B, lan_channel_num],   CLS 
+        #* Visual encoder2 
         end_points['seed_inds'] = end_points['fp2_inds']
         end_points['seed_xyz'] = end_points['fp2_xyz']
         end_points['seed_features'] = end_points['fp2_features']
-        #* xyz : [B,512,3], 
-        #*  features:[B,C,512]
-        # end_points, points_xyz, points_features  = self.sampling_module(end_points['fp2_xyz'],end_points['fp2_features'],end_points)
-        # end_points['seed_inds'] = end_points['fp2_inds']
-        # end_points['seed_xyz'] = points_xyz
-        # end_points['seed_features'] = points_features
-        #!+====================
+        
 
         return end_points
 
@@ -335,7 +325,7 @@ class BeaUTyDETRTKPS(nn.Module):
 
 
 
-        query = self.decoder_query_proj(cluster_feature).transpose(1, 2).contiguous()  # (B, V, F)
+        query = self.decoder_query_proj(cluster_feature).transpose(1, 2).contiguous()  #* from (B,F,V) to (B, V, F), F=288 , V=256
 
         if self.contrastive_align_loss:
             end_points['proposal_proj_queries'] = F.normalize(
@@ -345,15 +335,15 @@ class BeaUTyDETRTKPS(nn.Module):
 
         #*  query 数量是固定256 , token 数量是根据utterence 来定的 ,可能几十可能上百
         #* Proposals (one for each query) , 这些是proposed box ,  就是该utterence 下指定的 目标bbox proposal , 在过一个Hunagrian match 就能得到 配对后的 真的proposal 了
-        proposal_center, proposal_size = self.proposal_head(
+        proposal_center, proposal_size = self.proposal_head(#* 第一个header,
             cluster_feature,
             base_xyz=cluster_xyz,
             end_points=end_points,
             prefix='proposal_'
         )
         
-        base_xyz = proposal_center.detach().clone()  # (B, V, 3) 
-        base_size = proposal_size.detach().clone()  # (B, V, 3)
+        base_xyz = proposal_center.detach().clone()  #* (B, V, 3) 
+        base_size = proposal_size.detach().clone()  #* (B, V, 3)
         query_mask = None#? 这是做什么用的? 
 
         #* Decoder
@@ -371,6 +361,8 @@ class BeaUTyDETRTKPS(nn.Module):
                 raise NotImplementedError
 
             #* Transformer Decoder Layer, 这个query position 是动态变化的 
+            #* points_features == P_1 , 
+            #* text_feats == L_1
             query = self.decoder[i](
                 query, points_features.transpose(1, 2).contiguous(),
                 text_feats, query_pos,
