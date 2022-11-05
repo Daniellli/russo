@@ -53,9 +53,12 @@ class GroundingEvaluator:
         self.dets.update({'vd': 0, 'vid': 0})
         self.dets.update({'hard': 0, 'easy': 0})
         self.dets.update({'multi': 0, 'unique': 0})
+        self.dets.update({'multi@0.50': 0, 'unique@0.50': 0})
+        
         self.gts.update({'vd': 1e-14, 'vid': 1e-14})
         self.gts.update({'hard': 1e-14, 'easy': 1e-14})
         self.gts.update({'multi': 1e-14, 'unique': 1e-14})
+        self.gts.update({'multi@0.50': 1e-14, 'unique@0.50': 1e-14})
 
     def print_stats(self):
         """Print accumulated accuracies."""
@@ -77,9 +80,9 @@ class GroundingEvaluator:
                             for k in self.topks
                         ])
                     )
-
+        
         print('\nAnalysis')
-        for field in ['easy', 'hard', 'vd', 'vid', 'unique', 'multi']:
+        for field in ['easy', 'hard', 'vd', 'vid', 'unique', 'multi','unique@0.50','multi@0.50']:
             print(field, self.dets[field] / self.gts[field])
 
     def synchronize_between_processes(self):
@@ -250,6 +253,18 @@ class GroundingEvaluator:
                             else:
                                 self.gts['multi'] += 1
                                 self.dets['multi'] += found
+                        elif k == 1 and t == self.thresholds[1]:
+                            #* ACC@ 0.5
+                            if end_points['is_unique'][bid]:
+                                self.gts['unique@0.50'] += 1
+                                self.dets['unique@0.50'] += found
+                            else:
+                                self.gts['multi@0.50'] += 1
+                                self.dets['multi@0.50'] += found
+
+
+                            
+
 
     def _parse_gt(self, end_points):
         positive_map = torch.clone(end_points['positive_map'])  # (B, K, 256)
@@ -294,6 +309,7 @@ class GroundingGTEvaluator:
         self.gts.update({'vd': 1e-14, 'vid': 1e-14})
         self.gts.update({'hard': 1e-14, 'easy': 1e-14})
         self.gts.update({'multi': 1e-14, 'unique': 1e-14})
+        
 
     def print_stats(self):
         """Print accumulated accuracies."""
