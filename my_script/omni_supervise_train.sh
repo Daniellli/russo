@@ -31,6 +31,8 @@ gpu_ids="0,1,2,3,4,5,6,7"
 gpu_num=8
 
 
+gpu_ids="0,1,2,3";
+gpu_num=4;
 
 
 
@@ -43,7 +45,7 @@ save_freq=$val_freq;
 
 
 #* for  semi supervision architecture  : step2
-b_size='4,4';
+b_size='4,8';
 
 resume_mode_path="pretrained/bdetr_sr3d_cls_67.1.pth"
 
@@ -94,7 +96,6 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
 
     
     
-
 
 
 # --lr_decay_intermediate \

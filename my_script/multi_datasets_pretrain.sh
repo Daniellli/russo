@@ -20,9 +20,8 @@
 
 
 # train_data="sr3d nr3d scanrefer scannet sr3d+"
-# train_data="scanrefer sr3d+"
-train_data="nr3d sr3d"
-test_data=nr3d;
+train_data="scanrefer sr3d"
+test_data=scanrefer;
 DATA_ROOT=datasets/
 
 gpu_ids="1,2,4,5,6,8,9";

@@ -2,10 +2,10 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-23 00:39:49
- # @LastEditTime: 2022-11-02 15:51:51
+ # @LastEditTime: 2022-10-27 23:33:44
  # @LastEditors: xushaocong
  # @Description: 
- # @FilePath: /butd_detr/my_script/scanrefer_benchmark.sh
+ # @FilePath: /butd_detr/my_script/multi_datasets_pretrain.sh
  # email: xushaocong@stu.xmu.edu.cn
 ### 
  # @Author: xushaocong
@@ -20,23 +20,24 @@
 
 
 # train_data="sr3d nr3d scanrefer scannet sr3d+"
-train_data="scanrefer"
+train_data="scanrefer sr3d"
 test_data=scanrefer;
 DATA_ROOT=datasets/
 
-gpu_ids="0,1,7"
-gpu_num=3
-b_size=12
+
+gpu_ids="0,1,2,3"
+gpu_num=4
+b_size=16
 
 
 
 port=29511
-save_freq=100;
+save_freq=1;
 val_freq=1;
-print_freq=1;
+print_freq=100;
 
 # train_dist_mod.py
-resume_model_path=pretrained/scanrefer_det_52.2.pth;
+# resume_model_path=logs/bdetr/scanrefer/1666610747/ckpt_epoch_155_best.pth;
 #* for  semi supervision architecture  : step1 
 
 topk=8;
@@ -52,22 +53,19 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --use_soft_token_loss --use_contrastive_align \
     --log_dir ./logs/bdetr \
     --pp_checkpoint $DATA_ROOT/gf_detector_l6o256.pth \
-    --butd --self_attend --augment_det \
-    --max_epoch 400 \
-    --checkpoint_path $resume_model_path \
-    --eval-scanrefer \
-    --eval \
+    --self_attend --augment_det \
+    --max_epoch 400 --use-tkps \
+    --query_points_obj_topk $topk \
+    --upload-wandb \
     2>&1 | tee -a logs/train_test_cls.log
 
-# --use-tkps 
 
 
 
-# --query_points_obj_topk $topk \
-# --upload-wandb \
 
 
 
+# --checkpoint_path $resume_model_path \
 # --lr_decay_intermediate \
 # --lr_decay_epochs 160 175 \
 

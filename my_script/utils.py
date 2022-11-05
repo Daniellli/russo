@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 20:04:19
-LastEditTime: 2022-10-30 17:00:39
+LastEditTime: 2022-11-03 21:20:37
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/my_script/utils.py
@@ -235,7 +235,7 @@ def parse_option():
     parser.add_argument("--debug", action='store_true',
                         help="try to overfit few samples")
     parser.add_argument('--eval', default=False, action='store_true')
-    parser.add_argument('--eval--scanrefer', default=False, action='store_true',help=' generate the pred.json for the ')
+    parser.add_argument('--eval-scanrefer', default=False, action='store_true',help=' generate the pred.json for the ')
     parser.add_argument('--eval_train', action='store_true')
     parser.add_argument('--pp_checkpoint', default=None)
     parser.add_argument('--reduce_lr', action='store_true')
@@ -306,6 +306,7 @@ def load_checkpoint(args, model, optimizer, scheduler,distributed2common=False):
 
 def save_checkpoint(args, epoch, model, optimizer, scheduler, save_cur=False,is_best=False,prefix=None):
     """Save checkpoint if requested."""
+    spath = None
     if save_cur or epoch % args.save_freq == 0:
         state = {
             'config': args,
@@ -315,6 +316,7 @@ def save_checkpoint(args, epoch, model, optimizer, scheduler, save_cur=False,is_
             'scheduler': scheduler.state_dict(),
             'epoch': epoch
         }
+        
         
         if is_best:
             if prefix is not None :
@@ -332,6 +334,7 @@ def save_checkpoint(args, epoch, model, optimizer, scheduler, save_cur=False,is_
         print("Saved in {}".format(spath))
     else:
         print("not saving checkpoint")
+    return spath
 
 
 
@@ -354,12 +357,14 @@ return {*}
 '''
 def save_res(save_dir,epoch,performance,best_performce):
     is_best=False
-    with open(save_dir, 'a+') as f :
-        f.write( f"epoch:{epoch},"+','.join(["%s:%.4f"%(k,v) for k,v in performance.items()])+"\n")
+    
 
     acc_key = list(performance.keys())[0]
     if performance is not None and performance[acc_key] > best_performce:
         is_best=True
+
+    with open(save_dir, 'a+') as f :
+        f.write( f"epoch:{epoch},"+','.join(["%s:%.4f"%(k,v) for k,v in performance.items()])+f" {is_best} \n")
     return is_best,performance[acc_key]
 
 
@@ -710,11 +715,14 @@ param {*} has_color
 param {*} flag
 return {*}
 '''
-def save_for_vis(box,pc,save_path,scene_name,flag = "debug"):
+def save_for_vis(box,pc,save_path,scene_name,bidx,flag = "debug",idx=0,save = True):
       #* for teacher or student 
-    save_pc(pc,os.path.join(save_path, '%s_gt_%s.ply'%(scene_name,flag)))
+    if save :
+        save_pc(pc,os.path.join(save_path, '%s_%d_%d_gt_%s.ply'%(scene_name,idx,bidx,flag)))
     
-    save_box(box,os.path.join(save_path,'%s_box_%s.txt'%(scene_name,flag)) )
+    save_box(box,os.path.join(save_path,'%s_%d_%d_box_%s.txt'%(scene_name,idx,bidx,flag)) )
+
+
 
 
 
@@ -746,6 +754,11 @@ def save_pc_for_detector(datasets):
 
 
 
+
+def remove_file(old_path):
+    
+    if old_path is not None:
+        os.remove(old_path)
 
 
 
