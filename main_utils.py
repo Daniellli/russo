@@ -426,8 +426,6 @@ class BaseTrainTester:
 
         # Training is over, evaluate
         save_checkpoint(args, 'last', model, optimizer, scheduler, True)
-        if last_best_epoch_path is not None:
-            os.remove(last_best_epoch_path)
 
 
         saved_path = os.path.join(args.log_dir, 'ckpt_epoch_last.pth')
