@@ -248,7 +248,7 @@ class BaseTrainTester:
         #* eval student model 
         #!==========
 
-        DEBUG = True
+        DEBUG = False
         if DEBUG:
             performance = self.inference_for_scanrefer_benchmark(
                 args.start_epoch, test_loader,
