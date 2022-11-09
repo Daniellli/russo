@@ -591,9 +591,12 @@ class SemiSuperviseTrainTester(TrainTester):
 
             #* update lr decay milestones
             if args.lr_decay_intermediate:    
-                tmp = {scheduler._step_count+len(labeled_loader):1 } #* 一个epoch 后decay learning rate 
-                tmp.update({ k:v for  idx, (k,v) in enumerate(scheduler.milestones.items()) if idx != 0})
-                scheduler.milestones = tmp
+                # tmp = {scheduler._step_count+len(labeled_loader):1 } #* 一个epoch 后decay learning rate 
+                # tmp.update({ k:v for  idx, (k,v) in enumerate(scheduler.milestones.items()) if idx != 0})
+                # scheduler.milestones = tmp
+
+                scheduler.milestones ={len(labeled_dataset)*( l-args.warmup_epoch - args.start_epoch )+scheduler.last_epoch : 1 for l in args.lr_decay_epochs}
+                logger.info(scheduler.milestones )
 
             #* eval student model 
             if args.eval:

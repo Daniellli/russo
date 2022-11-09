@@ -64,7 +64,7 @@ class SamplingModule(nn.Module):
             points_obj_cls_logits = self.points_obj_cls(features)  #* (batch_size, 1, num_seed) , 分类每个点是否在near the object center ? 
             data_dict['seeds_obj_cls_logits'] = points_obj_cls_logits
             points_obj_cls_scores = torch.sigmoid(points_obj_cls_logits).squeeze(1)
-            sample_inds = torch.topk(points_obj_cls_scores, int((1024 + self.num_proposal) / 2))[1].int()#* 取得分最大的 int((1024 + self.num_proposal) / 2) 个点的index , 
+            sample_inds = torch.topk(points_obj_cls_scores, int((M + self.num_proposal) / 2))[1].int()#* 取得分最大的 int((1024 + self.num_proposal) / 2) 个点的index , 
             xyz, features, sample_inds = self.sa_module(xyz, features, sample_inds)
             # cluster_feature = features
             # cluster_xyz = xyz

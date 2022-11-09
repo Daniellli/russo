@@ -361,7 +361,7 @@ class BiDecoderLayer(nn.Module):
         query = query.transpose(0, 1)
         query_pos = query_pos.transpose(0, 1)
 
-        # Self attention
+        # Self attention #* query_pos 就是 每个proposal 的3维坐标 
         query2 = self.self_attn(
             query + query_pos, query + query_pos, query,
             attn_mask=None,
