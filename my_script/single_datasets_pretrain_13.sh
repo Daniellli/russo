@@ -17,32 +17,32 @@ export PYTHONWARNINGS='ignore:semaphore_tracker:UserWarning'
 #!  To train on multiple datasets, e.g. on SR3D and NR3D simultaneously, set --TRAIN_DATASET sr3d nr3d.
 
 # train_data="sr3d nr3d scanrefer scannet sr3d+"
-train_data=sr3d
-test_data=sr3d
+train_data=scanrefer
+test_data=scanrefer
 DATA_ROOT=datasets/
 
 
-gpu_ids="1,2,4,5,6,8,9";
-gpu_num=7;
-b_size=12
+gpu_ids="0,1,2,3";
+gpu_num=4;
+b_size=16;
 
 
 
 port=29530
-save_freq=1;
-val_freq=1;
+save_freq=5;
+val_freq=5;
 print_freq=100;
 save_freq=$val_freq;
 
-
-# resume_mode_path=logs/bdetr/sr3d/1667007312/ckpt_epoch_20_best.pth;
-# resume_mode_path=logs/bdetr/sr3d/1667038294/ckpt_epoch_32_best.pth;
-resume_mode_path=logs/bdetr/sr3d/1667060778/ckpt_epoch_60_best.pth;
+# resume_mode_path=logs/bdetr/sr3d/1667060778/ckpt_epoch_60_best.pth;
 
 
 
 #* for  semi supervision architecture  : step1 x
-# labeled_ratio=0.2
+labeled_ratio=0.3;
+topk=8;
+
+
 TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
     train_dist_mod.py --num_decoder_layers 6 \
     --use_color \
@@ -51,29 +51,25 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --val_freq $val_freq --batch_size $b_size --save_freq $val_freq --print_freq $print_freq \
     --lr_backbone=1e-3 --lr=1e-4 \
     --dataset $train_data --test_dataset $test_data \
-    --detect_intermediate --joint_det \
+    --detect_intermediate \
     --use_soft_token_loss --use_contrastive_align \
     --log_dir ./logs/bdetr \
     --pp_checkpoint $DATA_ROOT/gf_detector_l6o256.pth \
-    --butd_cls --self_attend \
-    --max_epoch 400 \
-    --checkpoint_path $resume_mode_path \
-    --lr_decay_epochs 61 66 \
-    --lr_decay_intermediate \
-    2>&1 | tee -a logs/train_test_cls.log
-
-
-
-# --upload-wandb \
-# --labeled_ratio $labeled_ratio \
-
-
-# --debug \
+    --self_attend --augment_det \
+    --use-tkps --query_points_obj_topk $topk \
+    --max_epoch 800 \
+    --labeled_ratio $labeled_ratio \
+    --upload-wandb \
+    2>&1 | tee -a logs/train_test_cls_13.log
 
 
 
 
-#  --joint_det
-# --use-tkps \
-# --query_points_obj_topk $topk \
+
+# --num_target 512 \
+# --checkpoint_path $resume_mode_path \
+#     --lr_decay_epochs 61 66 \
+#     --lr_decay_intermediate \
+    
+
 
