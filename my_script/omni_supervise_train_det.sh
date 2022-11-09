@@ -2,7 +2,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-26 21:42:30
- # @LastEditTime: 2022-11-02 00:21:55
+ # @LastEditTime: 2022-11-09 08:38:14
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/omni_supervise_train_det.sh

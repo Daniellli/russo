@@ -61,10 +61,6 @@ class SamplingModule(nn.Module):
             data_dict['query_points_feature'] = features  # (batch_size, C, num_proposal)
             data_dict['query_points_sample_inds'] = sample_inds  # (bsz, num_proposal) # should be 0,1,...,num_proposal
         elif self.sampling_method == 'kpsa-lang-filter':
-
-
-
-
             points_obj_cls_logits = self.points_obj_cls(features)  #* (batch_size, 1, num_seed) , 分类每个点是否在near the object center ? 
             data_dict['seeds_obj_cls_logits'] = points_obj_cls_logits
             points_obj_cls_scores = torch.sigmoid(points_obj_cls_logits).squeeze(1)
@@ -76,9 +72,6 @@ class SamplingModule(nn.Module):
             data_dict['query_points_feature'] = features  # (batch_size, C, num_proposal)
             data_dict['query_points_sample_inds'] = sample_inds  # (bsz, num_proposal) # should be 0,1,...,num_proposal
             ref_scores = self.match_module(features, data_dict['lang_hidden'], data_dict)#* data_dict['lang_hidden'] : [B, lang_feature_dim]
-
-            
-
 
             ref_scores = torch.sigmoid(ref_scores).squeeze(1)   # [B, N]
             sample_inds = torch.topk(ref_scores, self.num_proposal)[1].int()
@@ -142,8 +135,6 @@ class SamplingModule(nn.Module):
             data_dict['query_points_sample_inds'] = sample_inds  # (bsz, num_proposal) # should be 0,1,...,num_proposal
             ref_scores = self.match_module(features, data_dict['lang_hidden'], data_dict)#* data_dict['lang_hidden'] : [B, lang_feature_dim]
 
-            
-
 
             ref_scores = torch.sigmoid(ref_scores).squeeze(1)   # [B, N]
             sample_inds = torch.topk(ref_scores, self.num_proposal)[1].int()
@@ -175,9 +166,9 @@ def save_for_attention_vis(xyz,prefix="object"):
     debug_path = "logs/debug"
     make_dirs(debug_path)
     batch_size =xyz.shape[0]
-    save_format='%s_tmp_%d.ply'
+    save_format='%s_tmp_%d_%d.ply'
     for idx in range(batch_size):
-        save_pc(xyz[idx],os.path.join(debug_path,save_format%(prefix,idx)))
+        save_pc(xyz[idx],os.path.join(debug_path,save_format%(prefix,idx,xyz.device.index)))
         
 
 
