@@ -595,7 +595,7 @@ class SemiSuperviseTrainTester(TrainTester):
                 # tmp.update({ k:v for  idx, (k,v) in enumerate(scheduler.milestones.items()) if idx != 0})
                 # scheduler.milestones = tmp
 
-                scheduler.milestones ={len(train_loader)*( l-args.warmup_epoch - args.start_epoch )+scheduler.last_epoch : 1 for l in args.lr_decay_epochs}
+                scheduler.milestones ={len(labeled_dataset)*( l-args.warmup_epoch - args.start_epoch )+scheduler.last_epoch : 1 for l in args.lr_decay_epochs}
                 logger.info(scheduler.milestones )
 
             #* eval student model 
