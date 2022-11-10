@@ -249,7 +249,8 @@ class Joint3DDataset(Dataset):
                 'target': ' '.join(str(anno['object_name']).split('_')),
                 'anchors': [],
                 'anchor_ids': [],
-                'dataset': 'scanrefer'
+                'dataset': 'scanrefer',
+                'ann_id':anno['ann_id']
             }
             for anno in reader
             if anno['scene_id'] in scan_ids
@@ -953,7 +954,8 @@ class Joint3DDataset(Dataset):
                 if isinstance(anno['target_id'], int)
                 else class_ids[anno['target_id'][0]]
             ),
-            "supervised_mask":np.array(1).astype(np.int64)
+            "supervised_mask":np.array(1).astype(np.int64),
+            'ann_id':anno['ann_id']
         })
         return ret_dict
 

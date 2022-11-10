@@ -12,6 +12,7 @@
 
 from distutils.log import debug
 import os
+import shutil
 
 import numpy as np
 import torch
@@ -41,7 +42,7 @@ from loguru import logger
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(BASE_DIR)
 
-from my_script.utils import make_dirs, save_for_vis,parse_option,save_txt
+from my_script.utils import make_dirs, save_for_vis,parse_option,save_txt,load_json,move_dir_file
 import os.path as osp
 import time
 
@@ -230,6 +231,7 @@ class TrainTester(BaseTrainTester):
             if evaluator is not None:
                 for prefix in prefixes:
                     evaluator.evaluate(end_points, prefix)
+           
         evaluator.synchronize_between_processes()
       
         ans = None
@@ -253,6 +255,142 @@ class TrainTester(BaseTrainTester):
                 #!===================
 
         return ans
+
+
+    '''
+    description:  评估代码,    
+    return {*}
+    '''
+    @torch.no_grad()
+    def evaluate_one_epoch_and_save_qualitative_res(self, epoch, test_loader,model, criterion, set_criterion, args):
+        """
+        Eval grounding after a single epoch.
+
+        Some of the args:
+            model: a nn.Module that returns end_points (dict)
+            criterion: a function that returns (loss, end_points)
+        """
+        if args.test_dataset == 'scannet':
+            return self.evaluate_one_epoch_det(
+                epoch, test_loader, model,
+                criterion, set_criterion, args
+            )
+        stat_dict = {}
+        model.eval()  # set model to eval mode (for bn and dp)
+
+        if args.num_decoder_layers > 0:
+            prefixes = ['last_', 'proposal_']
+            prefixes = ['last_']
+            prefixes.append('proposal_')
+        else:
+            prefixes = ['proposal_']  # only proposal
+        prefixes += [f'{i}head_' for i in range(args.num_decoder_layers - 1)]
+        
+        #?
+        if args.butd_cls:
+            evaluator = GroundingGTEvaluator(prefixes=prefixes)
+        else:
+            evaluator = GroundingEvaluator(
+                only_root=True, thresholds=[0.25, 0.5],
+                topks=[1, 5, 10], prefixes=prefixes
+            )
+
+
+        CONFIG_DICT = {
+            'remove_empty_box': False, 'use_3d_nms': True,
+            'nms_iou': 0.25, 'use_old_type_nms': False, 'cls_nms': True,
+            'per_class_proposal': True, 'conf_thresh': 0.0,
+            'dataset_config': ScannetDatasetConfig(18),
+            'hungarian_loss': True
+        }
+
+        # Main eval branch
+        # record_res = []
+        qualitative_list = np.loadtxt('logs/only_all_consistency_works_qua_list.txt',dtype=np.str0,delimiter='\n').tolist()
+
+        
+        for batch_idx, batch_data in enumerate(test_loader):#* the length of batch data == 26 , 
+
+            # stat_dict, end_points = self._main_eval_branch(
+            #     batch_idx, batch_data, test_loader, model, stat_dict,
+            #     criterion, set_criterion, args
+            # )
+            stat_dict, end_points = self._main_eval_branch_debug(
+                batch_idx, batch_data, test_loader, model, stat_dict,
+                criterion, set_criterion, args,debug=True
+            )
+            
+            if evaluator is not None:
+                # for prefix in prefixes:
+                prefix='last_'
+                evaluator.evaluate(end_points, prefix)
+
+            #!==========================
+            #todo parse results and save 
+            prefix = 'last_'
+            better_res = load_json('logs/debug/vis_refer.json')#* only for current batch 
+            
+            attention_path = "logs/debug"
+
+            if len(better_res.items())>0:
+                #todo : pass an
+                #* return format :  pred_cls, pred_box and conf (0-1)
+                #* box 是8个定点
+                batch_pred_map_cls = my_parse_predictions(end_points, CONFIG_DICT, prefix)
+                better_idxs = np.array(list(better_res.keys()),dtype=np.int32)
+
+                # for  idx in better_idxs:
+                #     record_res.append(end_points['scan_ids'][idx]+"_%d_%s"%(end_points['target_id'][idx].cpu().numpy(),end_points['ann_id'][idx]))
+
+
+                
+                for idx,batch_res in  enumerate(batch_pred_map_cls):
+                    sample_id = end_points['scan_ids'][idx]+"_%d_%s"%(end_points['target_id'][idx].cpu().numpy(),end_points['ann_id'][idx])
+                    
+                    if idx  in better_idxs and sample_id in qualitative_list:
+                        #* 1. 获取target id 
+                        #* 2. 根据target id 获取这个target 对应的 score 最大的target  
+                        #* 3. 保存对应的 box等信息
+                        batch_res=  np.array(batch_res)
+                        
+                        # target_id = batch_data['target_cid'].cpu().numpy().tolist()[idx]
+                        # batch_res = batch_res[batch_res[:,0]==target_id]
+
+                        max_idx = np.argmax(np.array([x[2] for x in batch_res])) #* 只取confidence 最大的, 不管是什么哪个target  , 这个对应的是target id , 也就是第几个目标
+
+                        #* save for vis , get top k for  vis 
+
+                        
+                        target_save_path = osp.join(self.vis_save_path,sample_id)
+                        make_dirs(target_save_path)           
+
+                        old_attention_path = osp.join(attention_path,f"{end_points['scan_ids'][idx]}_{end_points['target_id'][idx].cpu().numpy()}_{end_points['ann_id'][idx]}")
+                        move_dir_file(old_attention_path,target_save_path)
+
+                        utterance_format="%s_%d_%s_utterance.txt"
+                        
+                        save_txt(end_points['utterances'][idx],osp.join(target_save_path,utterance_format%(end_points['scan_ids'][idx],end_points['target_id'][idx].cpu().numpy(),end_points['ann_id'][idx])))
+                        #* save pc and box         
+                        boxes = np.array([ box.tolist() for box in batch_res[max_idx][1]])[None]
+
+                        save_for_vis(boxes,batch_data['point_clouds'][idx],target_save_path,end_points['scan_ids'][idx],end_points['ann_id'][idx],flag='student',idx=end_points['target_id'][idx].cpu().numpy())
+                        save_for_vis(batch_data['all_bboxes'][idx][batch_data['all_bbox_label_mask'][idx]].cpu().numpy(),batch_data['point_clouds'][idx],
+                                    target_save_path,end_points['scan_ids'][idx],end_points['ann_id'][idx],flag='student2',idx=end_points['target_id'][idx].cpu().numpy(),save=False)
+                        save_for_vis((torch.cat([batch_data['center_label'],batch_data['size_gts']],axis=-1)[idx][batch_data['box_label_mask'][idx].bool()]).cpu().numpy()
+                                        ,batch_data['point_clouds'][idx],target_save_path,end_points['scan_ids'][idx],end_points['ann_id'][idx],flag='teacher',idx=end_points['target_id'][idx].cpu().numpy(),save=False)
+
+                    
+                    
+
+                #!==========================
+                
+        # save_txt('\n'.join(record_res),'logs/debug/final_list.txt')
+        evaluator.synchronize_between_processes()
+      
+     
+
+
+
 
 
     
@@ -292,6 +430,9 @@ class TrainTester(BaseTrainTester):
 
         for batch_idx, batch_data in enumerate(test_loader):#* the length of batch data == 26 , 
             #todo 是否会选择带有debug 参数的_main_eval_branch
+            #!+=======
+            debug = False
+            #!+=======
             if debug:
                 #* 是否保存 attention 
                 #* 不保存 直接设成false , 保存需要再model 里面先设置一下debug 保存attention 

@@ -15,6 +15,9 @@ import ipdb
 
 from IPython import embed
 st = ipdb.set_trace
+from my_script.utils import dump_json
+
+
 
 
 
@@ -204,7 +207,14 @@ class GroundingEvaluator:
         sem_scores[:, :sem_scores_.size(1), :sem_scores_.size(2)] = sem_scores_
 
         # Highest scoring box -> iou
-        for bid in range(len(positive_map)):
+
+        #!====================
+        if prefix == "last_":
+            save_for_vis = {}
+            dump_json('logs/debug/vis_refer.json',save_for_vis)#* 清空上一次的数据
+        #!====================
+
+        for bid in range(len(positive_map)): #* 便利每个batch
             # Keep scores for annotated objects only
             num_obj = int(end_points['box_label_mask'][bid].sum())
             pmap = positive_map[bid, :num_obj]
@@ -226,6 +236,7 @@ class GroundingEvaluator:
             ious = ious[torch.arange(len(ious)), torch.arange(len(ious))]
 
             # Measure IoU>threshold, ious are (obj, 10)
+            
             for t in self.thresholds:
                 thresholded = ious > t
                 for k in self.topks:
@@ -255,13 +266,30 @@ class GroundingEvaluator:
                                 self.dets['multi'] += found
                         elif k == 1 and t == self.thresholds[1]:
                             #* ACC@ 0.5
+                            
                             if end_points['is_unique'][bid]:
                                 self.gts['unique@0.50'] += 1
                                 self.dets['unique@0.50'] += found
                             else:
                                 self.gts['multi@0.50'] += 1
                                 self.dets['multi@0.50'] += found
+                            #!=========================
+                            if found and prefix == "last_":
+                                save_for_vis.update({       
+                                    bid:
+                                    {
+                                        "utterances":end_points['utterances'][bid],
+                                        "scan_ids":end_points['scan_ids'][bid],
+                                    }
+                                })
+                            #!=========================
 
+
+
+        #!=========================
+        if prefix == "last_":
+            dump_json('logs/debug/vis_refer.json',save_for_vis)
+        #!=========================
 
                             
 

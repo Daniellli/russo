@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 21:28:11
-LastEditTime: 2022-10-25 17:55:56
+LastEditTime: 2022-11-10 11:33:53
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/joint_semi_supervise_dataset.py
@@ -297,12 +297,27 @@ class JointSemiSupervisetDataset(Joint3DDataset):
                 for ind in anno['target_id']
             ])
 
+
+
+       
+
+            
+
         ret_dict = {
             'box_label_mask': box_label_mask.astype(np.float32),
             'center_label': gt_bboxes[:, :3].astype(np.float32),
             'sem_cls_label': _labels.astype(np.int64),
             'size_gts': gt_bboxes[:, 3:].astype(np.float32),
         }
+        
+        if 'ann_id' in anno.keys():
+            #  anno['ann_id']:
+            ret_dict.update({
+                'ann_id':anno['ann_id']
+            })
+
+
+            
 
         ret_dict.update({
             "scan_ids": anno['scan_id'],

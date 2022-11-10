@@ -1,11 +1,20 @@
 ###
 ###
  # @Author: xushaocong
- # @Date: 2022-10-24 10:21:18
- # @LastEditTime: 2022-11-10 11:29:27
+ # @Date: 2022-11-09 15:48:55
+ # @LastEditTime: 2022-11-10 11:30:43
  # @LastEditors: xushaocong
  # @Description: 
- # @FilePath: /butd_detr/my_script/train1.sh
+ # @FilePath: /butd_detr/my_script/train_nr3d.sh
+ # email: xushaocong@stu.xmu.edu.cn
+### 
+###
+ # @Author: xushaocong
+ # @Date: 2022-10-24 10:21:18
+ # @LastEditTime: 2022-11-09 15:20:28
+ # @LastEditors: xushaocong
+ # @Description: 
+ # @FilePath: /butd_detr/my_script/train2.sh
  # email: xushaocong@stu.xmu.edu.cn
 ### 
  # @Author: xushaocong
@@ -30,7 +39,7 @@ export PYTHONWARNINGS='ignore:semaphore_tracker:UserWarning'
 train_data=nr3d
 test_data=nr3d
 DATA_ROOT=datasets/
-gpu_ids="1,2,3,4,5,6,7"
+gpu_ids="0,1,2,3,4,5,6,7"
 gpu_num=7;
 
 
@@ -42,27 +51,26 @@ center_consistency_weight=5e-3;
 token_consistency_weight=1e-1;
 query_consistency_weight=1e-1;
 text_consistency_weight=1e-2;
-
 rampup_length=30;
 
-labeled_ratio=0.3;
+
+
 val_freq=1;
 print_freq=100;
 save_freq=$val_freq;
 
-
-epoch=900;
+epoch=800;
 port=29522
 
 
 #* for  semi supervision architecture  : step2
 b_size='4,8';
-# resume_model_path=pretrain/pretrain_20%_nr3d_3262_220.pth;
-# resume_model_path=pretrain/pretrain_50%_nr3d_3932_330.pth;
+# resume_model_path=pretrain/pretrain_nr3d_30%_3481_220.pth;
 # resume_model_path=logs/bdetr/nr3d/1667980370/student_ckpt_epoch_289_best.pth;
 resume_model_path=logs/bdetr/nr3d/1668007901/student_ckpt_epoch_372_best.pth;
 
-
+rampup_length=30;
+labeled_ratio=0.3;
 ema_decay=0.99;
 topk=8;
 
@@ -89,18 +97,14 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --query_consistency_weight $query_consistency_weight \
     --text_consistency_weight $text_consistency_weight \
     --checkpoint_path $resume_model_path \
-    --lr_decay_epochs 375 475 \
+    --lr_decay_epochs 375 445 \
     --lr_decay_intermediate \
+    --labeled_ratio $labeled_ratio \
     --rampup_length $rampup_length \
     --upload-wandb \
     2>&1 | tee -a logs/train_test_cls.log
 
-
-# --ema-full-supervise \
-
-#  --joint_det
     
-    
-
+# --reduce_lr \
 
 # --lr_decay_epochs 25 26 \

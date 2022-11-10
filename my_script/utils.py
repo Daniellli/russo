@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 20:04:19
-LastEditTime: 2022-11-03 21:20:37
+LastEditTime: 2022-11-10 13:28:52
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/my_script/utils.py
@@ -9,9 +9,11 @@ email: xushaocong@stu.xmu.edu.cn
 '''
 
 
+import json
 import os
 
 import os.path as osp
+import shutil
 import numpy as np
 
 import torch 
@@ -460,6 +462,28 @@ def points2box(box):
     
 
 
+def move_dir_file(src_dir,target_dir):
+
+    
+    for f in os.listdir(src_dir):
+        shutil.move(osp.join(src_dir,f),osp.join(target_dir,f))
+        
+
+
+
+def dump_json(path,json_data):
+
+    with open (path , 'w') as f :
+        
+        json.dump(json_data,f)
+
+
+def load_json(path):
+
+    with open (path , 'r') as f :
+        return json.load(f)
+
+
 
 '''
 description:  根据focal loss的公式编写
@@ -718,9 +742,9 @@ return {*}
 def save_for_vis(box,pc,save_path,scene_name,bidx,flag = "debug",idx=0,save = True):
       #* for teacher or student 
     if save :
-        save_pc(pc,os.path.join(save_path, '%s_%d_%d_gt_%s.ply'%(scene_name,idx,bidx,flag)))
+        save_pc(pc,os.path.join(save_path, '%s_%d_%s_gt_%s.ply'%(scene_name,idx,bidx,flag)))
     
-    save_box(box,os.path.join(save_path,'%s_%d_%d_box_%s.txt'%(scene_name,idx,bidx,flag)) )
+    save_box(box,os.path.join(save_path,'%s_%d_%s_box_%s.txt'%(scene_name,idx,bidx,flag)) )
 
 
 
@@ -728,6 +752,11 @@ def save_for_vis(box,pc,save_path,scene_name,bidx,flag = "debug",idx=0,save = Tr
 
 def save_txt(data,path):
     
+
+    with open('logs/debug/final_list.txt','w')as f :
+        f.write(data)
+
+
     with open(path,'w')as f :
         f.write(data)
 

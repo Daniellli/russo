@@ -241,13 +241,14 @@ class BaseTrainTester:
         if osp.exists(save_dir):
             os.remove(save_dir)
 
+
+
         #* 2.eval and save res to a txt file 
         load_checkpoint(args, model, None, None)
 
 
         #* eval student model 
-        #!==========
-
+        #!=========
         DEBUG = False
         if DEBUG:
             performance = self.inference_for_scanrefer_benchmark(
@@ -255,10 +256,16 @@ class BaseTrainTester:
                 model, criterion, set_criterion, args,for_vis=False,debug=DEBUG
             )
         else:
-            performance = self.evaluate_one_epoch(
+
+                performance = self.evaluate_one_epoch_and_save_qualitative_res(
                 args.start_epoch, test_loader,
                 model, criterion, set_criterion, args
             )
+            
+            # performance = self.evaluate_one_epoch(
+            #     args.start_epoch, test_loader,
+            #     model, criterion, set_criterion, args
+            # )
 
         if performance is not None :
             logger.info(','.join(['student_%s:%.04f'%(k,round(v,4)) for k,v in performance.items()]))
@@ -627,15 +634,16 @@ class BaseTrainTester:
             prefixes = ['object','text']
             debug_path = "logs/debug"
             save_format='%s_tmp_%d.ply'
-            new_save_format='%s_%s_%d_%d.ply'
+            new_save_format='%s_%s_%d_%s.ply'
 
             for prefix in prefixes:
                 print(prefix)
                 for idx, scan_name in enumerate(end_points['scan_ids']):
-                    target_save_path = osp.join(debug_path,scan_name+"_%d_%d"%(idx,batch_idx))
+                    target_save_path = osp.join(debug_path,scan_name+"_%d_%s"%(end_points['target_id'][idx],end_points['ann_id'][idx]))
                     make_dirs(target_save_path)
 
-                    new_name = osp.join(target_save_path, new_save_format%(prefix,scan_name,idx,batch_idx))
+        
+                    new_name = osp.join(target_save_path, new_save_format%(prefix,scan_name,end_points['target_id'][idx],end_points['ann_id'][idx]))
                     old_name = osp.join(debug_path, save_format%(prefix,idx))
                     os.rename(old_name,new_name)
         #!==================================================

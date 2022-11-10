@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-13 23:08:56
-LastEditTime: 2022-11-02 23:50:34
+LastEditTime: 2022-11-10 14:49:51
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/models/bdetr_kps.py
@@ -308,13 +308,13 @@ class BeaUTyDETRTKPS(nn.Module):
         
         if self.use_tkps:
             
-            end_points, cluster_xyz, cluster_feature  = self.sampling_module(
-                points_xyz, points_features, end_points
-            )
-            #todo :  如果是 debug 需要手动改成使用另一个function forward
-            # end_points, cluster_xyz, cluster_feature  = self.sampling_module.forward_for_debug(
-            #     points_xyz, points_features, end_points,debug=True,
+            # end_points, cluster_xyz, cluster_feature  = self.sampling_module(
+            #     points_xyz, points_features, end_points
             # )
+            #todo :  如果是 debug 需要手动改成使用另一个function forward
+            end_points, cluster_xyz, cluster_feature  = self.sampling_module.forward_for_debug(
+                points_xyz, points_features, end_points,debug=True,
+            )
         else :
             end_points = self._generate_queries(
                 points_xyz, points_features, end_points

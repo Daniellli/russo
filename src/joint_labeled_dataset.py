@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-04 19:55:56
-LastEditTime: 2022-10-25 17:56:32
+LastEditTime: 2022-11-10 09:35:13
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/joint_labeled_dataset.py
@@ -90,7 +90,9 @@ class JointLabeledDataset(JointSemiSupervisetDataset):
                 'target': ' '.join(str(anno['object_name']).split('_')),
                 'anchors': [],
                 'anchor_ids': [],
-                'dataset': 'scanrefer'
+                'dataset': 'scanrefer',
+                'ann_id':anno['ann_id']
+
             }
             for anno in reader
             if anno['scene_id'] in scan_ids
