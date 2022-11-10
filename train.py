@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-03 22:00:15
-LastEditTime: 2022-10-31 20:55:58
+LastEditTime: 2022-11-10 12:06:18
 LastEditors: xushaocong
 Description:  修改get_datasets , 换成可以添加使用数据集比例的dataloader
 FilePath: /butd_detr/train.py
@@ -594,9 +594,14 @@ class SemiSuperviseTrainTester(TrainTester):
                 # tmp = {scheduler._step_count+len(labeled_loader):1 } #* 一个epoch 后decay learning rate 
                 # tmp.update({ k:v for  idx, (k,v) in enumerate(scheduler.milestones.items()) if idx != 0})
                 # scheduler.milestones = tmp
+                logger.info(f"scheduler._step_count :{scheduler._step_count},args.start_epoch:{args.start_epoch},args.warmup_epoch:{args.warmup_epoch}")
+                decay_epoch = [( l-args.warmup_epoch - args.start_epoch ) for l in args.lr_decay_epochs]
 
-                scheduler.milestones ={len(labeled_dataset)*( l-args.warmup_epoch - args.start_epoch )+scheduler.last_epoch : 1 for l in args.lr_decay_epochs}
-                logger.info(scheduler.milestones )
+                logger.info(f"scheduler.last_epoch :{scheduler.last_epoch}")
+
+                scheduler.milestones ={len(labeled_loader)*l+scheduler.last_epoch : 1 for l in decay_epoch}
+                
+                logger.info(f"scheduler.milestones  :{scheduler.milestones }")
 
             #* eval student model 
             if args.eval:
