@@ -209,9 +209,10 @@ class GroundingEvaluator:
         # Highest scoring box -> iou
 
         #!====================
+        debug_path = 'logs/debug/vis_refer_%d.json'%(sem_scores.device.index)
         if prefix == "last_":
             save_for_vis = {}
-            dump_json('logs/debug/vis_refer.json',save_for_vis)#* 清空上一次的数据
+            dump_json(debug_path,save_for_vis)#* 清空上一次的数据
         #!====================
 
         for bid in range(len(positive_map)): #* 便利每个batch
@@ -288,7 +289,7 @@ class GroundingEvaluator:
 
         #!=========================
         if prefix == "last_":
-            dump_json('logs/debug/vis_refer.json',save_for_vis)
+            dump_json(debug_path,save_for_vis)
         #!=========================
 
                             

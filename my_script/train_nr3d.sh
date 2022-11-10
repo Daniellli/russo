@@ -2,7 +2,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-11-09 15:48:55
- # @LastEditTime: 2022-11-10 11:30:43
+ # @LastEditTime: 2022-11-10 15:00:04
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/train_nr3d.sh
@@ -40,7 +40,7 @@ train_data=nr3d
 test_data=nr3d
 DATA_ROOT=datasets/
 gpu_ids="0,1,2,3,4,5,6,7"
-gpu_num=7;
+gpu_num=4;
 
 
 

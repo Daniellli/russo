@@ -328,7 +328,7 @@ class TrainTester(BaseTrainTester):
             #!==========================
             #todo parse results and save 
             prefix = 'last_'
-            better_res = load_json('logs/debug/vis_refer.json')#* only for current batch 
+            better_res = load_json('logs/debug/vis_refer_%d.json'%(end_points['target_id'].device.index))#* only for current batch 
             
             attention_path = "logs/debug"
 

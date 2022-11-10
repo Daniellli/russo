@@ -633,9 +633,9 @@ class BaseTrainTester:
             # self.check_input(inputs,end_points['scan_ids'])
             prefixes = ['object','text']
             debug_path = "logs/debug"
-            save_format='%s_tmp_%d.ply'
+            save_format='%s_tmp_%d_%d.ply'
             new_save_format='%s_%s_%d_%s.ply'
-            # device_idx = batch_data['box_label_mask'].device.index
+            device_idx = batch_data['box_label_mask'].device.index
             for prefix in prefixes:
                 print(prefix)
                 for idx, scan_name in enumerate(end_points['scan_ids']):
@@ -643,7 +643,7 @@ class BaseTrainTester:
                     make_dirs(target_save_path)
                     new_name = osp.join(target_save_path, new_save_format%(prefix,scan_name,end_points['target_id'][idx],end_points['ann_id'][idx]))
 
-                    old_name = osp.join(debug_path, save_format%(prefix,idx))
+                    old_name = osp.join(debug_path, save_format%(prefix,idx,device_idx))
                     os.rename(old_name,new_name)
         #!==================================================
 
