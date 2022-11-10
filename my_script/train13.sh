@@ -1,11 +1,11 @@
 ###
 ###
  # @Author: xushaocong
- # @Date: 2022-10-24 10:21:18
- # @LastEditTime: 2022-10-27 23:11:36
+ # @Date: 2022-10-26 21:42:30
+ # @LastEditTime: 2022-11-10 00:03:34
  # @LastEditors: xushaocong
  # @Description: 
- # @FilePath: /butd_detr/my_script/train2.sh
+ # @FilePath: /butd_detr/my_script/train13.sh
  # email: xushaocong@stu.xmu.edu.cn
 ### 
  # @Author: xushaocong

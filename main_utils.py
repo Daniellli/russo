@@ -253,7 +253,7 @@ class BaseTrainTester:
         if DEBUG:
             performance = self.inference_for_scanrefer_benchmark(
                 args.start_epoch, test_loader,
-                model, criterion, set_criterion, args,for_vis=False,debug=DEBUG
+                model, criterion, set_criterion, args,for_vis=True,debug=DEBUG
             )
         else:
 
@@ -635,15 +635,14 @@ class BaseTrainTester:
             debug_path = "logs/debug"
             save_format='%s_tmp_%d.ply'
             new_save_format='%s_%s_%d_%s.ply'
-
+            # device_idx = batch_data['box_label_mask'].device.index
             for prefix in prefixes:
                 print(prefix)
                 for idx, scan_name in enumerate(end_points['scan_ids']):
                     target_save_path = osp.join(debug_path,scan_name+"_%d_%s"%(end_points['target_id'][idx],end_points['ann_id'][idx]))
                     make_dirs(target_save_path)
-
-        
                     new_name = osp.join(target_save_path, new_save_format%(prefix,scan_name,end_points['target_id'][idx],end_points['ann_id'][idx]))
+
                     old_name = osp.join(debug_path, save_format%(prefix,idx))
                     os.rename(old_name,new_name)
         #!==================================================
