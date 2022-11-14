@@ -2,7 +2,7 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-23 00:39:49
- # @LastEditTime: 2022-11-02 15:51:51
+ # @LastEditTime: 2022-11-14 16:09:36
  # @LastEditors: xushaocong
  # @Description: 
  # @FilePath: /butd_detr/my_script/scanrefer_benchmark.sh
@@ -60,19 +60,10 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     2>&1 | tee -a logs/train_test_cls.log
 
 # --use-tkps 
-
-
-
 # --query_points_obj_topk $topk \
 # --upload-wandb \
-
-
-
 # --lr_decay_intermediate \
 # --lr_decay_epochs 160 175 \
-
-
-
 # --butd 
 # --lr_decay_epochs 25 26 \
 

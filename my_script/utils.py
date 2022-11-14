@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 20:04:19
-LastEditTime: 2022-11-10 13:28:52
+LastEditTime: 2022-11-14 16:14:10
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/my_script/utils.py
@@ -25,6 +25,16 @@ from my_script.pc_utils import write_pc_as_ply
 import argparse
 from collections import OrderedDict
 
+
+from glob import glob
+
+import os.path as osp
+
+
+import shutil
+from tqdm import tqdm
+import os
+import multiprocessing as mp
 
 
 
@@ -792,6 +802,56 @@ def remove_file(old_path):
 
 
 
+
+def copy_ARKitScens():
+    
+    src_path = "/home/DISCOVER_summer2022/xusc/exp/butd_detr/datasets/arkitscenes/dataset/3dod"
+    tgt_path='/home/DISCOVER_summer2022/xusc/exp/butd_detr/datasets/ARKitScenes/dataset/3dod'
+
+    splits = {
+        'train':"Training",'valid':"Validation"
+    }
+
+
+    for split,item in splits.items():
+        src_all_sample_pathes  = os.listdir(osp.join(src_path,item))
+
+        for p in tqdm(src_all_sample_pathes):
+            src = osp.join(src_path,item,p,f'{p}_offline_prepared_data_2')
+            tgt = osp.join(tgt_path,item,p,f'{p}_offline_prepared_data_2')
+
+            if osp.exists(tgt):
+                shutil.rmtree(tgt)
+                
+            
+
+            if osp.exists(src):
+                shutil.copytree(src,tgt)
+            
+
+
+
+
+
+def delete_ckpt_except_last_one(path):
+    for o in os.listdir(path ):
+        all_ckpt = glob(osp.join(path,o)+"/*.pth")
+        num = len(all_ckpt)
+        if num >1:
+            all_ckpt = sorted(all_ckpt,key = lambda x : int(x.split('/')[-1].split('_')[-2]))
+            
+            for ckpt in all_ckpt[:-1]:
+                os.remove(ckpt)
+                print(ckpt,"has deleted")
+            print("=======================================")
+
+
+
+
+
+
+
+
 if __name__ == "__main__":
     # read_refer_it_3D_txt()
     # read_refer_it_3D_txt(path="/home/DISCOVER_summer2022/xusc/exp/butd_detr/data/meta_data/sr3d_train_scans.txt")
@@ -807,4 +867,9 @@ if __name__ == "__main__":
     # save_pc_for_detector(train_dataset)
     # save_pc_for_detector(val_dataset)
     # pc,scane_name=val_dataset.get_origin_data(0)
+
+
+    #* delete ckpy try
+    # path = "/home/DISCOVER_summer2022/xusc/exp/butd_detr/logs/bdetr/scanrefer"
+    # delete_ckpt_except_last_one(path)
 

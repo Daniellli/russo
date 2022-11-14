@@ -1,22 +1,12 @@
 '''
 Author: xushaocong
-Date: 2022-08-24 23:30:52
-LastEditTime: 2022-08-24 23:45:47
+Date: 2022-08-24 20:28:36
+LastEditTime: 2022-11-14 16:15:37
 LastEditors: xushaocong
-Description:  using open3d for vis 
+Description: 
 FilePath: /butd_detr/my_script/vis_utils.py
 email: xushaocong@stu.xmu.edu.cn
 '''
-'''
-Author: xushaocong
-Date: 2022-08-24 20:28:36
-LastEditTime: 2022-08-24 23:27:48
-LastEditors: xushaocong
-Description: 
-FilePath: /代码能力提升/point_exp2.py
-email: xushaocong@stu.xmu.edu.cn
-'''
-
 
 #!/usr/bin/env python
 #!coding=utf-8
