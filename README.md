@@ -1,12 +1,3 @@
-<!--
- * @Author: xushaocong
- * @Date: 2022-11-14 16:30:13
- * @LastEditTime: 2022-11-14 19:18:00
- * @LastEditors: xushaocong
- * @Description: 
- * @FilePath: /butd_detr/README.md
- * email: xushaocong@stu.xmu.edu.cn
--->
 # RUSSO: 3D Reference Understanding Transformers with Less Boxes
 
 
@@ -79,7 +70,7 @@ Note that these checkpoints were stored while using `DistributedDataParallel`. T
 
 
 ## Acknowledgements
-Parts of this code were based on the codebase of  [BUTD-DETR](https://github.com/nickgkan/butd_detr) and   [Group-Free](https://github.com/zeliu98/Group-Free-3D). The loss implementation (Hungarian matching and criterion class) are based on the codebase of [MDETR](https://github.com/ashkamath/mdetr).
+Parts of this code were based on the codebase of  [BUTD-DETR](https://github.com/nickgkan/butd_detr). The loss implementation (Hungarian matching and criterion class) are based on the codebase of [MDETR](https://github.com/ashkamath/mdetr).
 
 
 ## Citing ROSSO
