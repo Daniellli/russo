@@ -1,13 +1,16 @@
-# Update log 
-
-train_dist_mod_2.py : 修改了get_datasets  , 换成了可以添加加载数据集比例的dataset 
-
-
-
-
-
-
+<!--
+ * @Author: xushaocong
+ * @Date: 2022-11-14 16:30:13
+ * @LastEditTime: 2022-11-14 16:31:41
+ * @LastEditors: xushaocong
+ * @Description: 
+ * @FilePath: /butd_detr/README.md
+ * email: xushaocong@stu.xmu.edu.cn
+-->
 # Bottom Up Top Down Detection Transformers for Language Grounding in Images and Point Clouds
+
+
+
 
 
 By [Ayush Jain](https://github.com/ayushjain1144), [Nikolaos Gkanatsios](https://github.com/nickgkan), [Ishita Mediratta](https://github.com/ishitamed19), [Katerina Fragkiadaki](https://www.cs.cmu.edu/~katef/).
