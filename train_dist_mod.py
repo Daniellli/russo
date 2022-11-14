@@ -341,13 +341,13 @@ class TrainTester(BaseTrainTester):
 
                 # for  idx in better_idxs:
                 #     record_res.append(end_points['scan_ids'][idx]+"_%d_%s"%(end_points['target_id'][idx].cpu().numpy(),end_points['ann_id'][idx]))
-
-
                 
                 for idx,batch_res in  enumerate(batch_pred_map_cls):
                     sample_id = end_points['scan_ids'][idx]+"_%d_%s"%(end_points['target_id'][idx].cpu().numpy(),end_points['ann_id'][idx])
+                    #* better_idxs 表示这个sample 是否iou > 0.5 , qualitative_list 表示我自己列出来的需要保存的
                     
-                    if idx  in better_idxs and sample_id in qualitative_list:
+                    # if idx  in better_idxs and sample_id in qualitative_list:
+                    if  sample_id in qualitative_list:
                         #* 1. 获取target id 
                         #* 2. 根据target id 获取这个target 对应的 score 最大的target  
                         #* 3. 保存对应的 box等信息
