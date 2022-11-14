@@ -1,13 +1,13 @@
 <!--
  * @Author: xushaocong
  * @Date: 2022-11-14 16:30:13
- * @LastEditTime: 2022-11-14 18:27:55
+ * @LastEditTime: 2022-11-14 18:30:36
  * @LastEditors: xushaocong
  * @Description: 
  * @FilePath: /butd_detr/README.md
  * email: xushaocong@stu.xmu.edu.cn
 -->
-# Bottom Up Top Down Detection Transformers for Language Grounding in Images and Point Clouds
+# RUSSO: 3D Reference Understanding Transformers with Less Boxes
 
 
 
