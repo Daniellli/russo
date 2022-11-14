@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-04 19:55:56
-LastEditTime: 2022-11-10 09:35:13
+LastEditTime: 2022-11-14 18:08:36
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/joint_labeled_dataset.py
@@ -32,6 +32,7 @@ import numpy as np
 from data.model_util_scannet import ScannetDatasetConfig
 from src.joint_semi_supervise_dataset import JointSemiSupervisetDataset
 
+from loguru import logger 
 
 
 
@@ -64,6 +65,7 @@ class JointLabeledDataset(JointSemiSupervisetDataset):
 
     def load_scanrefer_annos(self):
         """Load annotations of ScanRefer."""
+        logger.info(f"in JointLabeledDataset, load_scanrefer_annos ")
         _path = self.data_path + 'scanrefer/ScanRefer_filtered'
         split = self.split
         if split in ('val', 'test'):
@@ -81,6 +83,7 @@ class JointLabeledDataset(JointSemiSupervisetDataset):
             
         with open(_path + '_%s.json' % split) as f:
             reader = json.load(f)
+
         annos = [
             {
                 'scan_id': anno['scene_id'],

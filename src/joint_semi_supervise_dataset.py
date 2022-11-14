@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 21:28:11
-LastEditTime: 2022-11-10 11:33:53
+LastEditTime: 2022-11-14 18:15:11
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/src/joint_semi_supervise_dataset.py
@@ -178,6 +178,8 @@ class JointSemiSupervisetDataset(Joint3DDataset):
         
         origin_box = self.get_current_pc_box(scan)
 
+
+        
         # Populate anno (used only for scannet)
         self.random_utt = False
         if anno['dataset'] == 'scannet':
@@ -310,11 +312,18 @@ class JointSemiSupervisetDataset(Joint3DDataset):
             'size_gts': gt_bboxes[:, 3:].astype(np.float32),
         }
         
-        if 'ann_id' in anno.keys():
+        #* the anno['dataset']=='scanrefer' actually do not need 
+        if 'ann_id' in anno.keys() and anno['dataset']=='scanrefer':
             #  anno['ann_id']:
             ret_dict.update({
                 'ann_id':anno['ann_id']
             })
+        elif anno['dataset']=='scannet' :
+            #* scannet , because joint_det is added 
+            ret_dict.update({
+                'ann_id':'-1'
+            })
+
 
 
             

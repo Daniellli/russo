@@ -36,7 +36,7 @@ DC18 = ScannetDatasetConfig(18)
 MAX_NUM_OBJ = 132
 
 import os.path as osp
-
+from loguru import logger 
 
 
 
@@ -227,11 +227,11 @@ class Joint3DDataset(Dataset):
 
     def load_scanrefer_annos(self):
         """Load annotations of ScanRefer."""
+        logger.info(f"in joint det dataset, ")
         _path = self.data_path + 'scanrefer/ScanRefer_filtered'
         split = self.split
         # if split in ('val', 'test'):
         #     split = 'val'
-
 
         with open(_path + '_%s.txt' % split) as f:
             scan_ids = [line.rstrip().strip('\n') for line in f.readlines()]

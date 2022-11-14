@@ -162,3 +162,7 @@ datasets/*
 
 vis_results
 vis_results/*
+
+
+
+*.tar.gz

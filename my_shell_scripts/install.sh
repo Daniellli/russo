@@ -1,10 +1,10 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-08-19 16:32:03
- # @LastEditTime: 2022-09-04 14:15:27
+ # @LastEditTime: 2022-11-14 16:41:55
  # @LastEditors: xushaocong
  # @Description: 
- # @FilePath: /butd_detr/my_script/install.sh
+ # @FilePath: /butd_detr/my_shell_scripts/install.sh
  # email: xushaocong@stu.xmu.edu.cn
 ### 
 
@@ -18,7 +18,7 @@
 
 #* env install , 除了cerberus2 的环境 还需要额外安装下面环境
 #! : 1. make log dir 
-# mkdir logs
+mkdir logs
 
 #! 2. bash to run follow line
 pip install transformers
@@ -26,10 +26,15 @@ pip install plyfile
 pip install h5py
 pip install termcolor
 pip install ipdb
-sh init.sh
 pip install open3d
 pip install trimesh
 pip install huggingface_hub
+
+
+
+
+
+# sh init.sh
 
 #!: 3. run follow line one by one
 # huggingface-cli login

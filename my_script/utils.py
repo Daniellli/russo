@@ -1,7 +1,7 @@
 '''
 Author: xushaocong
 Date: 2022-10-02 20:04:19
-LastEditTime: 2022-11-14 16:14:10
+LastEditTime: 2022-11-14 16:53:05
 LastEditors: xushaocong
 Description: 
 FilePath: /butd_detr/my_script/utils.py
@@ -92,8 +92,8 @@ def parse_semi_supervise_option():
     parser.add_argument('--max_epoch', type=int, default=400)
     parser.add_argument('--optimizer', type=str, default='adamW')
     parser.add_argument('--weight_decay', type=float, default=0.0005)
-    parser.add_argument("--lr", default=1e-3, type=float)
-    parser.add_argument("--lr_backbone", default=1e-4, type=float)
+    parser.add_argument("--lr", default=1e-4, type=float)
+    parser.add_argument("--lr_backbone", default=1e-3, type=float)
     parser.add_argument("--text_encoder_lr", default=1e-5, type=float)
     parser.add_argument('--lr-scheduler', type=str, default='step',
                         choices=["step", "cosine"])
@@ -148,9 +148,8 @@ def parse_semi_supervise_option():
     parser.add_argument('--use-tkps',action='store_true', help="use-tkps")
     parser.add_argument('--lr_decay_intermediate',action='store_true')
 
+
     parser.add_argument('--ema-decay', default=None, type=float,help=' EMA decay parameter ')
-
-
     parser.add_argument('--ema-full-supervise', action='store_true',help='ema-full-supervise ')
 
     
@@ -213,8 +212,8 @@ def parse_option():
     parser.add_argument('--max_epoch', type=int, default=400)
     parser.add_argument('--optimizer', type=str, default='adamW')
     parser.add_argument('--weight_decay', type=float, default=0.0005)
-    parser.add_argument("--lr", default=1e-3, type=float)
-    parser.add_argument("--lr_backbone", default=1e-4, type=float)
+    parser.add_argument("--lr", default=1e-4, type=float)
+    parser.add_argument("--lr_backbone", default=1e-3, type=float)
     parser.add_argument("--text_encoder_lr", default=1e-5, type=float)
     parser.add_argument('--lr-scheduler', type=str, default='step',
                         choices=["step", "cosine"])

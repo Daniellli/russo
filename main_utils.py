@@ -257,15 +257,14 @@ class BaseTrainTester:
             )
         else:
 
-                performance = self.evaluate_one_epoch_and_save_qualitative_res(
-                args.start_epoch, test_loader,
-                model, criterion, set_criterion, args
-            )
-            
-            # performance = self.evaluate_one_epoch(
+            #     performance = self.evaluate_one_epoch_and_save_qualitative_res(
             #     args.start_epoch, test_loader,
             #     model, criterion, set_criterion, args
             # )
+            performance = self.evaluate_one_epoch(
+                args.start_epoch, test_loader,
+                model, criterion, set_criterion, args
+            )
 
         if performance is not None :
             logger.info(','.join(['student_%s:%.04f'%(k,round(v,4)) for k,v in performance.items()]))
