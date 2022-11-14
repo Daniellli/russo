@@ -1,12 +1,4 @@
-'''
-Author: xushaocong
-Date: 2022-08-19 16:28:28
-LastEditTime: 2022-10-30 23:35:04
-LastEditors: xushaocong
-Description: 
-FilePath: /butd_detr/models/__init__.py
-email: xushaocong@stu.xmu.edu.cn
-'''
+
 # ------------------------------------------------------------------------
 # BEAUTY DETR
 # Copyright (c) 2022 Ayush Jain & Nikolaos Gkanatsios

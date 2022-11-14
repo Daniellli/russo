@@ -1,12 +1,5 @@
-'''
-Author: xushaocong
-Date: 2022-10-17 21:35:33
-LastEditTime: 2022-10-17 22:18:15
-LastEditors: xushaocong
-Description: 
-FilePath: /butd_detr/src/arkitscenes_utils.py
-email: xushaocong@stu.xmu.edu.cn
-'''
+
+
 import os
 import sys
 import json

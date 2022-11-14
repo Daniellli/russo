@@ -1,13 +1,3 @@
-'''
-Author: xushaocong
-Date: 2022-10-21 09:41:47
-LastEditTime: 2022-10-25 19:21:10
-LastEditors: xushaocong
-Description: 
-FilePath: /butd_detr/src/unlabeled_arkitscenes_dataset.py
-email: xushaocong@stu.xmu.edu.cn
-'''
-
 
 
 import os

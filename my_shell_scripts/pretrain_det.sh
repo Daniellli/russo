@@ -1,14 +1,4 @@
 
-###
- # @Author: xushaocong
- # @Date: 2022-11-14 17:27:58
- # @LastEditTime: 2022-11-14 17:28:16
- # @LastEditors: xushaocong
- # @Description: #* the only different is butd parameter 
- # @FilePath: /butd_detr/my_shell_scripts/pretrain_det.sh
- # email: xushaocong@stu.xmu.edu.cn
-### 
-
 export PYTHONWARNINGS='ignore:semaphore_tracker:UserWarning'
 
 # * dataset could be [sr3d, nr3d, scanrefer, scannet, sr3d+]

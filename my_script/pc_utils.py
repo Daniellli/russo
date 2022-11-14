@@ -1,12 +1,4 @@
-'''
-Author: xushaocong
-Date: 2022-08-22 15:05:23
-LastEditTime: 2022-10-30 20:52:36
-LastEditors: xushaocong
-Description: 
-FilePath: /butd_detr/my_script/pc_utils.py
-email: xushaocong@stu.xmu.edu.cn
-'''
+
 
 
 

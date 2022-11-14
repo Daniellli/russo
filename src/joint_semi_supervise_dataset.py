@@ -1,12 +1,4 @@
-'''
-Author: xushaocong
-Date: 2022-10-02 21:28:11
-LastEditTime: 2022-11-14 18:15:11
-LastEditors: xushaocong
-Description: 
-FilePath: /butd_detr/src/joint_semi_supervise_dataset.py
-email: xushaocong@stu.xmu.edu.cn
-'''
+
 # ------------------------------------------------------------------------
 # BEAUTY DETR
 # Copyright (c) 2022 Ayush Jain & Nikolaos Gkanatsios

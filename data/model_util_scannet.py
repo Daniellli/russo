@@ -1,12 +1,4 @@
-'''
-Author: xushaocong
-Date: 2022-08-19 18:59:01
-LastEditTime: 2022-10-18 17:16:06
-LastEditors: xushaocong
-Description: 
-FilePath: /butd_detr/data/model_util_scannet.py
-email: xushaocong@stu.xmu.edu.cn
-'''
+
 # ------------------------------------------------------------------------
 # BEAUTY DETR
 # Copyright (c) 2022 Ayush Jain & Nikolaos Gkanatsios

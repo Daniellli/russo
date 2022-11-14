@@ -1,21 +1,4 @@
-'''
-Author: xushaocong
-Date: 2022-10-04 19:55:59
-LastEditTime: 2022-10-25 17:49:18
-LastEditors: xushaocong
-Description: 
-FilePath: /butd_detr/src/joint_unlabeled_dataset.py
-email: xushaocong@stu.xmu.edu.cn
-'''
-'''
-Author: xushaocong
-Date: 2022-10-02 21:28:11
-LastEditTime: 2022-10-04 19:55:44
-LastEditors: xushaocong
-Description: 
-FilePath: /butd_detr/src/sr3d_dataset.py
-email: xushaocong@stu.xmu.edu.cn
-'''
+
 # ------------------------------------------------------------------------
 # BEAUTY DETR
 # Copyright (c) 2022 Ayush Jain & Nikolaos Gkanatsios

@@ -1,12 +1,3 @@
-'''
-Author: xushaocong
-Date: 2022-10-03 22:00:15
-LastEditTime: 2022-11-14 17:52:39
-LastEditors: xushaocong
-Description:  修改get_datasets , 换成可以添加使用数据集比例的dataloader
-FilePath: /butd_detr/train.py
-email: xushaocong@stu.xmu.edu.cn
-'''
 # ------------------------------------------------------------------------
 # BEAUTY DETR
 # Copyright (c) 2022 Ayush Jain & Nikolaos Gkanatsios

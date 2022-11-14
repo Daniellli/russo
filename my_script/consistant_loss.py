@@ -1,15 +1,3 @@
-'''
-Author: xushaocong
-Date: 2022-09-22 23:13:23
-LastEditTime: 2022-10-13 21:32:18
-LastEditors: xushaocong
-Description: 
-FilePath: /butd_detr/my_script/consistant_loss.py
-email: xushaocong@stu.xmu.edu.cn
-'''
-
-
-
 
  
 

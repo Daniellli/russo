@@ -1,12 +1,3 @@
-'''
-Author: xushaocong
-Date: 2022-10-02 20:04:19
-LastEditTime: 2022-11-14 16:53:05
-LastEditors: xushaocong
-Description: 
-FilePath: /butd_detr/my_script/utils.py
-email: xushaocong@stu.xmu.edu.cn
-'''
 
 
 import json

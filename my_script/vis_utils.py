@@ -1,12 +1,4 @@
-'''
-Author: xushaocong
-Date: 2022-08-24 20:28:36
-LastEditTime: 2022-11-14 16:15:37
-LastEditors: xushaocong
-Description: 
-FilePath: /butd_detr/my_script/vis_utils.py
-email: xushaocong@stu.xmu.edu.cn
-'''
+
 
 #!/usr/bin/env python
 #!coding=utf-8

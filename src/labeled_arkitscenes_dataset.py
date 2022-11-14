@@ -1,22 +1,3 @@
-'''
-Author: xushaocong
-Date: 2022-10-22 10:41:31
-LastEditTime: 2022-10-30 15:41:10
-LastEditors: xushaocong
-Description: 
-FilePath: /butd_detr/src/labeled_arkitscenes_dataset.py
-email: xushaocong@stu.xmu.edu.cn
-'''
-'''
-Author: xushaocong
-Date: 2022-10-21 09:41:47
-LastEditTime: 2022-10-22 02:01:51
-LastEditors: xushaocong
-Description: 
-FilePath: /butd_detr/src/arkitscenes_dataset.py
-email: xushaocong@stu.xmu.edu.cn
-'''
-
 
 
 import os

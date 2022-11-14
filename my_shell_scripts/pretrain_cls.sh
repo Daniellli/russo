@@ -1,14 +1,4 @@
 
-###
- # @Author: xushaocong
- # @Date: 2022-10-24 00:27:51
- # @LastEditTime: 2022-11-14 17:27:37
- # @LastEditors: xushaocong
- # @Description: 
- # @FilePath: /butd_detr/my_shell_scripts/pretrain_cls.sh
- # email: xushaocong@stu.xmu.edu.cn
-### 
-
 
 export PYTHONWARNINGS='ignore:semaphore_tracker:UserWarning'
 

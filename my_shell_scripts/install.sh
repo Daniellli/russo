@@ -1,14 +1,3 @@
-###
- # @Author: xushaocong
- # @Date: 2022-08-19 16:32:03
- # @LastEditTime: 2022-11-14 16:41:55
- # @LastEditors: xushaocong
- # @Description: 
- # @FilePath: /butd_detr/my_shell_scripts/install.sh
- # email: xushaocong@stu.xmu.edu.cn
-### 
-
-
 
 # conda env create -f environment.yml --name bdetr3d
 # conda activate bdetr3d

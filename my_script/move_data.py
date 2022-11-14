@@ -1,12 +1,4 @@
-'''
-Author: xushaocong
-Date: 2022-10-27 11:34:49
-LastEditTime: 2022-10-27 13:43:45
-LastEditors: xushaocong
-Description: 
-FilePath: /butd_detr/my_script/move_data.py
-email: xushaocong@stu.xmu.edu.cn
-'''
+
 
 
 import numpy as np

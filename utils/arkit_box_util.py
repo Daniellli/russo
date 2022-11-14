@@ -1,12 +1,3 @@
-'''
-Author: xushaocong
-Date: 2022-10-20 15:32:15
-LastEditTime: 2022-10-20 15:32:15
-LastEditors: xushaocong
-Description: 
-FilePath: /butd_detr/utils/arkit_box_util.py
-email: xushaocong@stu.xmu.edu.cn
-'''
 
 
 

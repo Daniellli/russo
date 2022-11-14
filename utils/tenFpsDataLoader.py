@@ -1,12 +1,4 @@
-'''
-Author: xushaocong
-Date: 2022-10-20 15:18:43
-LastEditTime: 2022-10-20 15:40:28
-LastEditors: xushaocong
-Description: 
-FilePath: /butd_detr/utils/tenFpsDataLoader.py
-email: xushaocong@stu.xmu.edu.cn
-'''
+
 import copy
 import cv2
 import glob

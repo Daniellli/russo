@@ -1,12 +1,4 @@
-'''
-Author: xushaocong
-Date: 2022-10-20 15:20:23
-LastEditTime: 2022-10-20 15:20:23
-LastEditors: xushaocong
-Description: 
-FilePath: /butd_detr/utils/taxonomy.py
-email: xushaocong@stu.xmu.edu.cn
-'''
+
 #TODO: no original categories
 # shortened version only
 

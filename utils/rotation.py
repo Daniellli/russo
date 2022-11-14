@@ -1,12 +1,6 @@
-'''
-Author: xushaocong
-Date: 2022-10-20 15:21:04
-LastEditTime: 2022-10-20 15:21:04
-LastEditors: xushaocong
-Description: 
-FilePath: /butd_detr/utils/rotation.py
-email: xushaocong@stu.xmu.edu.cn
-'''
+
+
+
 import cv2
 import math
 import numpy as np

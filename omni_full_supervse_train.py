@@ -1,19 +1,7 @@
-'''
-Author: xushaocong
-Date: 2022-10-03 22:00:15
-LastEditTime: 2022-10-30 14:57:12
-LastEditors: xushaocong
-Description:  将 ARKitScenes 也作为有标签数据进行监督 , 也就是用mean teacher 
+# 1.和其他main function 不同的是需要 加载labeledARKitScenes ,
+# 2.  然后loss 计算需要考虑 query loss  ,   
+# 3. batch size 需要考虑 所有的labeled datsets 和ARKitScenes datasets , 和这些一样
 
-1.和其他main function 不同的是需要 加载labeledARKitScenes ,
-2.  然后loss 计算需要考虑 query loss  ,   
-3. batch size 需要考虑 所有的labeled datsets 和ARKitScenes datasets , 和这些一样
-- train.py 
-- omni_supervise_train.py
-
-FilePath: /butd_detr/omni_full_supervse_train.py
-email: xushaocong@stu.xmu.edu.cn
-'''
 # ------------------------------------------------------------------------
 # BEAUTY DETR
 # Copyright (c) 2022 Ayush Jain & Nikolaos Gkanatsios
