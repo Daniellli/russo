@@ -1,7 +1,7 @@
 <!--
  * @Author: xushaocong
  * @Date: 2022-11-14 16:30:13
- * @LastEditTime: 2022-11-14 18:30:36
+ * @LastEditTime: 2022-11-14 19:18:00
  * @LastEditors: xushaocong
  * @Description: 
  * @FilePath: /butd_detr/README.md
@@ -9,11 +9,6 @@
 -->
 # RUSSO: 3D Reference Understanding Transformers with Less Boxes
 
-
-
-
-
-By [Shaocong Xu](https://github.com/Daniellli).
 
 
 Official implementation of 《RUSSO: 3D Reference Understanding Transformers with Less Boxes》
