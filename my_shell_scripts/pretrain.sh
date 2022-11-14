@@ -2,10 +2,10 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-10-24 00:27:51
- # @LastEditTime: 2022-11-09 23:29:58
+ # @LastEditTime: 2022-11-14 16:18:19
  # @LastEditors: xushaocong
  # @Description: 
- # @FilePath: /butd_detr/my_script/single_datasets_pretrain_1.sh
+ # @FilePath: /butd_detr/my_shell_scripts/single_datasets_pretrain.sh
  # email: xushaocong@stu.xmu.edu.cn
 ### 
 
@@ -33,18 +33,14 @@ save_freq=5;
 val_freq=5;
 print_freq=10;
 save_freq=$val_freq;
-
 # resume_mode_path=logs/bdetr/sr3d/1667060778/ckpt_epoch_60_best.pth;
-# resume_mode_path=logs/bdetr/nr3d/1667666279/ckpt_epoch_216_best.pth;
-
-
-# resume_mode_path=logs/bdetr/sr3d/1667007312/ckpt_epoch_20_best.pth;
 
 
 #* for  semi supervision architecture  : step1 x
 labeled_ratio=0.7;
-
 topk=8;
+
+
 TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
     train_dist_mod.py --num_decoder_layers 6 \
     --use_color \

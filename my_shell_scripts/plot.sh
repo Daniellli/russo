@@ -1,10 +1,10 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-11-10 15:10:46
- # @LastEditTime: 2022-11-10 21:53:15
+ # @LastEditTime: 2022-11-14 16:17:31
  # @LastEditors: xushaocong
  # @Description: 
- # @FilePath: /butd_detr/my_script/plot.sh
+ # @FilePath: /butd_detr/my_shell_scripts/plot.sh
  # email: xushaocong@stu.xmu.edu.cn
 ### 
 train_data="scanrefer"
@@ -14,6 +14,8 @@ DATA_ROOT=datasets/
 gpu_ids="0,1,2,3,4,5,6,7"
 gpu_num=8
 b_size=64
+
+
 
 port=29511
 save_freq=100;

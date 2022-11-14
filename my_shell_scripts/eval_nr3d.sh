@@ -2,10 +2,10 @@
 ###
  # @Author: xushaocong
  # @Date: 2022-11-07 19:54:41
- # @LastEditTime: 2022-11-07 20:00:27
+ # @LastEditTime: 2022-11-14 16:18:26
  # @LastEditors: xushaocong
  # @Description: 
- # @FilePath: /butd_detr/my_script/eval_nr3d.sh
+ # @FilePath: /butd_detr/my_shell_scripts/eval_nr3d.sh
  # email: xushaocong@stu.xmu.edu.cn
 ### 
 ###
@@ -71,14 +71,13 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --eval \
     2>&1 | tee -a logs/train_test_cls.log
 
+
+
 # --lr_decay_epochs 61 66 \
 #     --lr_decay_intermediate \
 # --upload-wandb \
 # --labeled_ratio $labeled_ratio \
 # --debug \
-
-
-
 
 #  --joint_det
 # --use-tkps \
