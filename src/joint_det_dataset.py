@@ -336,6 +336,7 @@ class Joint3DDataset(Dataset):
                     'dataset': 'scannet'
                 })
         if self.split == 'train':
+            #? 这是干嘛? 过滤这个区间的数据?
             annos = [
                 anno for a, anno in enumerate(annos)
                 if a not in {965, 977}
