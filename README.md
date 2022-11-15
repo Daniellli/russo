@@ -51,8 +51,70 @@ If you need to use a different version, you can try to modify `environment.yml` 
 - `Note: ` On NR3D and ScanRefer we need much more training epochs to converge. It's better to monitor the validation accuracy and decrease learning rate accordingly.
 
 ## Pre-trained checkpoints
-`todo: ` 
+`Our chekcpoints  are available as follows: `
+
+
+
+
+### ScanRefer
+
+| Labeled | Unlabeled | Model (baidu pan)                               | extract  code |
+| ------- | --------- | ----------------------------------------------- | ------------- |
+| 20%     |           | https://pan.baidu.com/s/1Tq_cvj35KYtJuc8pKEZCJA | bft2          |
+| 20%     | 80%       | https://pan.baidu.com/s/1oSmAPp59CVzVuwZPeL1BMA | twkp          |
+| 30%     |           | https://pan.baidu.com/s/16wkTh5FwALmSNiRr9DnafQ | a958          |
+| 30%     | 70%       | https://pan.baidu.com/s/1DkVUhYaFvC_o36900qZCtQ | phyc          |
+| 50%     |           | https://pan.baidu.com/s/1EGqGnNSSOTCDs0OS0iwmyg | h7b4          |
+| 50%     | 50%       | https://pan.baidu.com/s/1HeJMf7m0rpMvZv16q7MRNg | rzw3          |
+| 100%    |           | https://pan.baidu.com/s/1YwNyJrAdA0IFa1lwkV_yQA | y4yi          |
+| 100%    | 100%      | https://pan.baidu.com/s/1R0hGWZmmrd6YLUJJvacnyw | gwgg          |
+
+
+
+
+
+### Nr3D
+
+| Labeled | Unlabeled | Model (baidu pan)                               | extract  code |
+| ------- | --------- | ----------------------------------------------- | ------------- |
+| 20%     |           | https://pan.baidu.com/s/17KrmeeMFeeg6hB3PLziaBQ | ehfk          |
+| 20%     | 80%       | https://pan.baidu.com/s/1z_MB9YJq7wGQVpoIVAHAHg | my44          |
+| 30%     |           | https://pan.baidu.com/s/1Jkj8gxq-dHj60bIl7qIaOA | kdgt          |
+| 30%     | 70%       | https://pan.baidu.com/s/1FPurxPrn5AYOKEXs5t-UhA | mbbj          |
+| 50%     |           | https://pan.baidu.com/s/11rKbrj33s2AKRRfmcwO1rQ | ujvw          |
+| 50%     | 50%       | https://pan.baidu.com/s/17TIIQWD4g0Ltg4swj59t7w | e7j8          |
+| 100%    |           | https://pan.baidu.com/s/1XfkaATThKX3oHPONuHN7gQ | k83c          |
+| 100%    | 100%      | https://pan.baidu.com/s/1aYNVLAjaheZCby9dliIU3w | 1gm1          |
+
+
+
+
+
+
+
+
+
+### Sr3D
+
+| Labeled | Unlabeled | Model (baidu pan)                               | extract  code |
+| ------- | --------- | ----------------------------------------------- | ------------- |
+| 20%     |           | https://pan.baidu.com/s/1V2jxN4wmh75u5fG8YkKLrA | b7ka          |
+| 20%     | 80%       | https://pan.baidu.com/s/1wYgUucmASmdh6ExBtyoN5Q | str6          |
+| 30%     |           | https://pan.baidu.com/s/1nsJZHEyX_Jk-MyINM8Fg3g | 1sx3          |
+| 30%     | 70%       | https://pan.baidu.com/s/1VEiJHzkkD5LDnN_FQEIANg | pd6v          |
+| 50%     |           | https://pan.baidu.com/s/1WoAFfLCNudeLK2UeINtSkQ | rbzc          |
+| 50%     | 50%       | https://pan.baidu.com/s/1Os3OQUEmfgBGQIwHI8Rt6A | hwba          |
+| 100%    |           | https://pan.baidu.com/s/1AP8i1vXx5BgQI-dXZUSs6w | piff          |
+| 100%    | 100%      | https://pan.baidu.com/s/1AP8i1vXx5BgQI-dXZUSs6w | piff          |
+
+
+
+Note that the model is trained in EB-DETR if the Unlabeled is equal to blank, otherwise trained in EB-DETR with RUSSO. 
+
+
+
 <!-- Download our checkpoints for :[SR3D_det](https://zenodo.org/record/6430189/files/sr3d_butd_det_52.1_27.pth?download=1), [NR3D_det](https://zenodo.org/record/6430189/files/bdetr_nr3d_43.3.pth?download=1), [ScanRefer_det](https://zenodo.org/record/6430189/files/scanrefer_det_52.2.pth?download=1), [SR3D_cls](https://zenodo.org/record/6430189/files/bdetr_sr3d_cls_67.1.pth?download=1), [NR3D_cls](https://zenodo.org/record/6430189/files/bdetr_nr3d_cls_55.4.pth?download=1). Add `--checkpoint_path CKPT_NAME` to the above scripts in order to utilize the stored checkpoints. -->
+
 
 
 
@@ -70,7 +132,9 @@ Note that these checkpoints were stored while using `DistributedDataParallel`. T
 
 
 ## Acknowledgements
-Parts of this code were based on the codebase of  [BUTD-DETR](https://github.com/nickgkan/butd_detr). The loss implementation (Hungarian matching and criterion class) are based on the codebase of [MDETR](https://github.com/ashkamath/mdetr).
+Parts of this code were based on the codebase of  [BUTD-DETR](https://github.com/nickgkan/butd_detr).
+
+
 
 
 ## Citing ROSSO

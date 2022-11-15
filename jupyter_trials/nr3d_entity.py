@@ -5,17 +5,21 @@ from entity import *
 
 class NR3DEntity(Entity):
 
-    def __init__(self,data_name, split,ratio=None,split_root="data/meta_data"):
-        super().__init__(data_name, split,ratio,split_root)
+    def __init__(self,data_name, split,ratio=None,init_anno=False,split_root="data/meta_data"):
+        super().__init__(data_name, split,ratio,init_anno,split_root=split_root)
+        
+        #todo stat  assignment scenes  
+
+
         
 
+        
     '''
     description:  获取SR3D 作者划分好的 训练集 和测试集
     param {*} split
     return {*}
     '''
     def get_split_list(self):
-        
         with open(osp.join(self.split_root,'%s_%s_scans.txt' % (self.data_name,self.split)),'r') as f:
             scan_ids = set(eval(f.read()))
         logger.info(f" length : {len(scan_ids)}")
@@ -58,7 +62,8 @@ class NR3DEntity(Entity):
         for idx in range(annos.shape[0]):
             ann = annos.iloc[idx]
             if ann.scan_id in self.scan_ids \
-                and ann.mentions_target_class and (ann.correct_guess  or self.split != 'test'):
+                and ann.mentions_target_class and (ann.correct_guess  or self.split != 'test') \
+                    and anno.target in anno.utterance:
                 ans.append(ann)
         logger.info(f"annos num = {len(ans)}")             
         return ans
@@ -94,14 +99,26 @@ class NR3DEntity(Entity):
         annos=  get_refer_it_3D(self.data_name)
         #* 根据当前scenario 进行过滤            
         ans = []
+        
         for idx in range(annos.shape[0]):
             ann = annos.iloc[idx]
             #* 根据assignment id 来划分数据集
             if ann.assignmentid in self.scan_ids \
-                and ann.mentions_target_class and (ann.correct_guess or self.split != 'test'):
+                and ann.mentions_target_class and (ann.correct_guess or self.split != 'test')\
+                     and ann.instance_type in ann.utterance:
+
                 ans.append(ann)
 
-        logger.info(f"annos num = {len(self.annos)}")
+
+        all_scan_id = []
+        for ann in ans:
+            all_scan_id.append(ann.scan_id)
+            
+
+        self.scan_ids = list(set(all_scan_id))
+        logger.info(f"annos num = {len(ans)},scan ids = {len(self.scan_ids)}")
+        
+
         return ans
 
 
@@ -166,3 +183,16 @@ class NR3DEntity(Entity):
             print(f"length  = {len(split_labeled_data)}")
             
             save_txt(os.path.join(self.split_root,'nr3d_train_{}.txt'.format(ratio)),'\n'.join(split_labeled_data.astype(np.str0).tolist()))
+
+
+
+
+if __name__ == "__main__":
+    
+    for ratio in np.linspace(0.1,0.9,9):
+        logger.info(ratio)
+        NR3DEntity('nr3d','train',round(ratio,1),init_anno=True)
+        logger.info("==================================================================")
+        
+
+        

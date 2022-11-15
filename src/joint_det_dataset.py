@@ -211,6 +211,11 @@ class Joint3DDataset(Dataset):
                     or split != 'test'
                 )
             ]
+
+
+        
+
+
         # Add distractor info
         for anno in annos:
             anno['distractor_ids'] = [

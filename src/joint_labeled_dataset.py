@@ -17,6 +17,7 @@ from src.joint_semi_supervise_dataset import JointSemiSupervisetDataset
 
 from loguru import logger 
 
+from IPython import embed 
 
 
 NUM_CLASSES = 485
@@ -216,9 +217,10 @@ class JointLabeledDataset(JointSemiSupervisetDataset):
                 == anno['target']
                 and ind != anno['target_id']
             ]
-
-        # Filter out sentences that do not explicitly mention the target class
+        
+        #* Filter out sentences that do not explicitly mention the target class
         annos = [anno for anno in annos if anno['target'] in anno['utterance']]
+        
         return annos
 
     def load_sr3d_annos(self, dset='sr3d'):

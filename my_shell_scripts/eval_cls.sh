@@ -1,4 +1,13 @@
 
+###
+ # @Author: daniel
+ # @Date: 2022-11-14 22:15:44
+ # @LastEditTime: 2022-11-15 19:29:54
+ # @LastEditors: daniel
+ # @Description: 
+ # @FilePath: /butd_detr/my_shell_scripts/eval_cls.sh
+ # have a nice day
+### 
 
 export PYTHONWARNINGS='ignore:semaphore_tracker:UserWarning'
 
@@ -7,8 +16,8 @@ export PYTHONWARNINGS='ignore:semaphore_tracker:UserWarning'
 #!  To train on multiple datasets, e.g. on SR3D and NR3D simultaneously, set --TRAIN_DATASET sr3d nr3d.
 
 # train_data="sr3d nr3d scanrefer scannet sr3d+"
-train_data=nr3d
-test_data=nr3d
+train_data=sr3d
+test_data=sr3d
 DATA_ROOT=datasets/
 
 
@@ -22,7 +31,9 @@ port=29530
 val_freq=1;
 print_freq=1;
 save_freq=100;
-resume_mode_path=archive/table3_nr3d/nr100_all_consistency_5390_306.pth;
+resume_mode_path=archive/table2_sr3d/pretrain_100%_sr3d_6703_40.pth;
+# resume_mode_path=archive/table2_sr3d/sr50_all_consistency_6367_155.pth;
+
 topk=8;
 
 
