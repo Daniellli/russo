@@ -5,17 +5,17 @@ import numpy as np
 import os.path as osp
 import sys
 import os
-root = "/data/xusc/exp/butd_detr"
+root = "~/exp/butd_detr"
 sys.path.append(root)
 from my_script.utils import make_dirs
 import shutil 
 
 from tqdm import tqdm 
 class ARKitScene:
-    def __init__(self, split,src_path = '/data/xusc/exp/butd_detr/datasets/arkitscenes/dataset/3dod'):
+    def __init__(self, split,src_path = '~/exp/butd_detr/datasets/arkitscenes/dataset/3dod'):
         
         self.split=split
-        self.detected_path ="/data/xusc/exp/butd_detr/datasets/fcaf3d_arkitscenes/submit"
+        self.detected_path ="~/exp/butd_detr/datasets/fcaf3d_arkitscenes/submit"
         
         if split=="train":
             self.split_branch = 'Training'
@@ -70,9 +70,9 @@ class ARKitScene:
 
 splits= ['train','valid']
 
-target_dir = "/data/xusc/exp/butd_detr/datasets/ARKitScenes/dataset/3dod"
+target_dir = "~/exp/butd_detr/datasets/ARKitScenes/dataset/3dod"
 
-src_path = '/data/xusc/exp/butd_detr/datasets/arkitscenes/dataset/3dod'
+src_path = '~/exp/butd_detr/datasets/arkitscenes/dataset/3dod'
 
 
 invalid_path  = [] 
