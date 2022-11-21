@@ -2,7 +2,7 @@
 ###
  # @Author: daniel
  # @Date: 2022-11-19 10:39:17
- # @LastEditTime: 2022-11-21 17:07:36
+ # @LastEditTime: 2022-11-21 17:16:23
  # @LastEditors: daniel
  # @Description: 
  # @FilePath: /butd_detr/my_shell_scripts/train_det.sh
@@ -22,8 +22,8 @@ DATA_ROOT=datasets/
 
 
 #* GPU id you need to run this shell 
-gpu_ids="1,2,3,7";
-gpu_num=4;
+gpu_ids="0,1,2,3,4,5,6,7";
+gpu_num=8;
 
 
 
@@ -40,14 +40,14 @@ ema_decay=0.99;
 
 
 val_freq=1;
-print_freq=100;
+print_freq=50;
 save_freq=$val_freq;
 port=29522
 
 epoch=800;
 b_size='4,8';
 
-resume_model_path=archive/table1_scanrefer/pretrain_20%_scanrefer_2763_240.pth;
+resume_model_path=archive/pretrain_20%_scanrefer_2763_240.pth;
 labeled_ratio=0.2;
 topk=8;
 decay_epoch="440 500";
