@@ -293,3 +293,172 @@ class JointUnlabeledDataset(JointSemiSupervisetDataset):
             ]
         
         return annos
+
+
+
+
+    def __getitem__(self, index):
+        """Get current batch for input index."""
+        split = self.split
+
+        # Read annotation
+        anno = self.annos[index]
+        scan = self.scans[anno['scan_id']]
+        scan.pc = np.copy(scan.orig_pc)
+
+
+        
+        origin_box = self.get_current_pc_box(scan)
+
+
+        
+        # Populate anno (used only for scannet)
+        self.random_utt = False
+        if anno['dataset'] == 'scannet':
+            self.random_utt = self.joint_det and np.random.random() > 0.5
+            sampled_classes = self._sample_classes(anno['scan_id'])
+            utterance = self._create_scannet_utterance(sampled_classes)
+            
+            # Target ids
+            if not self.random_utt:  # detection18 phrase
+                anno['target_id'] = np.where(np.array([
+                    self.label_map18[
+                        scan.get_object_instance_label(ind)
+                    ] in DC18.nyu40id2class
+                    for ind in range(len(scan.three_d_objects))
+                ])[:MAX_NUM_OBJ])[0].tolist()
+            else:
+                anno['target_id'] = np.where(np.array([
+                    self.label_map[
+                        scan.get_object_instance_label(ind)
+                    ] in DC.nyu40id2class
+                    and
+                    DC.class2type[DC.nyu40id2class[self.label_map[
+                        scan.get_object_instance_label(ind)
+                    ]]] in sampled_classes
+                    for ind in range(len(scan.three_d_objects))
+                ])[:MAX_NUM_OBJ])[0].tolist()
+
+
+            # Target names
+            if not self.random_utt:
+                anno['target'] = [
+                    DC18.class2type[DC18.nyu40id2class[self.label_map18[
+                        scan.get_object_instance_label(ind)
+                    ]]]
+                    if self.label_map18[
+                        scan.get_object_instance_label(ind)
+                    ] != 39
+                    else 'other furniture'
+                    for ind in anno['target_id']
+                ]
+            else:
+                anno['target'] = [
+                    DC.class2type[DC.nyu40id2class[self.label_map[
+                        scan.get_object_instance_label(ind)
+                    ]]]
+                    for ind in anno['target_id']
+                ]
+            anno['utterance'] = utterance
+
+        # Point cloud representation#* point_cloud == [x,y,z,r,g,b], 50000 points 
+        point_cloud, augmentations, og_color ,origin_pc= self._get_pc(anno, scan)
+
+
+        #!+========================================================
+        #* 用场景原始color
+        if self.overfit:
+            point_cloud = np.copy(np.concatenate([point_cloud[:,:3],og_color],axis=-1) )
+            origin_pc =  np.copy(np.concatenate([origin_pc[:,:3],og_color],axis=-1) )
+        #!+======================================================== 
+
+
+
+        # "Target" boxes: append anchors if they're to be detected
+        gt_bboxes, box_label_mask, point_instance_label = \
+            self._get_target_boxes(anno, scan)
+
+        # Positive map for soft-token and contrastive losses
+        tokens_positive, positive_map = self._get_token_positive_map(anno)
+
+        #* Scene gt boxes, 
+        (
+            class_ids, all_bboxes, all_bbox_label_mask
+        ) = self._get_scene_objects(scan)
+
+        #* Detected boxes
+        (
+            all_detected_bboxes, all_detected_bbox_label_mask,
+            detected_class_ids, detected_logits
+        ) = self._get_detected_objects(split, anno['scan_id'], augmentations)
+
+        #!===================
+        #* wrong
+        # teacher_box = all_bboxes.copy()
+        # teacher_box = self.transformation_box(teacher_box,augmentations)
+        #* right 
+        teacher_box = origin_box
+
+        #!===================
+
+        # Assume a perfect object detector 
+        if self.butd_gt:
+            all_detected_bboxes = all_bboxes #* 使用groundtruth bbox
+            all_detected_bbox_label_mask = all_bbox_label_mask
+            detected_class_ids = class_ids
+
+        # Assume a perfect object proposal stage
+        if self.butd_cls:
+            all_detected_bboxes = all_bboxes #? 那么  这个detected box 和 auged  pc 能对应上吗? 
+            all_detected_bbox_label_mask = all_bbox_label_mask
+            detected_class_ids = np.zeros((len(all_bboxes,)))
+            classes = np.array(self.cls_results[anno['scan_id']])
+            detected_class_ids[all_bbox_label_mask] = classes[classes > -1]
+
+
+        # Visualize for debugging
+        if self.visualize and anno['dataset'].startswith('sr3d'):
+            self._visualize_scene(anno, point_cloud, og_color, all_bboxes)
+
+
+        # Return
+        _labels = np.zeros(MAX_NUM_OBJ)
+        if not isinstance(anno['target_id'], int) and not self.random_utt:
+            _labels[:len(anno['target_id'])] = np.array([
+                DC18.nyu40id2class[self.label_map18[
+                    scan.get_object_instance_label(ind)
+                ]]
+                for ind in anno['target_id']
+            ])
+
+
+
+       
+
+            
+
+        ret_dict = {
+
+        }
+        
+        ret_dict.update({
+            "scan_ids": anno['scan_id'],
+            "point_clouds": point_cloud.astype(np.float32),
+            "utterances": (
+                ' '.join(anno['utterance'].replace(',', ' ,').split())
+                + ' . not mentioned'
+            ),
+            "all_detected_boxes": all_detected_bboxes.astype(np.float32),
+            "all_detected_bbox_label_mask": all_detected_bbox_label_mask.astype(np.bool8),
+            "all_detected_class_ids": detected_class_ids.astype(np.int64),
+            "all_detected_logits": detected_logits.astype(np.float32),
+            "is_view_dep": self._is_view_dep(anno['utterance']),
+            "is_hard": len(anno['distractor_ids']) > 1,
+            "is_unique": len(anno['distractor_ids']) == 0,
+            "pc_before_aug":origin_pc.astype(np.float32),
+            "teacher_box":teacher_box.astype(np.float32),
+            "augmentations":augmentations,
+            "supervised_mask":np.array(0).astype(np.int64)
+
+        })
+        return ret_dict
