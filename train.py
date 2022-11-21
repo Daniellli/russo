@@ -310,6 +310,15 @@ class SemiSuperviseTrainTester(TrainTester):
             #* epoch start from 1 by default , so have to minus one 
             global_step = (batch_idx+1) + (epoch -args.start_epoch) *total_iteration
             alpha = args.ema_decay
+
+        
+
+            ran_epoch =  epoch -args.start_epoch
+            if ran_epoch>args.rampup_length:
+                alpha=args.ema_decay_after_rampup
+                
+
+
             self.update_ema_variables(model,ema_model,alpha,global_step)
             #*===================================================
 
@@ -317,6 +326,9 @@ class SemiSuperviseTrainTester(TrainTester):
             stat_dict = self._accumulate_stats(stat_dict, end_points)
 
             if (batch_idx + 1) % args.print_freq == 0:
+
+                logger.info(f"ran_epoch:{ran_epoch},alpha:{alpha}")
+                
                 # Terminal logs
                 self.logger.info(
                     f'Train: [{epoch}][{batch_idx + 1}/{total_iteration}]  '

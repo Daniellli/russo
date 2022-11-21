@@ -2,7 +2,7 @@
 ###
  # @Author: daniel
  # @Date: 2022-11-19 10:39:17
- # @LastEditTime: 2022-11-21 17:16:23
+ # @LastEditTime: 2022-11-21 21:04:03
  # @LastEditors: daniel
  # @Description: 
  # @FilePath: /butd_detr/my_shell_scripts/train_det.sh
@@ -35,8 +35,9 @@ token_consistency_weight=1;
 query_consistency_weight=1;
 text_consistency_weight=1e-2;
 
-rampup_length=100;#*  let it as  100  if SR3D 
+rampup_length=30;#*  let it as  100  if SR3D 
 ema_decay=0.99;
+ema_decay_after_rampup=0.999;
 
 
 val_freq=1;
@@ -45,9 +46,9 @@ save_freq=$val_freq;
 port=29522
 
 epoch=800;
-b_size='4,8';
+b_size='4,2';
 
-resume_model_path=archive/pretrain_20%_scanrefer_2763_240.pth;
+resume_model_path=pretrain/pretrain_20%_scanrefer_2763_240.pth;
 labeled_ratio=0.2;
 topk=8;
 decay_epoch="440 500";
@@ -67,6 +68,7 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --query_consistency_weight $query_consistency_weight \
     --text_consistency_weight $text_consistency_weight \
     --ema-decay $ema_decay \
+    --ema-decay-after-rampup $ema_decay_after_rampup \
     --rampup_length $rampup_length \
     --checkpoint_path $resume_model_path \
     --lr_decay_epochs $decay_epoch \

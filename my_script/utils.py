@@ -141,6 +141,7 @@ def parse_semi_supervise_option():
 
 
     parser.add_argument('--ema-decay', default=None, type=float,help=' EMA decay parameter ')
+    parser.add_argument('--ema-decay-after-rampup', default=None, type=float,help=' EMA decay parameter ')
     parser.add_argument('--ema-full-supervise', action='store_true',help='ema-full-supervise ')
 
     
