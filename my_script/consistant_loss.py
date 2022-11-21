@@ -5,7 +5,7 @@
 
 import sys
 
-sys.path.append("/data/xusc/exp/butd_detr")
+sys.path.append("~/exp/butd_detr")
 import torch
 
 import os.path as osp
@@ -19,7 +19,7 @@ from my_script.utils import make_dirs,rot_x,rot_y,rot_z,points2box,box2points,fo
 
 from loguru import logger
 
-DEBUG_FILT = "/data/xusc/exp/butd_detr/logs/debug"
+DEBUG_FILT = "~/exp/butd_detr/logs/debug"
 
 
 
