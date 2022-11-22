@@ -217,7 +217,6 @@ class SemiSuperviseTrainTester(TrainTester):
         logger.info(f"token_consistency_weight  : {token_consistency_weight}")
         logger.info(f"query_consistency_weight  : {query_consistency_weight}")
         logger.info(f"text_consistency_weight  : {text_consistency_weight}")
-
         unlabeled_loader_iter=iter(unlabeled_loader)
 
         
@@ -311,6 +310,15 @@ class SemiSuperviseTrainTester(TrainTester):
             #* epoch start from 1 by default , so have to minus one 
             global_step = (batch_idx+1) + (epoch -args.start_epoch) *total_iteration
             alpha = args.ema_decay
+
+        
+
+            ran_epoch =  epoch -args.start_epoch
+            if ran_epoch>args.rampup_length:
+                alpha=args.ema_decay_after_rampup
+                
+
+
             self.update_ema_variables(model,ema_model,alpha,global_step)
             #*===================================================
 
@@ -318,6 +326,9 @@ class SemiSuperviseTrainTester(TrainTester):
             stat_dict = self._accumulate_stats(stat_dict, end_points)
 
             if (batch_idx + 1) % args.print_freq == 0:
+
+                logger.info(f"ran_epoch:{ran_epoch},alpha:{alpha}")
+                
                 # Terminal logs
                 self.logger.info(
                     f'Train: [{epoch}][{batch_idx + 1}/{total_iteration}]  '
@@ -531,6 +542,8 @@ class SemiSuperviseTrainTester(TrainTester):
         labeled_loader = self.get_dataloader(labeled_dataset,int(batch_size_list[0]),args.num_workers,shuffle = True)
         unlabeled_loader = self.get_dataloader(unlabeled_datasets,int(batch_size_list[1]),args.num_workers,shuffle = True)
         test_loader = self.get_dataloader(test_dataset,int(batch_size_list.sum().astype(np.int64)),args.num_workers,shuffle = False)
+        logger.info(f"un supervised mask :{unlabeled_loader.dataset.__getitem__(0)['supervised_mask']}")
+        
 
 
         logger.info(f"length of  labeled dataset: {len(labeled_loader.dataset)} \t  length of  unlabeled dataset: {len(unlabeled_loader.dataset)} \t length of testing dataset: {len(test_loader.dataset)}")

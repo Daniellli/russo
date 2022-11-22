@@ -2,7 +2,7 @@
 ###
  # @Author: daniel
  # @Date: 2022-11-14 22:15:44
- # @LastEditTime: 2022-11-15 19:29:54
+ # @LastEditTime: 2022-11-21 21:32:23
  # @LastEditors: daniel
  # @Description: 
  # @FilePath: /butd_detr/my_shell_scripts/eval_cls.sh
@@ -42,7 +42,11 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --pp_checkpoint $DATA_ROOT/gf_detector_l6o256.pth \
     --val_freq $val_freq --save_freq $val_freq --print_freq $print_freq \
     --dataset $train_data --test_dataset $test_data \
+<<<<<<< HEAD
     --detect_intermediate --batch_size $b_size \
+=======
+    --batch_size $b_size --detect_intermediate \
+>>>>>>> 1dc1be10eb4b6b0fdbe3e3889cd0f65d4c15d681
     --use_soft_token_loss --use_contrastive_align \
     --butd_cls --self_attend --use-tkps \
     --query_points_obj_topk $topk \

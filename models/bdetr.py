@@ -96,7 +96,6 @@ class BeaUTyDETR(nn.Module):
         #*!=============================
         model_path=osp.join(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__))))),'.cache/huggingface/transformers/roberta')
         self.tokenizer = RobertaTokenizerFast.from_pretrained(model_path)
-        
         self.text_encoder = RobertaModel.from_pretrained(model_path)
         #*!=============================
         

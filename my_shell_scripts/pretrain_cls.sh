@@ -2,7 +2,7 @@
 ###
  # @Author: daniel
  # @Date: 2022-11-14 22:15:44
- # @LastEditTime: 2022-11-15 15:12:36
+ # @LastEditTime: 2022-11-21 21:32:51
  # @LastEditors: daniel
  # @Description: 
  # @FilePath: /butd_detr/my_shell_scripts/pretrain_cls.sh
@@ -16,13 +16,13 @@ export PYTHONWARNINGS='ignore:semaphore_tracker:UserWarning'
 #!  To train on multiple datasets, e.g. on SR3D and NR3D simultaneously, set --TRAIN_DATASET sr3d nr3d.
 
 #* dataset you want to train ,  could be nr3d or sr3d ,for cls 
-train_data=sr3d
-test_data=sr3d
+train_data=nr3d
+test_data=nr3d
 DATA_ROOT=datasets/
 
 #* GPU id you need to run this shell 
-gpu_ids="0,4,5,6,7";
-gpu_num=1;
+gpu_ids="0,1,2,3,4,5,6,7";
+gpu_num=8;
 
 #* batch size 
 b_size=12;
@@ -36,7 +36,7 @@ save_freq=$val_freq;
 
 
 #* for  semi supervision architecture  : step1 x
-labeled_ratio=0.7;
+labeled_ratio=0.5;
 topk=8;
 
 
@@ -51,6 +51,7 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --butd_cls --self_attend --use-tkps \
     --query_points_obj_topk $topk \
     --labeled_ratio $labeled_ratio \
+    --upload-wandb \
     2>&1 | tee -a logs/pretrain_cls.log
 
 

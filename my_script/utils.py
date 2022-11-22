@@ -141,6 +141,7 @@ def parse_semi_supervise_option():
 
 
     parser.add_argument('--ema-decay', default=None, type=float,help=' EMA decay parameter ')
+    parser.add_argument('--ema-decay-after-rampup', default=None, type=float,help=' EMA decay parameter ')
     parser.add_argument('--ema-full-supervise', action='store_true',help='ema-full-supervise ')
 
     
@@ -844,9 +845,7 @@ def delete_ckpt_except_last_one(path):
 
 if __name__ == "__main__":
     # read_refer_it_3D_txt()
-    # read_refer_it_3D_txt(path="~/exp/butd_detr/data/meta_data/sr3d_train_scans.txt")
-    # read_refer_it_3D_txt(path="~/exp/butd_detr/data/meta_data/nr3d_test_scans.txt")
-    # read_refer_it_3D_txt(path="~/exp/butd_detr/data/meta_data/nr3d_train_scans.txt")
+    
     
     #* 生成labeled datasets for SR3D
     for x in np.linspace(0.1,0.9,9):
@@ -860,6 +859,5 @@ if __name__ == "__main__":
 
 
     #* delete ckpy try
-    # path = "~/exp/butd_detr/logs/bdetr/scanrefer"
     # delete_ckpt_except_last_one(path)
 

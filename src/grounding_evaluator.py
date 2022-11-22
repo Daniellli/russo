@@ -208,6 +208,100 @@ class GroundingEvaluator:
 
         # Highest scoring box -> iou
 
+        for bid in range(len(positive_map)): #* 便利每个batch
+            # Keep scores for annotated objects only
+            num_obj = int(end_points['box_label_mask'][bid].sum())
+            pmap = positive_map[bid, :num_obj]
+            scores = (
+                sem_scores[bid].unsqueeze(0)  # (1, Q, 256)
+                * pmap.unsqueeze(1)  # (obj, 1, 256)
+            ).sum(-1)  # (obj, Q)
+
+            # 10 predictions per gt box
+            top = scores.argsort(1, True)[:, :10]  # (obj, 10)
+            pbox = pred_bbox[bid, top.reshape(-1)]
+
+            # IoU
+            ious, _ = _iou3d_par(
+                box_cxcyczwhd_to_xyzxyz(gt_bboxes[bid][:num_obj]),  # (obj, 6)
+                box_cxcyczwhd_to_xyzxyz(pbox)  # (obj*10, 6)
+            )  # (obj, obj*10)
+            ious = ious.reshape(top.size(0), top.size(0), top.size(1))
+            ious = ious[torch.arange(len(ious)), torch.arange(len(ious))]
+
+            # Measure IoU>threshold, ious are (obj, 10)
+            
+            for t in self.thresholds:
+                thresholded = ious > t
+                for k in self.topks:
+                    found = thresholded[:, :k].any(1)
+                    self.dets[(prefix, t, k, 'bbf')] += found.sum().item()
+                    self.gts[(prefix, t, k, 'bbf')] += len(thresholded)
+                    if prefix == 'last_':
+                        found = found[0].item()
+                        if k == 1 and t == self.thresholds[0]:
+                            if end_points['is_view_dep'][bid]:
+                                self.gts['vd'] += 1
+                                self.dets['vd'] += found
+                            else:
+                                self.gts['vid'] += 1
+                                self.dets['vid'] += found
+                            if end_points['is_hard'][bid]:
+                                self.gts['hard'] += 1
+                                self.dets['hard'] += found
+                            else:
+                                self.gts['easy'] += 1
+                                self.dets['easy'] += found
+                            if end_points['is_unique'][bid]:
+                                self.gts['unique'] += 1
+                                self.dets['unique'] += found
+                            else:
+                                self.gts['multi'] += 1
+                                self.dets['multi'] += found
+                        elif k == 1 and t == self.thresholds[1]:
+                            #* ACC@ 0.5
+                            
+                            if end_points['is_unique'][bid]:
+                                self.gts['unique@0.50'] += 1
+                                self.dets['unique@0.50'] += found
+                            else:
+                                self.gts['multi@0.50'] += 1
+                                self.dets['multi@0.50'] += found
+                   
+
+
+
+
+
+
+
+    def evaluate_bbox_by_contrast_for_vis(self, end_points, prefix):
+        """
+        Evaluate bounding box IoU by contrasting with span features.
+
+        Args:
+            end_points (dict): contains predictions and gt
+            prefix (str): layer name
+        """
+        # Parse gt
+        positive_map, gt_bboxes = self._parse_gt(end_points)
+
+        # Parse predictions
+        pred_center = end_points[f'{prefix}center']  # B, Q, 3
+        pred_size = end_points[f'{prefix}pred_size']  # (B,Q,3) (l,w,h)
+        assert (pred_size < 0).sum() == 0
+        pred_bbox = torch.cat([pred_center, pred_size], dim=-1)
+
+        proj_tokens = end_points['proj_tokens']  # (B, tokens, 64)
+        proj_queries = end_points[f'{prefix}proj_queries']  # (B, Q, 64)
+        sem_scores = torch.matmul(proj_queries, proj_tokens.transpose(-1, -2))
+        sem_scores_ = (sem_scores / 0.07).softmax(-1)  # (B, Q, tokens)
+        sem_scores = torch.zeros(sem_scores_.size(0), sem_scores_.size(1), 256)
+        sem_scores = sem_scores.to(sem_scores_.device)
+        sem_scores[:, :sem_scores_.size(1), :sem_scores_.size(2)] = sem_scores_
+
+        # Highest scoring box -> iou
+
         #!====================
         debug_path = 'logs/debug/vis_refer_%d.json'%(sem_scores.device.index)
         if prefix == "last_":
