@@ -22,22 +22,22 @@ DATA_ROOT=datasets/
 
 
 #* GPU id you need to run this shell 
-gpu_ids="0,1,2,3";
-gpu_num=4;
+gpu_ids="0,1,2,3,4,5,6,8";
+gpu_num=8;
 
 
 
 
 #* for not mask 
-size_consistency_weight=1e-5;
-center_consistency_weight=5e-3;
-token_consistency_weight=1e-1;
+size_consistency_weight=1e-4;
+center_consistency_weight=1e-4;
+token_consistency_weight=1e-2;
 query_consistency_weight=1e-1;
-text_consistency_weight=1e-2;
+text_consistency_weight=1e-1;
 
-rampup_length=30;#*  let it as  100  if SR3D 
+rampup_length=0;#*  let it as  100  if SR3D 
 ema_decay=0.99;
-ema_decay_after_rampup=0.999;
+ema_decay_after_rampup=0.99;
 
 
 val_freq=1;
@@ -46,12 +46,12 @@ save_freq=$val_freq;
 port=29522
 
 epoch=800;
-b_size='14,2';
+b_size='10,2';
 
 resume_model_path=pretrain/pretrain_20%_scanrefer_2763_240.pth;
 labeled_ratio=0.2;
 topk=8;
-decay_epoch="440 500";
+decay_epoch="800 900";
 
 TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
     train.py --use_color --data_root $DATA_ROOT \

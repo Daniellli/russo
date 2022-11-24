@@ -68,7 +68,10 @@ class SemiSuperviseTrainTester(TrainTester):
         
         def sigmoid_rampup(current,args):
             # rampup_length =  args.max_epoch - args.start_epoch +1
+            
             rampup_length = args.rampup_length
+            if rampup_length == 0:
+                return 1
             logger.info(f"rampup_length:{rampup_length}")
             
             current=  current-args.start_epoch
