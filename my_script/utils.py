@@ -28,6 +28,8 @@ import os
 import multiprocessing as mp
 
 
+from IPython import embed
+
 
 def parse_semi_supervise_option():
     """Parse cmd arguments."""
@@ -47,7 +49,7 @@ def parse_semi_supervise_option():
     parser.add_argument('--self_attend', action='store_true')
 
     # Loss
-    parser.add_argument('--query_points_obj_topk', default=4, type=int)
+    parser.add_argument('--query_points_obj_topk', default=8, type=int)
     parser.add_argument('--use_contrastive_align', action='store_true')
     parser.add_argument('--use_soft_token_loss', action='store_true')
     parser.add_argument('--detect_intermediate', action='store_true')
@@ -150,6 +152,20 @@ def parse_semi_supervise_option():
     args, _ = parser.parse_known_args()
     args.eval = args.eval or args.eval_train
 
+
+
+    args.use_color = True
+    args.use_soft_token_loss=True
+    args.use_contrastive_align=True
+    args.self_attend=True
+    args.use_tkps=True
+    
+    # --use_color
+    # --use_soft_token_loss
+    # --use_contrastive_align
+    # --self_attend
+    # --use-tkps
+
     return args
 
 
@@ -171,7 +187,7 @@ def parse_option():
     parser.add_argument('--self_attend', action='store_true')
 
     # Loss
-    parser.add_argument('--query_points_obj_topk', default=4, type=int)
+    parser.add_argument('--query_points_obj_topk', default=8, type=int)
     parser.add_argument('--use_contrastive_align', action='store_true')
     parser.add_argument('--use_soft_token_loss', action='store_true')
     parser.add_argument('--detect_intermediate', action='store_true')
@@ -253,6 +269,14 @@ def parse_option():
 
     args, _ = parser.parse_known_args()
     args.eval = args.eval or args.eval_train
+
+
+    args.use_color = True
+    args.use_soft_token_loss=True
+    args.use_contrastive_align=True
+    args.self_attend=True
+    args.use_tkps=True
+
 
     return args
 
