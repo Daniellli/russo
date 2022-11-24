@@ -22,8 +22,8 @@ DATA_ROOT=datasets/
 
 
 #* GPU id you need to run this shell 
-gpu_ids="1,2,3,5,7";
-gpu_num=5;
+gpu_ids="0,1,2,3";
+gpu_num=4;
 
 
 
@@ -45,13 +45,13 @@ print_freq=50;
 save_freq=$val_freq;
 port=29522
 
-epoch=800;
-b_size='10,2';
+epoch=1000;
+b_size='16,2';
 
 resume_model_path=archive/table1_scanrefer/pretrain_20%_scanrefer_2763_240.pth;
 labeled_ratio=0.2;
 topk=8;
-decay_epoch="800 900";
+decay_epoch="1000 1001";
 
 
 

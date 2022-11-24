@@ -573,6 +573,8 @@ class SemiSuperviseTrainTester(TrainTester):
             model = model.cuda(args.local_rank)
             ema_model = ema_model.cuda(args.local_rank)
 
+     
+
         
         #* file and variable for saving the eval res 
         best_performce = 0
@@ -628,7 +630,6 @@ class SemiSuperviseTrainTester(TrainTester):
                     if is_best:
                         ema_best_performce= tnew_performance
                 exit(0)
-
 
         model = DistributedDataParallel(
             model, device_ids=[args.local_rank],

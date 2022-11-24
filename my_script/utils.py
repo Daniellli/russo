@@ -292,6 +292,9 @@ def detach_module(model):
     if len(list(model.keys())[0].split('.')) <=6:
         return model
 
+    
+    
+
     new_state_dict = OrderedDict()
     for k, v in model.items():
         name = k[7:] # module字段在最前面，从第7个字符开始就可以去掉module
