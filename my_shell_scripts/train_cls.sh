@@ -2,7 +2,7 @@
 ###
  # @Author: daniel
  # @Date: 2022-11-21 16:48:48
- # @LastEditTime: 2022-11-26 01:04:11
+ # @LastEditTime: 2022-11-26 01:27:31
  # @LastEditors: daniel
  # @Description: 
  # @FilePath: /butd_detr/my_shell_scripts/train_cls.sh
@@ -16,14 +16,14 @@ export PYTHONWARNINGS='ignore:semaphore_tracker:UserWarning'
 #!  To train on multiple datasets, e.g. on SR3D and NR3D simultaneously, set --TRAIN_DATASET sr3d nr3d.
 
 #* dataset you want to train ,  could be nr3d or sr3d ,for cls 
-train_data=sr3d
-test_data=sr3d
+train_data=nr3d
+test_data=nr3d
 DATA_ROOT=datasets/
 
 
 #* GPU id you need to run this shell 
-gpu_ids="1,2,3,5,7";
-gpu_num=5;
+gpu_ids="0,1,2,3,4,5,6,7";
+gpu_num=8;
 
 
 
@@ -46,10 +46,10 @@ save_freq=$val_freq;
 port=29522
 
 epoch=800;
-b_size='10,2';
+b_size='6,1';
 
 # resume_model_path=archive/table3_nr3d/pretrain_30%_nr3d_3481_220.pth;
-resume_model_path=archive/table2_sr3d/pretrain_20%_sr3d_4456_55.pth;
+resume_model_path=pretrain/pretrain_20%_nr3d_3262_220.pth;
 
 labeled_ratio=0.2;
 topk=8;
@@ -67,6 +67,7 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --query_consistency_weight $query_consistency_weight \
     --text_consistency_weight $text_consistency_weight \
     --ema-decay $ema_decay \
+    --ema-decay-after-rampup $ema_decay_after_rampup \
     --rampup_length $rampup_length \
     --checkpoint_path $resume_model_path \
     --lr_decay_epochs $decay_epoch \
