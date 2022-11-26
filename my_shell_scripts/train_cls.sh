@@ -2,7 +2,7 @@
 ###
  # @Author: daniel
  # @Date: 2022-11-21 16:48:48
- # @LastEditTime: 2022-11-26 01:27:31
+ # @LastEditTime: 2022-11-26 11:24:51
  # @LastEditors: daniel
  # @Description: 
  # @FilePath: /butd_detr/my_shell_scripts/train_cls.sh
