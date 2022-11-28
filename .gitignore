@@ -184,3 +184,22 @@ datasets/flickr
 
 
 *.tar.gz
+
+
+vis_results
+vis_results/*
+*.pkl
+*.tar.gz
+*.p
+datasets/scans
+datasets/scans/*
+datasets/scannet_pc/*
+datasets/scannet_pc
+datasets/group_free*
+datasets/arkitscenes
+datasets/flickr
+datasets/fcaf3d_scannet
+datasets/fcaf3d_arkitscenes
+datasets/ARKitScenes
+datasets/scans_test
+

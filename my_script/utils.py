@@ -300,7 +300,7 @@ def detach_module(model):
     return new_state_dict 
 
 
-def load_checkpoint(args, model, optimizer, scheduler,distributed2common=False):
+def load_checkpoint(args, model, optimizer, scheduler):
     """Load from checkpoint."""
     print("=> loading checkpoint '{}'".format(args.checkpoint_path))
 
@@ -312,11 +312,11 @@ def load_checkpoint(args, model, optimizer, scheduler,distributed2common=False):
 
 
     #todo checkpoint['model']  delete ".module"
-    if distributed2common:
-        common_model = detach_module(checkpoint['model'])
-        model.load_state_dict(common_model, True)
-    else :
-        model.load_state_dict(checkpoint['model'], True)
+    # if distributed2common:
+    common_model = detach_module(checkpoint['model'])
+    model.load_state_dict(common_model, True)
+    # else :
+    #     model.load_state_dict(checkpoint['model'], True)
     
 
 

@@ -2,7 +2,7 @@
 ###
  # @Author: daniel
  # @Date: 2022-11-21 16:48:48
- # @LastEditTime: 2022-11-28 00:34:45
+ # @LastEditTime: 2022-11-28 15:23:56
  # @LastEditors: daniel
  # @Description: 
  # @FilePath: /butd_detr/my_shell_scripts/train_cls.sh
@@ -22,8 +22,8 @@ DATA_ROOT=datasets/
 
 
 #* GPU id you need to run this shell 
-gpu_ids="2,3,4,5,6,7";
-gpu_num=6;
+gpu_ids="0,1,2,3";
+gpu_num=4;
 
 
 
@@ -46,10 +46,10 @@ save_freq=$val_freq;
 port=29522
 
 epoch=1000;
-b_size='10,1';
+b_size='2,4';
 
 # resume_model_path=archive/table3_nr3d/pretrain_30%_nr3d_3481_220.pth;
-resume_model_path=archive/table2_sr3d/pretrain_20%_sr3d_4456_55.pth;
+resume_model_path=pretrain/pretrain_20%_sr3d_4456_55.pth;
 
 labeled_ratio=0.2;
 topk=8;

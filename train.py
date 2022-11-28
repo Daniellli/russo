@@ -588,8 +588,8 @@ class SemiSuperviseTrainTester(TrainTester):
         #* 2.eval and save res to a txt file 
         if args.checkpoint_path:
             assert os.path.isfile(args.checkpoint_path)
-            load_checkpoint(args, model, optimizer, scheduler,distributed2common=True)
-            load_checkpoint(args, ema_model, optimizer, scheduler,distributed2common=True)
+            load_checkpoint(args, model, optimizer, scheduler)
+            load_checkpoint(args, ema_model, optimizer, scheduler)
 
             #* update lr decay milestones
             if args.lr_decay_intermediate:    
