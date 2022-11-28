@@ -2,10 +2,10 @@
 ###
  # @Author: daniel
  # @Date: 2022-11-19 10:39:17
- # @LastEditTime: 2022-11-28 21:20:08
+ # @LastEditTime: 2022-11-28 21:23:40
  # @LastEditors: daniel
  # @Description: 
- # @FilePath: /butd_detr/my_shell_scripts/train_det.sh
+ # @FilePath: /butd_detr/my_shell_scripts/train_det_full.sh
  # have a nice day
 ### 
 
@@ -23,7 +23,7 @@ DATA_ROOT=datasets/
 
 #* GPU id you need to run this shell 
 gpu_ids="1,2,3,4";
-gpu_num=1;
+gpu_num=4;
 
 
 
@@ -73,9 +73,10 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --lr_decay_epochs $decay_epoch \
     --lr_decay_intermediate \
     --joint_det --ema-full-supervise \
+    --upload-wandb \
     2>&1 | tee -a logs/train_det.log
 
-# --upload-wandb \
+
 
 # --labeled_ratio $labeled_ratio \
 
