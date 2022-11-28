@@ -2,7 +2,7 @@
 ###
  # @Author: daniel
  # @Date: 2022-11-21 16:48:48
- # @LastEditTime: 2022-11-26 11:24:51
+ # @LastEditTime: 2022-11-28 00:34:45
  # @LastEditors: daniel
  # @Description: 
  # @FilePath: /butd_detr/my_shell_scripts/train_cls.sh
@@ -16,24 +16,24 @@ export PYTHONWARNINGS='ignore:semaphore_tracker:UserWarning'
 #!  To train on multiple datasets, e.g. on SR3D and NR3D simultaneously, set --TRAIN_DATASET sr3d nr3d.
 
 #* dataset you want to train ,  could be nr3d or sr3d ,for cls 
-train_data=nr3d
-test_data=nr3d
+train_data=sr3d
+test_data=sr3d
 DATA_ROOT=datasets/
 
 
 #* GPU id you need to run this shell 
-gpu_ids="0,1,2,3,4,5,6,7";
-gpu_num=8;
+gpu_ids="2,3,4,5,6,7";
+gpu_num=6;
 
 
 
 
 #* for not mask 
-size_consistency_weight=1e-4;
+size_consistency_weight=0;
 center_consistency_weight=1e-4;
-token_consistency_weight=1e-2;
-query_consistency_weight=1;
-text_consistency_weight=1;
+token_consistency_weight=0;
+query_consistency_weight=0;
+text_consistency_weight=0;
 
 rampup_length=0;#*  let it as  100  if SR3D 
 ema_decay=0.99;
@@ -45,15 +45,15 @@ print_freq=50;
 save_freq=$val_freq;
 port=29522
 
-epoch=800;
-b_size='6,1';
+epoch=1000;
+b_size='10,1';
 
 # resume_model_path=archive/table3_nr3d/pretrain_30%_nr3d_3481_220.pth;
-resume_model_path=pretrain/pretrain_20%_nr3d_3262_220.pth;
+resume_model_path=archive/table2_sr3d/pretrain_20%_sr3d_4456_55.pth;
 
 labeled_ratio=0.2;
 topk=8;
-decay_epoch="800 850";
+decay_epoch="1000 1001";
 
 TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
     train.py --data_root $DATA_ROOT \
