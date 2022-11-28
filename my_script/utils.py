@@ -313,7 +313,10 @@ def load_checkpoint(args, model, optimizer, scheduler):
 
     #todo checkpoint['model']  delete ".module"
     # if distributed2common:
+    
+    
     common_model = detach_module(checkpoint['model'])
+    # list(common_model.keys())[0]
     model.load_state_dict(common_model, True)
     # else :
     #     model.load_state_dict(checkpoint['model'], True)
