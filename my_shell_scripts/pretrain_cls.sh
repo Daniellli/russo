@@ -2,7 +2,11 @@
 ###
  # @Author: daniel
  # @Date: 2022-11-14 22:15:44
+<<<<<<< HEAD
  # @LastEditTime: 2022-11-21 21:32:51
+=======
+ # @LastEditTime: 2022-11-19 11:30:07
+>>>>>>> ce5c24fe3f595e8b29416025aaf57774ea3d2673
  # @LastEditors: daniel
  # @Description: 
  # @FilePath: /butd_detr/my_shell_scripts/pretrain_cls.sh
@@ -21,8 +25,13 @@ test_data=nr3d
 DATA_ROOT=datasets/
 
 #* GPU id you need to run this shell 
+<<<<<<< HEAD
 gpu_ids="0,1,2,3,4,5,6,7";
 gpu_num=8;
+=======
+gpu_ids="1,2,3,5,7";
+gpu_num=5;
+>>>>>>> ce5c24fe3f595e8b29416025aaf57774ea3d2673
 
 #* batch size 
 b_size=12;
@@ -36,7 +45,11 @@ save_freq=$val_freq;
 
 
 #* for  semi supervision architecture  : step1 x
+<<<<<<< HEAD
 labeled_ratio=0.5;
+=======
+labeled_ratio=0.2;
+>>>>>>> ce5c24fe3f595e8b29416025aaf57774ea3d2673
 topk=8;
 
 

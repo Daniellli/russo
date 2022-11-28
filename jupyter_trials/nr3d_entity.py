@@ -62,8 +62,7 @@ class NR3DEntity(Entity):
         for idx in range(annos.shape[0]):
             ann = annos.iloc[idx]
             if ann.scan_id in self.scan_ids \
-                and ann.mentions_target_class and (ann.correct_guess  or self.split != 'test') \
-                    and anno.target in anno.utterance:
+                and ann.mentions_target_class and (ann.correct_guess  or self.split != 'test') and ann.instance_type in ann.utterance:
                 ans.append(ann)
         logger.info(f"annos num = {len(ans)}")             
         return ans
@@ -147,6 +146,23 @@ class NR3DEntity(Entity):
     
 
 
+    def stat_scene(self,annos,assign_ids):
+
+        
+
+        all_annn = [] 
+        for ann in annos:
+
+            if ann['assignmentid'] in assign_ids:
+                all_annn.append(ann)
+
+        
+
+        all_scene = set([ass.scan_id for ass in all_annn])
+        # logger.info(f" {len(all_annn)} sample, {len(all_scene)} scenes  ")
+
+        return all_scene
+
     '''
     description:  根据比例获取不重复的assignmentid set
     param {*} self
@@ -155,7 +171,7 @@ class NR3DEntity(Entity):
     '''
     def split_labeled_according_assignment_id(self,ratio):
         
-        all_ann= self.get_all_ann_by_scanid()
+        all_ann= self.annos
         assignments = []
         for idx in range(len(all_ann)):
             assignments.append (all_ann[idx]['assignmentid'])
@@ -166,9 +182,12 @@ class NR3DEntity(Entity):
         choices = np.random.choice(length,int(length*ratio),replace= False)
 
         split_res = np.array(assignments)[choices]
+
+        all_scene = self.stat_scene(self.annos,split_res)
+        
+        logger.info(f"from {len(self.annos)} samples selecting {len(split_res)} samples, {len(set(split_res))} repeated samples,{len(all_scene)} scenes ")
         return split_res
 
-    
 
     '''
     description:  根据assignment id 划分不同的subset 
@@ -179,20 +198,18 @@ class NR3DEntity(Entity):
         for ratio in np.linspace(0.1,0.9,9):
             ratio = round(ratio,1)
             split_labeled_data = self.split_labeled_according_assignment_id(ratio)
-
-            print(f"length  = {len(split_labeled_data)}")
-            
             save_txt(os.path.join(self.split_root,'nr3d_train_{}.txt'.format(ratio)),'\n'.join(split_labeled_data.astype(np.str0).tolist()))
 
 
 
 
 if __name__ == "__main__":
-    
-    for ratio in np.linspace(0.1,0.9,9):
-        logger.info(ratio)
-        NR3DEntity('nr3d','train',round(ratio,1),init_anno=True)
-        logger.info("==================================================================")
+    nr3d = NR3DEntity('nr3d','train',None,init_anno=True)
+    nr3d.split_nr3d_according_to_assignmentid()
+    # for ratio in np.linspace(0.1,0.9,9):
+    #     logger.info(ratio)
+    #     NR3DEntity('nr3d','train',round(ratio,1),init_anno=True)
+    #     logger.info("==================================================================")
         
 
         
