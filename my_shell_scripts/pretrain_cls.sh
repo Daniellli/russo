@@ -2,11 +2,7 @@
 ###
  # @Author: daniel
  # @Date: 2022-11-14 22:15:44
-<<<<<<< HEAD
- # @LastEditTime: 2022-11-21 21:32:51
-=======
- # @LastEditTime: 2022-11-19 11:30:07
->>>>>>> ce5c24fe3f595e8b29416025aaf57774ea3d2673
+ # @LastEditTime: 2022-11-29 09:37:46
  # @LastEditors: daniel
  # @Description: 
  # @FilePath: /butd_detr/my_shell_scripts/pretrain_cls.sh
@@ -25,32 +21,25 @@ test_data=nr3d
 DATA_ROOT=datasets/
 
 #* GPU id you need to run this shell 
-<<<<<<< HEAD
-gpu_ids="0,1,2,3,4,5,6,7";
-gpu_num=8;
-=======
-gpu_ids="1,2,3,5,7";
-gpu_num=5;
->>>>>>> ce5c24fe3f595e8b29416025aaf57774ea3d2673
+gpu_ids="0,1,2,3";
+gpu_num=4;
 
 #* batch size 
-b_size=12;
-
+b_size=6;
 
 
 port=29530
-val_freq=5;
+val_freq=1;
 print_freq=10;
 save_freq=$val_freq;
 
 
 #* for  semi supervision architecture  : step1 x
-<<<<<<< HEAD
-labeled_ratio=0.5;
-=======
 labeled_ratio=0.2;
->>>>>>> ce5c24fe3f595e8b29416025aaf57774ea3d2673
-topk=8;
+topk=12;
+
+
+resume_model_path=logs/bdetr/nr3d/1669643193/ckpt_epoch_210_best.pth;
 
 
 TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
@@ -59,11 +48,10 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --pp_checkpoint $DATA_ROOT/gf_detector_l6o256.pth \
     --val_freq $val_freq --save_freq $val_freq --print_freq $print_freq \
     --dataset $train_data --test_dataset $test_data \
-    --detect_intermediate \
-    --use_soft_token_loss --use_contrastive_align \
-    --butd_cls --self_attend --use-tkps \
+    --detect_intermediate --butd_cls \
     --query_points_obj_topk $topk \
     --labeled_ratio $labeled_ratio \
+    --checkpoint_path $resume_model_path \
     --upload-wandb \
     2>&1 | tee -a logs/pretrain_cls.log
 

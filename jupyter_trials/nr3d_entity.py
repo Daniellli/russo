@@ -204,12 +204,12 @@ class NR3DEntity(Entity):
 
 
 if __name__ == "__main__":
-    nr3d = NR3DEntity('nr3d','train',None,init_anno=True)
-    nr3d.split_nr3d_according_to_assignmentid()
-    # for ratio in np.linspace(0.1,0.9,9):
-    #     logger.info(ratio)
-    #     NR3DEntity('nr3d','train',round(ratio,1),init_anno=True)
-    #     logger.info("==================================================================")
+    # nr3d = NR3DEntity('nr3d','train',None,init_anno=True)
+    # nr3d.split_nr3d_according_to_assignmentid()
+    for ratio in np.linspace(0.1,0.9,9):
+        logger.info(ratio)
+        NR3DEntity('nr3d','train',round(ratio,1),init_anno=True)
+        logger.info("==================================================================")
         
 
         

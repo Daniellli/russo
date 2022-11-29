@@ -798,10 +798,7 @@ class SemiSuperviseTrainTester(TrainTester):
             model = model.cuda(args.local_rank)
             ema_model = ema_model.cuda(args.local_rank)
 
-        model = DistributedDataParallel(
-            model, device_ids=[args.local_rank],
-            broadcast_buffers=True  # , find_unused_parameters=True
-        )
+       
 
         
         #* file and variable for saving the eval res 
@@ -819,7 +816,7 @@ class SemiSuperviseTrainTester(TrainTester):
         if args.checkpoint_path:
             assert os.path.isfile(args.checkpoint_path)
             load_checkpoint(args, model, optimizer, scheduler)
-            load_checkpoint(args, ema_model, optimizer, scheduler,distributed2common=True)
+            load_checkpoint(args, ema_model, optimizer, scheduler)
 
             #* update lr decay milestones
             if args.lr_decay_intermediate:    
@@ -857,6 +854,10 @@ class SemiSuperviseTrainTester(TrainTester):
                 exit(0)
 
 
+        model = DistributedDataParallel(
+            model, device_ids=[args.local_rank],
+            broadcast_buffers=True  # , find_unused_parameters=True
+        )
 
                     
         #* Training loop
