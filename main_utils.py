@@ -332,10 +332,7 @@ class BaseTrainTester:
         if torch.cuda.is_available():
             model = model.cuda(args.local_rank)
 
-        model = DistributedDataParallel(
-            model, device_ids=[args.local_rank],
-            broadcast_buffers=True  # , find_unused_parameters=True
-        )
+      
         
         # model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model.cuda(args.local_rank))
         # model = DistributedDataParallel(model,device_ids=[args.local_rank],find_unused_parameters=True,broadcast_buffers = True) 
@@ -360,7 +357,6 @@ class BaseTrainTester:
                 logger.info(f"current step :{scheduler._step_count},last epoch {scheduler.last_epoch} , warm up epoch :{args.warmup_epoch},args.lr_decay_epochs :{args.lr_decay_epochs},len(train_loader):{len(train_loader)}")
                 
                 
-                
                 # tmp = {scheduler._step_count+len(train_loader):1 } #* 一个epoch 后decay learning rate 
                 # tmp.update({ k:v for  idx, (k,v) in enumerate(scheduler.milestones.items()) if idx != 0})
                 
@@ -383,7 +379,10 @@ class BaseTrainTester:
                 
                 
              
-        
+        model = DistributedDataParallel(
+            model, device_ids=[args.local_rank],
+            broadcast_buffers=True  # , find_unused_parameters=True
+        )
 
         logger.info(scheduler.milestones)
         last_best_epoch_path = None
@@ -416,13 +415,15 @@ class BaseTrainTester:
                     if args.upload_wandb:
                         wandb.log(performance)
                         
+                        
                     with open(save_dir, 'a+')as f :
                         f.write( f"epoch:{epoch},"+','.join(["%s:%.4f"%(k,v) for k,v in performance.items()])+"\n")
                         
                     acc_key = list(performance.keys())[0]
                     if performance is not None and performance[acc_key] > best_performce:
                         best_performce =  performance[acc_key]
-                        spath = save_checkpoint(args, epoch, model, optimizer, scheduler ,is_best=True)            
+                        spath = save_checkpoint(args, epoch, model, optimizer, scheduler ,is_best=True)
+                        wandb.log({'best_acc':best_performce})
 
                         if last_best_epoch_path is not None:
                             os.remove(last_best_epoch_path)
