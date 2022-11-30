@@ -2,7 +2,7 @@
 ###
  # @Author: daniel
  # @Date: 2022-11-19 10:39:17
- # @LastEditTime: 2022-11-28 21:23:40
+ # @LastEditTime: 2022-11-30 09:52:58
  # @LastEditors: daniel
  # @Description: 
  # @FilePath: /butd_detr/my_shell_scripts/train_det_full.sh
@@ -22,8 +22,8 @@ DATA_ROOT=datasets/
 
 
 #* GPU id you need to run this shell 
-gpu_ids="1,2,3,4";
-gpu_num=4;
+gpu_ids="0,1,2,3,4,5,6,7";
+gpu_num=8;
 
 
 
@@ -46,10 +46,10 @@ save_freq=$val_freq;
 port=29522
 
 epoch=1000;
-b_size='10,2';#* 在full supervise setting 下没意义, 直接求和作为full supervise的batch size 
+b_size='2,2';#* 在full supervise setting 下没意义, 直接求和作为full supervise的batch size 
 
 # resume_model_path=archive/table1_scanrefer/pretrain_20%_scanrefer_2763_240.pth;
-resume_model_path=pretrain/pretrain_100%_scanrefer_5191_112.pth;
+resume_model_path=archive/table1_scanrefer/pretrain_100%_scanrefer_5191_112.pth;
 
 labeled_ratio=0.2;
 topk=8;

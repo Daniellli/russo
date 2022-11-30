@@ -860,6 +860,7 @@ class SemiSuperviseTrainTester(TrainTester):
 
                     
         #* Training loop
+        last_student_best_path = last_teacher_best_path = None
         for epoch in range(args.start_epoch, args.max_epoch + 1):
             
             labeled_loader.sampler.set_epoch(epoch)
@@ -897,7 +898,10 @@ class SemiSuperviseTrainTester(TrainTester):
                     is_best,snew_performance = save_res(save_dir,epoch,performance,best_performce)
                     if is_best:
                         best_performce =  snew_performance
-                        save_checkpoint(args, epoch, model, optimizer, scheduler ,is_best=True,prefix='student_')
+                        spath = save_checkpoint(args, epoch, model, optimizer, scheduler ,is_best=True,prefix='student_')
+
+                        remove_file(last_student_best_path)
+                        last_student_best_path = spath
 
                 
                 ema_performance = self.evaluate_one_epoch(
@@ -910,7 +914,11 @@ class SemiSuperviseTrainTester(TrainTester):
                     ema_is_best,tnew_performance = save_res(ema_save_dir,epoch,ema_performance,ema_best_performce)
                     if ema_is_best:
                         ema_best_performce =  tnew_performance
-                        save_checkpoint(args, epoch, ema_model, optimizer, scheduler ,is_best=True,prefix='teacher_')     
+                        spath= save_checkpoint(args, epoch, ema_model, optimizer, scheduler ,is_best=True,prefix='teacher_')     
+                        
+                        remove_file(last_teacher_best_path)
+                        last_teacher_best_path = spath
+
                 
                 
                 #todo 把save as txt 分离出来? 
