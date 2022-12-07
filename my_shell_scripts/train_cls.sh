@@ -2,7 +2,7 @@
 ###
  # @Author: daniel
  # @Date: 2022-11-21 16:48:48
- # @LastEditTime: 2022-11-28 15:23:56
+ # @LastEditTime: 2022-12-07 16:06:08
  # @LastEditors: daniel
  # @Description: 
  # @FilePath: /butd_detr/my_shell_scripts/train_cls.sh
@@ -22,18 +22,18 @@ DATA_ROOT=datasets/
 
 
 #* GPU id you need to run this shell 
-gpu_ids="0,1,2,3";
-gpu_num=4;
+gpu_ids="0,1,3,4,5,6";
+gpu_num=6;
 
 
 
 
 #* for not mask 
-size_consistency_weight=0;
+size_consistency_weight=1e-4;
 center_consistency_weight=1e-4;
-token_consistency_weight=0;
-query_consistency_weight=0;
-text_consistency_weight=0;
+token_consistency_weight=1e-2;
+query_consistency_weight=1;
+text_consistency_weight=1;
 
 rampup_length=0;#*  let it as  100  if SR3D 
 ema_decay=0.99;
@@ -46,10 +46,14 @@ save_freq=$val_freq;
 port=29522
 
 epoch=1000;
-b_size='2,4';
+b_size='6,1';
 
-# resume_model_path=archive/table3_nr3d/pretrain_30%_nr3d_3481_220.pth;
-resume_model_path=pretrain/pretrain_20%_sr3d_4456_55.pth;
+
+# resume_model_path=archive/nr3d/pretrain_30%_nr3d_3455_180.pth;
+# resume_model_path=archive/table2_sr3d/pretrain_20%_sr3d_4456_55.pth;
+resume_model_path=logs/bdetr/sr3d/1670258911/sr20_all_consistency_5345_80_1.pth;
+
+
 
 labeled_ratio=0.2;
 topk=8;
@@ -71,6 +75,7 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --rampup_length $rampup_length \
     --checkpoint_path $resume_model_path \
     --lr_decay_epochs $decay_epoch \
+    --query_points_obj_topk $topk \
     --lr_decay_intermediate \
     --labeled_ratio $labeled_ratio \
     --upload-wandb \
