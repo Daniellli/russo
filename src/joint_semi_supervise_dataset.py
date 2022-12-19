@@ -310,7 +310,8 @@ class JointSemiSupervisetDataset(Joint3DDataset):
             ret_dict.update({
                 'ann_id':anno['ann_id']
             })
-        elif anno['dataset']=='scannet' :
+        # elif anno['dataset']=='scannet' :
+        else:
             #* scannet , because joint_det is added 
             ret_dict.update({
                 'ann_id':'-1'
