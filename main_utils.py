@@ -229,6 +229,12 @@ class BaseTrainTester:
         # Move model to devices
         if torch.cuda.is_available():
             model = model.cuda(args.local_rank)
+
+        #* 2.eval and save res to a txt file 
+        load_checkpoint(args, model, None, None)
+
+
+
         model = DistributedDataParallel(
             model, device_ids=[args.local_rank],
             broadcast_buffers=True  # , find_unused_parameters=True
@@ -243,8 +249,6 @@ class BaseTrainTester:
 
 
 
-        #* 2.eval and save res to a txt file 
-        load_checkpoint(args, model, None, None)
 
 
         #* eval student model 

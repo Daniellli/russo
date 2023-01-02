@@ -2,7 +2,7 @@
 ###
  # @Author: daniel
  # @Date: 2022-11-19 10:39:17
- # @LastEditTime: 2022-11-30 09:52:58
+ # @LastEditTime: 2023-01-02 15:49:09
  # @LastEditors: daniel
  # @Description: 
  # @FilePath: /butd_detr/my_shell_scripts/train_det_full.sh
@@ -48,9 +48,9 @@ port=29522
 epoch=1000;
 b_size='2,2';#* 在full supervise setting 下没意义, 直接求和作为full supervise的batch size 
 
-# resume_model_path=archive/table1_scanrefer/pretrain_20%_scanrefer_2763_240.pth;
-resume_model_path=archive/table1_scanrefer/pretrain_100%_scanrefer_5191_112.pth;
 
+
+resume_model_path=archive/table1_scanrefer/pretrain_100%_scanrefer_5191_112.pth;
 labeled_ratio=0.2;
 topk=8;
 decay_epoch="1000 1001";
