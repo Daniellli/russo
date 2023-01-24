@@ -337,7 +337,7 @@ class SemiSuperviseTrainTester(TrainTester):
                     f'Train: [{epoch}][{batch_idx + 1}/{total_iteration}]  '
                 )
                 self.logger.info(''.join([
-                    f'{key} {stat_dict[key] / args.print_freq:.4f} \t'
+                    f'{key} {stat_dict[key] / args.print_freq:.10f} \t'
                     for key in sorted(stat_dict.keys())
                     if 'loss' in key and 'proposal_' not in key
                     and 'last_' not in key and 'head_' not in key

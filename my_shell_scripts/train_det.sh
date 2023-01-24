@@ -22,8 +22,8 @@ DATA_ROOT=datasets/
 
 
 #* GPU id you need to run this shell 
-gpu_ids="0,1,2,3";
-gpu_num=4;
+gpu_ids="0,2,3,4,5,6,7";
+gpu_num=7;
 
 
 
@@ -31,9 +31,10 @@ gpu_num=4;
 #* for not mask 
 size_consistency_weight=1e-4;
 center_consistency_weight=1e-4;
-token_consistency_weight=1e-2;
-query_consistency_weight=1;
-text_consistency_weight=1;
+token_consistency_weight=1;
+query_consistency_weight=0;
+text_consistency_weight=0;
+
 
 rampup_length=0;#*  let it as  100  if SR3D 
 ema_decay=0.99;
@@ -41,17 +42,28 @@ ema_decay_after_rampup=0.99;
 
 
 val_freq=1;
+
+
 print_freq=50;
 save_freq=$val_freq;
 port=29522
 
 epoch=1000;
-b_size='16,2';
+b_size='10,1';
 
 resume_model_path=archive/table1_scanrefer/pretrain_20%_scanrefer_2763_240.pth;
+# resume_model_path=logs/bdetr/scanrefer/1674353108/student_ckpt_epoch_592_best.pth; #* load the best 
+# resume_model_path=logs/bdetr/scanrefer/1674451061/student_ckpt_epoch_613_best.pth; #* load the best  and decay
+# resume_model_path=logs/bdetr/scanrefer/1674457457/student_ckpt_epoch_844_best.pth; #* load the best 
+
+
+
+
+
 labeled_ratio=0.2;
 topk=8;
-decay_epoch="1000 1001";
+# decay_epoch="452 538";
+decay_epoch="614 848";
 
 
 
