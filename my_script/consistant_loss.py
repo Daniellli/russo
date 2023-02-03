@@ -141,7 +141,16 @@ def compute_bbox_center_consistency_loss(center, ema_center,mask=None):
     
         # return (dist.sum(-1)/(mask.sum(-1)+1e-10)).sum(),ind2
     else :
-        return (dist1+dist2).mean(),ind2
+
+        # return (dist1+dist2).mean(),ind2
+
+        dist=(dist1+dist2)
+        eps = torch.quantile(dist, 0.85)
+
+        dist_ = (dist<eps) * dist
+        
+        
+        return dist_.mean(),ind2
 
 
 
@@ -277,7 +286,8 @@ def compute_refer_consistency_loss(end_points, ema_end_points,augmentation, pref
     
     #* ignore teacher 匹配到255的 query
     #!============
-    mask =teacher_out["pred_sem_cls"]!=255
+    mask=None
+    # mask =teacher_out["pred_sem_cls"]!=255
     #!============
     
     center_loss,teacher2student_map_idx = compute_bbox_center_consistency_loss(student_out['pred_boxes'][:,:,:3],teacher_out['pred_boxes'][:,:,:3],mask)

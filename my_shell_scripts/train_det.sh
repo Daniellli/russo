@@ -29,8 +29,8 @@ gpu_num=5;
 
 
 #* for not mask 
-size_consistency_weight=5e-3;
-center_consistency_weight=1e-1;
+size_consistency_weight=0;
+center_consistency_weight=1e-2;
 # token_consistency_weight=1e-2;
 token_consistency_weight=0;
 query_consistency_weight=0;
