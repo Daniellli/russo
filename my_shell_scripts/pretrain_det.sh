@@ -11,7 +11,7 @@ test_data=scanrefer
 DATA_ROOT=datasets/
 
 #* GPU id you need to run this shell 
-gpu_ids="0,4,5,6,7";
+gpu_ids="1,2,3,7,8";
 gpu_num=5;
 
 #* batch size 
@@ -20,14 +20,22 @@ b_size=12;
 
 
 port=29530
-val_freq=5;
+val_freq=1;
 print_freq=10;
 save_freq=$val_freq;
 
 
 #* for  semi supervision architecture  : step1 x
-labeled_ratio=0.7;
+labeled_ratio=0.2;
 topk=8;
+
+# resume_model_path=logs/bdetr/scanrefer/1672710759/ckpt_epoch_388_best.pth;
+resume_model_path=logs/bdetr/scanrefer/1675266963/ckpt_epoch_419_best.pth;
+decay_epoch="390 420";
+epoch=1000;
+
+
+
 
 
 TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
@@ -41,6 +49,9 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --self_attend --use-tkps \
     --query_points_obj_topk $topk \
     --labeled_ratio $labeled_ratio \
+    --checkpoint_path $resume_model_path --max_epoch $epoch \
+    --lr_decay_epochs $decay_epoch --lr_decay_intermediate \
+    --upload-wandb \
     2>&1 | tee -a logs/pretrain_cls.log
 
 

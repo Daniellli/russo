@@ -12,6 +12,8 @@ import os.path as osp
 from my_script.pc_utils import *
 import torch.nn.functional as F
 
+from data.model_util_scannet import ScannetDatasetConfig
+
 from IPython import embed
 
 from my_script.utils import make_dirs,rot_x,rot_y,rot_z,points2box,box2points,focalLoss,nn_distance
@@ -46,11 +48,53 @@ def parse_endpoint(end_points,prefix):
     pred_size = end_points[f'{prefix}pred_size']  # (B,K,3) (l,w,h)
     pred_bbox = torch.cat([pred_center, pred_size], dim=-1)
     pred_logits = end_points[f'{prefix}sem_cls_scores']  # (B, Q, n_class)
+    pred_sem_cls = torch.argmax(pred_logits[..., :], -1)
     output['pred_logits'] = pred_logits
+    output["pred_sem_cls"] = pred_sem_cls
     output["pred_boxes"] = pred_bbox
+    
+
+    
+    # soft_token_span= torch.argmax(pred_logits[..., :], -1)
+    
 
     return output
 
+
+
+# def parse_predictions(end_points, prefix):
+
+#     pred_center = end_points[f'{prefix}center']  # B,num_proposal,3
+#     pred_size = end_points[f'{prefix}pred_size']  # B, num_proposal, 3
+
+#     pred_sem_cls = torch.argmax(end_points[f'{prefix}sem_cls_scores'][..., :-1], -1)  #* B,num_proposal,#* [B,Q_num,T_num], T_num的最后一个对应not mentioned,  所以对前面x个去argmax, 也就是最大响应分类的idx, 得到一个[B,num_proposal], 每个proposal 对应的类别
+#     sem_cls_probs = softmax(end_points[f'{prefix}sem_cls_scores'].detach().cpu().numpy())  #* B,num_proposal,10,  将[B,Q_num,T_num], sota max 后得到最后一个在总的map占的比例, 应该不是10 ! 
+
+#     num_proposal = pred_center.shape[1]
+#     bsize = pred_center.shape[0]
+
+
+#     obj_prob = (1 - sem_cls_probs[:,:,-1]) # (B,K) #* 是obj的概率
+#     sem_cls_probs = sem_cls_probs[..., :-1] / obj_prob[..., None] #* 类别的概率
+
+#     #* 上面作者的做法是计算每个目标是每个类别的概率, 也就是有B X 256 X num_class
+#     #* class = 18  
+#     pred_corners_3d_upright_camera = torch.cat([pred_center,pred_size],axis=-1).cpu().detach().numpy()
+
+#     batch_pred_map_cls = []  # a list (len: batch_size) of list (len: num of predictions per sample) of tuples of pred_cls, pred_box and conf (0-1)
+#     data_config  = ScannetDatasetConfig(18)
+
+#     for i in range(bsize):
+#         cur_list = []
+#         for ii in range(data_config.num_class):#* 遍历所有类别
+#             cur_list += [
+#                 (ii, pred_corners_3d_upright_camera[i, j], sem_cls_probs[i, j, ii] * obj_prob[i, j])
+#                 for j in range(pred_center.shape[1]) if  obj_prob[i, j] > 0.0
+#             ]
+
+#         batch_pred_map_cls.append(cur_list)
+
+#     return batch_pred_map_cls
 
 
     
@@ -70,6 +114,8 @@ def get_activated_map(teacher_logit):#todo:  默认每个bbox 只响应一个 to
 
 
 
+
+
 '''
 description: 
 param {*} bbox
@@ -81,35 +127,21 @@ def compute_bbox_center_consistency_loss(center, ema_center,mask=None):
    
     if mask is not None : 
         #*这样就不能clip 了
-        center[~mask]=  1e+6
-        ema_center[~mask] =1e+6
+        # center[~mask]=  1e+6
+        ema_center[~mask]+=1e+6
 
     dist1, ind1, dist2, ind2 = nn_distance(center, ema_center)  #* ind1 (B, num_proposal): find the ema_center index closest to center
     
 
-    # rearrange_center=torch.cat([center[b_idx,ind1[b_idx],:].unsqueeze(0) for b_idx in range(B)],dim=0)
-    # rearrange_ema_center=torch.cat([ema_center[b_idx,ind2[b_idx],:].unsqueeze(0) for b_idx in range(B)],dim=0)
-    
-    # (((rearrange_center - ema_center )**2).sum(dim=-1) == dist1).int().sum()
-    # (((rearrange_ema_center - center )**2).sum(dim=-1) == dist2).int().sum()
-
-    # rearrange_size =torch.cat([size[b_idx,ind1[b_idx],:].unsqueeze(0) for b_idx in range(B)],dim=0)
-    # size_loss=F.mse_loss(rearrange_size, ema_size)
-    #!=========================
-    # border_line = torch.quantile(dist1,0.90)
-    # dist1 = (dist1<border_line) * dist1
-    # if mask is not None : 
-    #     dist1[~mask] = 0
-    #!=========================
-
     #TODO: use both dist1 and dist2 or only use dist1
-
-    dist = dist1+ dist2
-    #* 返回 loss,    teacher center 向student  center 对齐的索引
     if mask is not None :
-        return (dist.sum(-1)/(mask.sum(-1)+1e-10)).sum(),ind2
+        # dist =dist2[mask] #*the index in 2-th to 1-th  cloest distance 
+        return dist2[mask].sum(),ind2
+        #* 返回 loss,    teacher center 向student  center 对齐的索引
+    
+        # return (dist.sum(-1)/(mask.sum(-1)+1e-10)).sum(),ind2
     else :
-        return dist.mean(),ind2
+        return (dist1+dist2).mean(),ind2
 
 
 
@@ -131,18 +163,20 @@ def compute_token_map_consistency_loss(cls_scores, ema_cls_scores,map_ind,mask=N
     cls_log_prob = F.log_softmax(cls_scores, dim=2) #(B, num_proposal, num_class)
     ema_cls_prob = F.softmax(ema_cls_scores, dim=2) #(B, num_proposal, num_class)
 
-    
+    # todo : 
     cls_log_prob_aligned = torch.cat([torch.index_select(a, 0, i).unsqueeze(0) for a, i in zip(cls_log_prob, map_ind)])#* 根据map_ind 重新组织cls_log_prob (student out)
-    class_consistency_loss = F.kl_div(cls_log_prob_aligned, ema_cls_prob, reduction='none')
-
-
     if mask is not None:    
-        class_consistency_loss[~mask] =0
-
+        
+        # class_consistency_loss = F.kl_div(cls_log_prob_aligned[mask], ema_cls_prob[mask], reduction='none')
+        # class_consistency_loss[~mask] =0
         #* class_consistency_loss : [B,Q,T] 
         #todo does  it need to multiple by 2 according to  SESS? 
-        return (class_consistency_loss.mean(-1).sum(-1)/(mask.sum(-1)+1e-10)).sum()/B
+        # return (class_consistency_loss.mean(-1).sum(-1)/(mask.sum(-1)+1e-10)).sum()/B
+
+
+        return F.kl_div(cls_log_prob_aligned[mask], ema_cls_prob[mask], reduction='sum')
     else :
+        class_consistency_loss = F.kl_div(cls_log_prob_aligned, ema_cls_prob, reduction='none')
         return class_consistency_loss.mean()*2
 
 
@@ -207,15 +241,17 @@ def compute_size_consistency_loss(size, ema_size, map_ind, mask):
     B,N,_=size.shape
     size_aligned = torch.cat([torch.index_select(a, 0, i).unsqueeze(0) for a, i in zip(size, map_ind)])
 
-    size_consistency_loss = F.mse_loss(size_aligned, ema_size,reduction='none')
+    
 
 
     if mask is not None:    
-        size_consistency_loss[~mask] =0
+        return  F.mse_loss(size_aligned[mask], ema_size[mask],reduction='sum')
 
-    
-        return (size_consistency_loss.sum(-1).sum(-1)/(mask.sum(-1)+1e-10)).sum()/B
+        # size_consistency_loss[~mask] =0
+        # return (size_consistency_loss.sum(-1).sum(-1)/(mask.sum(-1)+1e-10)).sum()/B
+
     else :
+        size_consistency_loss = F.mse_loss(size_aligned, ema_size,reduction='none')
         return size_consistency_loss.mean()
 
     
@@ -232,22 +268,16 @@ return {*}
 def compute_refer_consistency_loss(end_points, ema_end_points,augmentation, prefix="last_"):
     
     student_out=parse_endpoint(end_points,prefix)
+    
     teacher_out=parse_endpoint(ema_end_points,prefix)
     
     # processong augmentaiton for 
     if augmentation is not None and len(augmentation.keys()) >0:
         teacher_out['pred_boxes'] = transformation_box(teacher_out['pred_boxes'],augmentation)
     
-
-    #* 下面这行是成立的
-    #* teacher_out['tokenized'] ['input_ids'] == student_out['tokenized'] ['input_ids']
-    
-    #*  只对token span 内的 pred target 计算loss
-    # mask_len = (teacher_out['tokenized']['attention_mask']==1).sum(-1) #* 获取每个description 经过language model 后的token  set 实际长度
-    # teacher_activated_token_map = get_activated_map(teacher_out['pred_logits'])
-    # mask =torch.cat([(teacher_activated_token_map[idx]<desc_len).unsqueeze(0) for idx,desc_len in enumerate(mask_len)],dim=0)#* calculate the mask 
+    #* ignore teacher 匹配到255的 query
     #!============
-    mask = None
+    mask =teacher_out["pred_sem_cls"]!=255
     #!============
     
     center_loss,teacher2student_map_idx = compute_bbox_center_consistency_loss(student_out['pred_boxes'][:,:,:3],teacher_out['pred_boxes'][:,:,:3],mask)
@@ -278,9 +308,8 @@ def compute_query_consistency_loss(student_query,teacher_query,map_idx):
     __student_log_query = F.log_softmax(student_query, dim=2) #(B, num_proposal, num_class)
     __teacher_query = F.softmax(teacher_query, dim=2) #(B, num_proposal, num_class)
 
-    
     student_query_aligned = torch.cat([torch.index_select(a, 0, i).unsqueeze(0) for a, i in zip(__student_log_query, map_idx)])#* 根据map_ind 重新组织cls_log_prob (student out)
-    return F.kl_div(student_query_aligned, __teacher_query, reduction='mean')*2
+    return F.kl_div(student_query_aligned, __teacher_query, reduction='mean')
 
 
 
