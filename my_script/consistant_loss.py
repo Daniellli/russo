@@ -47,11 +47,18 @@ def parse_endpoint(end_points,prefix):
     pred_center = end_points[f'{prefix}center']  # B, K, 3
     pred_size = end_points[f'{prefix}pred_size']  # (B,K,3) (l,w,h)
     pred_bbox = torch.cat([pred_center, pred_size], dim=-1)
-    pred_logits = end_points[f'{prefix}sem_cls_scores']  # (B, Q, n_class)
+    pred_logits=torch.nn.functional.softmax(end_points[f'{prefix}sem_cls_scores'],dim=-1)  #* (B, Q, n_class)
     pred_sem_cls = torch.argmax(pred_logits[..., :], -1)
-    output['pred_logits'] = pred_logits
-    output["pred_sem_cls"] = pred_sem_cls
-    output["pred_boxes"] = pred_bbox
+    pred_obj_logit = (1 - pred_logits[:,:,-1])
+
+
+    # sem_cls_probs = softmax(end_points[f'{prefix}sem_cls_scores'].detach().cpu().numpy())  
+    # pred_obj_logit = (1 - sem_cls_probs[:,:,-1]) # (B,K) #* 是obj的概率
+    
+    output['pred_logits'] = pred_logits #* the soft token span logit, [B,query_number,token_span_range(256)]
+    output["pred_sem_cls"] = pred_sem_cls #* which token the query point to 
+    output["pred_obj_logit"] = pred_obj_logit #* the last value of token span, which means the query point to an object proability 
+    output["pred_boxes"] = pred_bbox 
     
 
     
@@ -121,9 +128,10 @@ description:
 param {*} bbox
 param {*} ema_bbox
 param {*} mask
+param {*} logit : the  object logit 
 return {*}
 '''
-def compute_bbox_center_consistency_loss(center, ema_center,mask=None):
+def compute_bbox_center_consistency_loss(center, ema_center,mask=None,logit=None):
    
     if mask is not None : 
         #*这样就不能clip 了
@@ -136,21 +144,18 @@ def compute_bbox_center_consistency_loss(center, ema_center,mask=None):
     #TODO: use both dist1 and dist2 or only use dist1
     if mask is not None :
         # dist =dist2[mask] #*the index in 2-th to 1-th  cloest distance 
-        return dist2[mask].sum(),ind2
+        return dist2[mask].mean(),ind2
         #* 返回 loss,    teacher center 向student  center 对齐的索引
     
         # return (dist.sum(-1)/(mask.sum(-1)+1e-10)).sum(),ind2
     else :
 
         # return (dist1+dist2).mean(),ind2
-
-        dist=(dist1+dist2)
-        eps = torch.quantile(dist, 0.85)
-
-        dist_ = (dist<eps) * dist
+        dist2 = logit*dist2 #* the obj probility to filter 
+        # dist_ = (dist2<torch.quantile(dist2, 0.85)) * dist2
         
         
-        return dist_.mean(),ind2
+        return dist2.mean(),ind2
 
 
 
@@ -290,7 +295,7 @@ def compute_refer_consistency_loss(end_points, ema_end_points,augmentation, pref
     # mask =teacher_out["pred_sem_cls"]!=255
     #!============
     
-    center_loss,teacher2student_map_idx = compute_bbox_center_consistency_loss(student_out['pred_boxes'][:,:,:3],teacher_out['pred_boxes'][:,:,:3],mask)
+    center_loss,teacher2student_map_idx = compute_bbox_center_consistency_loss(student_out['pred_boxes'][:,:,:3],teacher_out['pred_boxes'][:,:,:3],mask,logit=teacher_out['pred_obj_logit'])
     soft_token_loss=compute_token_map_consistency_loss(student_out['pred_logits'],teacher_out['pred_logits'],teacher2student_map_idx,mask= mask)
 
     size_loss = compute_size_consistency_loss(student_out['pred_boxes'][:,:,3:],teacher_out['pred_boxes'][:,:,3:],teacher2student_map_idx,mask)
