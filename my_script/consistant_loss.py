@@ -47,38 +47,23 @@ def parse_endpoint(end_points,prefix):
     pred_center = end_points[f'{prefix}center']  # B, K, 3
     pred_size = end_points[f'{prefix}pred_size']  # (B,K,3) (l,w,h)
     pred_bbox = torch.cat([pred_center, pred_size], dim=-1)
-    pred_logits=torch.nn.functional.softmax(end_points[f'{prefix}sem_cls_scores'],dim=-1)  #* (B, Q, n_class)
+
+
+
+
+    pred_logits=F.softmax(end_points[f'{prefix}sem_cls_scores'],dim=-1)  #* (B, Q, n_class)
     pred_sem_cls = torch.argmax(pred_logits[..., :], -1)
     pred_obj_logit = (1 - pred_logits[:,:,-1])
 
+    #* 保存非 softmax 的方便计算KL 散度
+    output['pred_logits'] = end_points[f'{prefix}sem_cls_scores']  #* the soft token span logit, [B,query_number,token_span_range(256)]
 
-    # sem_cls_probs = softmax(end_points[f'{prefix}sem_cls_scores'].detach().cpu().numpy())  
-    # pred_obj_logit = (1 - sem_cls_probs[:,:,-1]) # (B,K) #* 是obj的概率
-    
-    output['pred_logits'] = pred_logits #* the soft token span logit, [B,query_number,token_span_range(256)]
     output["pred_sem_cls"] = pred_sem_cls #* which token the query point to 
     output["pred_obj_logit"] = pred_obj_logit #* the last value of token span, which means the query point to an object proability 
     output["pred_boxes"] = pred_bbox 
     
 
     return output
-
-
-    
-
-'''
-description:  给定一个model 推理输出的 [B,query_num,token_map_size] 的 embedding, 对token_map_size 取响应最大的token position得[B,query_num] 
-param {*} teacher_logit
-return {*}
-'''
-def get_activated_map(teacher_logit):#todo:  默认每个bbox 只响应一个 token ; how to optimize 
-    query_dist_map =teacher_logit.softmax(-1) #* softmax 找到对应的token,  每个channel对应的一个token , 共256个token 
-    target = torch.argmax(query_dist_map, 2).long() #* 等于255 应该是没有匹配到文本token的, 如paper解释的一样
-
-    return target
-
-  
-
 
 
 
@@ -98,22 +83,34 @@ def compute_bbox_center_consistency_loss(center, ema_center,mask=None,logit=None
 
     #TODO: use both dist1 and dist2 or only use dist1
     if mask is not None :
-
-
-        dist2 = (dist2<torch.quantile(dist2, 0.85)) * dist2
-
+        dist2 = (dist2<torch.quantile(dist2, 0.92)) * dist2
         return dist2[mask].mean(),ind2
-        #* 返回 loss,    teacher center 向student  center 对齐的索引
-    
-        # return (dist.sum(-1)/(mask.sum(-1)+1e-10)).sum(),ind2
     else :
 
-        # return (dist1+dist2).mean(),ind2
-        # dist2 = logit*dist2 #* the obj probility to filter 
-        dist_ = (dist2<torch.quantile(dist2, 0.25)) * dist2
-        
+        dist_ = (dist2<torch.quantile(dist2, 0.92)) * dist2        
         return dist_.mean(),ind2
 
+
+'''
+description: 
+param {*} end_points
+param {*} ema_end_points
+param {*} map_ind
+param {*} config
+return {*}
+'''
+def compute_size_consistency_loss(size, ema_size, map_ind, mask):
+    
+    B,N,_=size.shape
+    size_aligned = torch.cat([torch.index_select(a, 0, i).unsqueeze(0) for a, i in zip(size, map_ind)])
+
+    if mask is not None:    
+        dist2= F.mse_loss(size_aligned, ema_size,reduction='none')
+        dist2 = (dist2<torch.quantile(dist2, 0.92)) * dist2
+        return dist2[mask].mean()
+    else :
+        size_consistency_loss = F.mse_loss(size_aligned, ema_size,reduction='none')
+        return size_consistency_loss.mean()
 
 
 
@@ -131,33 +128,58 @@ return {*}
 def compute_token_map_consistency_loss(cls_scores, ema_cls_scores,map_ind,mask=None):
     #* ? 
     B,Q,T=cls_scores.shape
-    cls_log_prob = F.log_softmax(cls_scores, dim=2) #(B, num_proposal, num_class)
-    ema_cls_prob = F.softmax(ema_cls_scores, dim=2) #(B, num_proposal, num_class)
+    
+    cls_log_prob = F.log_softmax(cls_scores, dim=-1) #(B, num_proposal, num_class)
+    ema_cls_prob = F.softmax(ema_cls_scores, dim=-1) #(B, num_proposal, num_class)
 
     # todo : 
     cls_log_prob_aligned = torch.cat([torch.index_select(a, 0, i).unsqueeze(0) for a, i in zip(cls_log_prob, map_ind)])#* 根据map_ind 重新组织cls_log_prob (student out)
     if mask is not None:    
         
-        # class_consistency_loss = F.kl_div(cls_log_prob_aligned[mask], ema_cls_prob[mask], reduction='none')
-        # class_consistency_loss[~mask] =0
-        #* class_consistency_loss : [B,Q,T] 
-        #todo does  it need to multiple by 2 according to  SESS? 
-        # return (class_consistency_loss.mean(-1).sum(-1)/(mask.sum(-1)+1e-10)).sum()/B
+        dist2 = F.kl_div(cls_log_prob_aligned, ema_cls_prob, reduction='none')
+        return dist2[mask].mean()
 
-
-        return F.kl_div(cls_log_prob_aligned[mask], ema_cls_prob[mask], reduction='sum')
     else :
         class_consistency_loss = F.kl_div(cls_log_prob_aligned, ema_cls_prob, reduction='none')
         return class_consistency_loss.mean()*2
 
 
 
+'''
+description: 计算queries 之间的 距离
+param {*} student_query
+param {*} teacher_query
+param {*} map_idx
+return {*}
+'''
+def compute_query_consistency_loss(student_query,teacher_query,map_idx,mask=None):
+       
+    __student_log_query = F.log_softmax(student_query, dim=-1) #(B, num_proposal, num_class)
+    __teacher_query = F.softmax(teacher_query, dim=-1) #(B, num_proposal, num_class)
+
+    student_query_aligned = torch.cat([torch.index_select(a, 0, i).unsqueeze(0) for a, i in zip(__student_log_query, map_idx)])#* 根据map_ind 重新组织cls_log_prob (student out)
+    dist2 = F.kl_div(student_query_aligned, __teacher_query, reduction='none')
+
+    if mask is not None:
+        return  dist2[mask].mean()
+
+    return dist2.mean()
+
+
+
+'''
+description: 计算queries 之间的 距离
+param {*} student_query
+param {*} teacher_query
+param {*} map_idx
+return {*}
+'''
+def compute_text_consistency_loss(student_text,teacher_text,map_idx):
+
+    return F.kl_div( F.log_softmax(student_text, dim=-1) , F.softmax(teacher_text, dim=-1), reduction='mean')
+
+
     
-
-
-
-
-
 
 '''
 description:  对detector 的bbox进行数据增强 ,#! 没有加入噪声
@@ -203,37 +225,6 @@ def transformation_box(bboxes,augmentations):
     
 
 
-'''
-description: 
-param {*} end_points
-param {*} ema_end_points
-param {*} map_ind
-param {*} config
-return {*}
-'''
-def compute_size_consistency_loss(size, ema_size, map_ind, mask):
-    
-    B,N,_=size.shape
-    size_aligned = torch.cat([torch.index_select(a, 0, i).unsqueeze(0) for a, i in zip(size, map_ind)])
-
-    
-
-
-    if mask is not None:    
-        dist2= F.mse_loss(size_aligned, ema_size,reduction='none')
-
-        dist2 = (dist2<torch.quantile(dist2, 0.85)) * dist2
-
-        return dist2[mask].mean()
-
-
-        # size_consistency_loss[~mask] =0
-        # return (size_consistency_loss.sum(-1).sum(-1)/(mask.sum(-1)+1e-10)).sum()/B
-
-    else :
-        size_consistency_loss = F.mse_loss(size_aligned, ema_size,reduction='none')
-        return size_consistency_loss.mean()
-
     
 
 
@@ -248,20 +239,14 @@ return {*}
 def compute_refer_consistency_loss(end_points, ema_end_points,augmentation, prefix="last_"):
     
     student_out=parse_endpoint(end_points,prefix)
-    
     teacher_out=parse_endpoint(ema_end_points,prefix)
     
-    # processong augmentaiton for 
     if augmentation is not None and len(augmentation.keys()) >0:
         teacher_out['pred_boxes'] = transformation_box(teacher_out['pred_boxes'],augmentation)
     
-    #* ignore teacher 匹配到255的 query
-    #!============
     mask=None
-    mask= teacher_out['pred_obj_logit']>0.4
+    mask= ((teacher_out['pred_obj_logit']>0.1) * (teacher_out['pred_sem_cls']!=255))
     
-    # mask =teacher_out["pred_sem_cls"]!=255
-    #!============
     
     center_loss,teacher2student_map_idx = compute_bbox_center_consistency_loss(student_out['pred_boxes'][:,:,:3],teacher_out['pred_boxes'][:,:,:3],mask)
     size_loss = compute_size_consistency_loss(student_out['pred_boxes'][:,:,3:],teacher_out['pred_boxes'][:,:,3:],teacher2student_map_idx,mask)
@@ -269,43 +254,15 @@ def compute_refer_consistency_loss(end_points, ema_end_points,augmentation, pref
 
     soft_token_loss=compute_token_map_consistency_loss(student_out['pred_logits'],teacher_out['pred_logits'],teacher2student_map_idx,mask= mask)
 
-    query_consistent_loss=compute_query_consistency_loss(student_out['proj_queries'],teacher_out['proj_queries'],teacher2student_map_idx)
+    query_consistent_loss=compute_query_consistency_loss(student_out['proj_queries'],teacher_out['proj_queries'],teacher2student_map_idx,mask= mask)
     text_consistent_loss=compute_text_consistency_loss(student_out['proj_tokens'],teacher_out['proj_tokens'],teacher2student_map_idx)
 
-    # logger.info(f" center_loss:{center_loss}, soft_token_loss : {soft_token_loss}, size_loss(not included ):{size_loss}")
+    logger.info(" center_loss:%.10f \t size_loss :%.10f \t soft_token_loss : %.10f \t  query_consistent_loss : %.10f \t text_consistent_loss : %.10f \t "
+                %(center_loss,size_loss,soft_token_loss,query_consistent_loss,text_consistent_loss))
 
     return center_loss,soft_token_loss,size_loss,query_consistent_loss,text_consistent_loss
     
 
-
-
-'''
-description: 计算queries 之间的 距离
-param {*} student_query
-param {*} teacher_query
-param {*} map_idx
-return {*}
-'''
-def compute_query_consistency_loss(student_query,teacher_query,map_idx):
-       
-    __student_log_query = F.log_softmax(student_query, dim=2) #(B, num_proposal, num_class)
-    __teacher_query = F.softmax(teacher_query, dim=2) #(B, num_proposal, num_class)
-
-    student_query_aligned = torch.cat([torch.index_select(a, 0, i).unsqueeze(0) for a, i in zip(__student_log_query, map_idx)])#* 根据map_ind 重新组织cls_log_prob (student out)
-    return F.kl_div(student_query_aligned, __teacher_query, reduction='mean')
-
-
-
-'''
-description: 计算queries 之间的 距离
-param {*} student_query
-param {*} teacher_query
-param {*} map_idx
-return {*}
-'''
-def compute_text_consistency_loss(student_text,teacher_text,map_idx):
-
-    return F.kl_div( F.log_softmax(student_text, dim=2) , F.softmax(teacher_text, dim=2), reduction='mean')*2
 
 
 
@@ -368,16 +325,6 @@ def get_consistency_loss(end_points, ema_end_points,augmentation):
 
 
     return end_points
-
-
-
-
-
-
-
-
-
-
 
 
 

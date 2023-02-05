@@ -29,15 +29,15 @@ gpu_num=5;
 
 
 #* for not mask 
-size_consistency_weight=1;
-center_consistency_weight=1;
+size_consistency_weight=1e-2;
+center_consistency_weight=1e-2;
 # token_consistency_weight=1e-2;
 token_consistency_weight=0;
 query_consistency_weight=0;
 text_consistency_weight=0;
 
 
-rampup_length=30;#*  let it as  100  if SR3D 
+rampup_length=50;#*  let it as  100  if SR3D 
 ema_decay=0.999;
 ema_decay_after_rampup=0.99;
 
@@ -54,11 +54,10 @@ b_size='8,2';
 
 resume_model_path=logs/bdetr/scanrefer/1675301948/scanrefer20_3332_480.pth;
 
-
 labeled_ratio=0.2;
 topk=8;
 
-decay_epoch="1000 1001";
+decay_epoch="481 1001";
 
 
 
