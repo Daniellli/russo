@@ -61,47 +61,7 @@ def parse_endpoint(end_points,prefix):
     output["pred_boxes"] = pred_bbox 
     
 
-    
-    # soft_token_span= torch.argmax(pred_logits[..., :], -1)
-    
-
     return output
-
-
-
-# def parse_predictions(end_points, prefix):
-
-#     pred_center = end_points[f'{prefix}center']  # B,num_proposal,3
-#     pred_size = end_points[f'{prefix}pred_size']  # B, num_proposal, 3
-
-#     pred_sem_cls = torch.argmax(end_points[f'{prefix}sem_cls_scores'][..., :-1], -1)  #* B,num_proposal,#* [B,Q_num,T_num], T_num的最后一个对应not mentioned,  所以对前面x个去argmax, 也就是最大响应分类的idx, 得到一个[B,num_proposal], 每个proposal 对应的类别
-#     sem_cls_probs = softmax(end_points[f'{prefix}sem_cls_scores'].detach().cpu().numpy())  #* B,num_proposal,10,  将[B,Q_num,T_num], sota max 后得到最后一个在总的map占的比例, 应该不是10 ! 
-
-#     num_proposal = pred_center.shape[1]
-#     bsize = pred_center.shape[0]
-
-
-#     obj_prob = (1 - sem_cls_probs[:,:,-1]) # (B,K) #* 是obj的概率
-#     sem_cls_probs = sem_cls_probs[..., :-1] / obj_prob[..., None] #* 类别的概率
-
-#     #* 上面作者的做法是计算每个目标是每个类别的概率, 也就是有B X 256 X num_class
-#     #* class = 18  
-#     pred_corners_3d_upright_camera = torch.cat([pred_center,pred_size],axis=-1).cpu().detach().numpy()
-
-#     batch_pred_map_cls = []  # a list (len: batch_size) of list (len: num of predictions per sample) of tuples of pred_cls, pred_box and conf (0-1)
-#     data_config  = ScannetDatasetConfig(18)
-
-#     for i in range(bsize):
-#         cur_list = []
-#         for ii in range(data_config.num_class):#* 遍历所有类别
-#             cur_list += [
-#                 (ii, pred_corners_3d_upright_camera[i, j], sem_cls_probs[i, j, ii] * obj_prob[i, j])
-#                 for j in range(pred_center.shape[1]) if  obj_prob[i, j] > 0.0
-#             ]
-
-#         batch_pred_map_cls.append(cur_list)
-
-#     return batch_pred_map_cls
 
 
     
@@ -138,7 +98,10 @@ def compute_bbox_center_consistency_loss(center, ema_center,mask=None,logit=None
 
     #TODO: use both dist1 and dist2 or only use dist1
     if mask is not None :
-        # dist =dist2[mask] #*the index in 2-th to 1-th  cloest distance 
+
+
+        dist2 = (dist2<torch.quantile(dist2, 0.85)) * dist2
+
         return dist2[mask].mean(),ind2
         #* 返回 loss,    teacher center 向student  center 对齐的索引
     
@@ -257,7 +220,12 @@ def compute_size_consistency_loss(size, ema_size, map_ind, mask):
 
 
     if mask is not None:    
-        return  F.mse_loss(size_aligned[mask], ema_size[mask],reduction='sum')
+        dist2= F.mse_loss(size_aligned, ema_size,reduction='none')
+
+        dist2 = (dist2<torch.quantile(dist2, 0.85)) * dist2
+
+        return dist2[mask].mean()
+
 
         # size_consistency_loss[~mask] =0
         # return (size_consistency_loss.sum(-1).sum(-1)/(mask.sum(-1)+1e-10)).sum()/B
@@ -290,16 +258,16 @@ def compute_refer_consistency_loss(end_points, ema_end_points,augmentation, pref
     #* ignore teacher 匹配到255的 query
     #!============
     mask=None
-    mask= teacher_out['pred_obj_logit']>0.1
+    mask= teacher_out['pred_obj_logit']>0.4
     
     # mask =teacher_out["pred_sem_cls"]!=255
     #!============
     
     center_loss,teacher2student_map_idx = compute_bbox_center_consistency_loss(student_out['pred_boxes'][:,:,:3],teacher_out['pred_boxes'][:,:,:3],mask)
-    soft_token_loss=compute_token_map_consistency_loss(student_out['pred_logits'],teacher_out['pred_logits'],teacher2student_map_idx,mask= mask)
-
     size_loss = compute_size_consistency_loss(student_out['pred_boxes'][:,:,3:],teacher_out['pred_boxes'][:,:,3:],teacher2student_map_idx,mask)
 
+
+    soft_token_loss=compute_token_map_consistency_loss(student_out['pred_logits'],teacher_out['pred_logits'],teacher2student_map_idx,mask= mask)
 
     query_consistent_loss=compute_query_consistency_loss(student_out['proj_queries'],teacher_out['proj_queries'],teacher2student_map_idx)
     text_consistent_loss=compute_text_consistency_loss(student_out['proj_tokens'],teacher_out['proj_tokens'],teacher2student_map_idx)
