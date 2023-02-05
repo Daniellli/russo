@@ -22,15 +22,15 @@ DATA_ROOT=datasets/
 
 
 #* GPU id you need to run this shell 
-gpu_ids="0,1,2,3";
-gpu_num=4;
+gpu_ids="1,2,3,4,8";
+gpu_num=5;
 
 
 
 
 #* for not mask 
 size_consistency_weight=0;
-center_consistency_weight=1;
+center_consistency_weight=1e+1;
 # token_consistency_weight=1e-2;
 token_consistency_weight=0;
 query_consistency_weight=0;
@@ -52,8 +52,7 @@ port=29522
 epoch=1000;
 b_size='8,2';
 
-resume_model_path=pretrain/scanrefer20_3332_480.pth;
-
+resume_model_path=logs/bdetr/scanrefer/1675301948/scanrefer20_3332_480.pth;
 
 
 labeled_ratio=0.2;

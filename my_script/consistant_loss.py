@@ -133,11 +133,6 @@ return {*}
 '''
 def compute_bbox_center_consistency_loss(center, ema_center,mask=None,logit=None):
    
-    if mask is not None : 
-        #*这样就不能clip 了
-        # center[~mask]=  1e+6
-        ema_center[~mask]+=1e+6
-
     dist1, ind1, dist2, ind2 = nn_distance(center, ema_center)  #* ind1 (B, num_proposal): find the ema_center index closest to center
     
 
@@ -151,11 +146,10 @@ def compute_bbox_center_consistency_loss(center, ema_center,mask=None,logit=None
     else :
 
         # return (dist1+dist2).mean(),ind2
-        dist2 = logit*dist2 #* the obj probility to filter 
-        # dist_ = (dist2<torch.quantile(dist2, 0.85)) * dist2
+        # dist2 = logit*dist2 #* the obj probility to filter 
+        dist_ = (dist2<torch.quantile(dist2, 0.25)) * dist2
         
-        
-        return dist2.mean(),ind2
+        return dist_.mean(),ind2
 
 
 
@@ -217,9 +211,6 @@ def transformation_box(bboxes,augmentations):
     B,N,_=bboxes.shape
 
     all_det_pts = box2points(bboxes).view(B,-1, 3)
-    all_det_pts = rot_z(all_det_pts, augmentations['theta_z'])
-    all_det_pts = rot_x(all_det_pts, augmentations['theta_x'])
-    all_det_pts = rot_y(all_det_pts, augmentations['theta_y'])
 
     for idx, tmp in enumerate(augmentations['yz_flip']): 
         if tmp:
@@ -229,6 +220,13 @@ def transformation_box(bboxes,augmentations):
     for idx, tmp in enumerate(augmentations['xz_flip']): 
         if tmp:
             all_det_pts[idx,:, 1] = -all_det_pts[idx,:, 1]
+
+            
+    all_det_pts = rot_z(all_det_pts, augmentations['theta_z'])
+    all_det_pts = rot_x(all_det_pts, augmentations['theta_x'])
+    all_det_pts = rot_y(all_det_pts, augmentations['theta_y'])
+
+  
 
 
     B2,N2,_=all_det_pts.shape
@@ -292,10 +290,12 @@ def compute_refer_consistency_loss(end_points, ema_end_points,augmentation, pref
     #* ignore teacher 匹配到255的 query
     #!============
     mask=None
+    mask= teacher_out['pred_obj_logit']>0.1
+    
     # mask =teacher_out["pred_sem_cls"]!=255
     #!============
     
-    center_loss,teacher2student_map_idx = compute_bbox_center_consistency_loss(student_out['pred_boxes'][:,:,:3],teacher_out['pred_boxes'][:,:,:3],mask,logit=teacher_out['pred_obj_logit'])
+    center_loss,teacher2student_map_idx = compute_bbox_center_consistency_loss(student_out['pred_boxes'][:,:,:3],teacher_out['pred_boxes'][:,:,:3],mask)
     soft_token_loss=compute_token_map_consistency_loss(student_out['pred_logits'],teacher_out['pred_logits'],teacher2student_map_idx,mask= mask)
 
     size_loss = compute_size_consistency_loss(student_out['pred_boxes'][:,:,3:],teacher_out['pred_boxes'][:,:,3:],teacher2student_map_idx,mask)
