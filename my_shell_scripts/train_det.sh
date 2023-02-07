@@ -29,8 +29,8 @@ gpu_num=5;
 
 
 #* for not mask 
-size_consistency_weight=1e-2;
-center_consistency_weight=1e-2;
+size_consistency_weight=1e-1;
+center_consistency_weight=1e-1;
 # token_consistency_weight=1e-2;
 token_consistency_weight=0;
 query_consistency_weight=0;
@@ -50,7 +50,7 @@ save_freq=$val_freq;
 port=29522
 
 epoch=1000;
-b_size='8,2';
+b_size='8,4';
 
 resume_model_path=logs/bdetr/scanrefer/1675301948/scanrefer20_3332_480.pth;
 

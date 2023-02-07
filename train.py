@@ -205,45 +205,58 @@ class SemiSuperviseTrainTester(TrainTester):
 
         total_iteration=len(labeled_loader)
     
-        logger.info(f"total_iteration == {total_iteration}")
+        # logger.info(f"total_iteration == {total_iteration}")
 
         center_consistency_weight = self.get_current_consistency_weight(args.center_consistency_weight ,epoch,args)
         size_consistency_weight = self.get_current_consistency_weight(args.size_consistency_weight ,epoch,args)
         token_consistency_weight = self.get_current_consistency_weight(args.token_consistency_weight ,epoch,args)
-
         query_consistency_weight = self.get_current_consistency_weight(args.query_consistency_weight ,epoch,args)
         text_consistency_weight = self.get_current_consistency_weight(args.text_consistency_weight ,epoch,args)
 
+        # logger.info(f"center_consistency_weight  : {center_consistency_weight}")
+        # logger.info(f"size_consistency_weight  : {size_consistency_weight}")
+        # logger.info(f"token_consistency_weight  : {token_consistency_weight}")
+        # logger.info(f"query_consistency_weight  : {query_consistency_weight}")
+        # logger.info(f"text_consistency_weight  : {text_consistency_weight}")
 
-        logger.info(f"center_consistency_weight  : {center_consistency_weight}")
-        logger.info(f"size_consistency_weight  : {size_consistency_weight}")
-        logger.info(f"token_consistency_weight  : {token_consistency_weight}")
-        logger.info(f"query_consistency_weight  : {query_consistency_weight}")
-        logger.info(f"text_consistency_weight  : {text_consistency_weight}")
-        unlabeled_loader_iter=iter(unlabeled_loader)
+
+        #* change the position of labeled and unlabeled dataloader 
+        #* the  batch_data is unlabeled data while the batch_data_unlabeled is labeled . 
+        # unlabeled_loader_iter=iter(unlabeled_loader)
+        loader_iter=iter(labeled_loader)
+       
+        def merge_A_to_B(A,B):
+            for key in A: #* 两个batch 合成一个batch, 
+                if  isinstance(B[key],list):
+                    B[key] = B[key]+A[key]
+                elif  isinstance(B[key],dict):
+                    for kkey in B[key]:
+                        B[key][kkey] = torch.cat((B[key][kkey], A[key][kkey]), dim=0)
+                else:
+                    B[key] = torch.cat((B[key], A[key]), dim=0)
 
         
-        for batch_idx, batch_data in enumerate(labeled_loader):
+        for batch_idx, batch_data_unlabeled in enumerate(unlabeled_loader):
 
+            # try:
+            #     batch_data_unlabeled = next(unlabeled_loader_iter)
+            # except StopIteration:
+            #     unlabeled_loader_iter = iter(unlabeled_loader)
+            #     batch_data_unlabeled = next(unlabeled_loader_iter)
 
             try:
-                batch_data_unlabeled = next(unlabeled_loader_iter)
+                batch_data = next(loader_iter)
             except StopIteration:
-                unlabeled_loader_iter = iter(unlabeled_loader)
-                batch_data_unlabeled = next(unlabeled_loader_iter)
+                loader_iter = iter(labeled_loader)
+                batch_data = next(loader_iter)
+
+                
 
             # Move to GPU
             batch_data = self._to_gpu(batch_data)
             batch_data_unlabeled = self._to_gpu(batch_data_unlabeled)
             
-            for key in batch_data_unlabeled: #* 两个batch 合成一个batch, 
-                if  isinstance(batch_data[key],list):
-                    batch_data[key] = batch_data[key]+batch_data_unlabeled[key]
-                elif  isinstance(batch_data[key],dict):
-                    for kkey in batch_data[key]:
-                        batch_data[key][kkey] = torch.cat((batch_data[key][kkey], batch_data_unlabeled[key][kkey]), dim=0)
-                else:
-                    batch_data[key] = torch.cat((batch_data[key], batch_data_unlabeled[key]), dim=0)
+            merge_A_to_B(batch_data_unlabeled,batch_data)
 
             inputs = self._get_inputs(batch_data)
             teacher_input=self._get_teacher_inputs(batch_data)
@@ -271,7 +284,7 @@ class SemiSuperviseTrainTester(TrainTester):
             for key in batch_data:
                 assert (key not in end_points)
                 end_points[key] = batch_data[key]
-                # teacher_end_points[key] = batch_data[key]
+                teacher_end_points[key] = batch_data[key]
 
             #* add index for knowing  what is labeled which is unlabeled 
             loss, end_points = self._compute_loss(

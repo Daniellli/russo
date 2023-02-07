@@ -257,8 +257,8 @@ def compute_refer_consistency_loss(end_points, ema_end_points,augmentation, pref
     query_consistent_loss=compute_query_consistency_loss(student_out['proj_queries'],teacher_out['proj_queries'],teacher2student_map_idx,mask= mask)
     text_consistent_loss=compute_text_consistency_loss(student_out['proj_tokens'],teacher_out['proj_tokens'],teacher2student_map_idx)
 
-    logger.info(" center_loss:%.10f \t size_loss :%.10f \t soft_token_loss : %.10f \t  query_consistent_loss : %.10f \t text_consistent_loss : %.10f \t "
-                %(center_loss,size_loss,soft_token_loss,query_consistent_loss,text_consistent_loss))
+    # logger.info(" center_loss:%.10f \t size_loss :%.10f \t soft_token_loss : %.10f \t  query_consistent_loss : %.10f \t text_consistent_loss : %.10f \t "
+    #             %(center_loss,size_loss,soft_token_loss,query_consistent_loss,text_consistent_loss))
 
     return center_loss,soft_token_loss,size_loss,query_consistent_loss,text_consistent_loss
     
