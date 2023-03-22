@@ -18,7 +18,7 @@ from IPython import embed
 
 from my_script.utils import make_dirs,rot_x,rot_y,rot_z,points2box,box2points,focalLoss,nn_distance
 
-
+from my_script.pc_utils import * 
 from loguru import logger
 
 DEBUG_FILT = "~/exp/butd_detr/logs/debug"
@@ -95,23 +95,21 @@ def compute_bbox_center_consistency_loss(center, ema_center,mask=None,logit=None
    
     dist1, ind1, dist2, ind2 = nn_distance(center, ema_center)  #* ind1 (B, num_proposal): find the ema_center index closest to center
     
-
+    # 
     #TODO: use both dist1 and dist2 or only use dist1
     if mask is not None :
 
+        # dist2 = (dist2<torch.quantile(dist2, 0.85)) * dist2
 
-        dist2 = (dist2<torch.quantile(dist2, 0.85)) * dist2
-
-        return dist2[mask].mean(),ind2
+        return dist2[mask].sum(),ind2
         #* 返回 loss,    teacher center 向student  center 对齐的索引
-    
+
         # return (dist.sum(-1)/(mask.sum(-1)+1e-10)).sum(),ind2
     else :
-
         # return (dist1+dist2).mean(),ind2
         # dist2 = logit*dist2 #* the obj probility to filter 
+
         dist_ = (dist2<torch.quantile(dist2, 0.25)) * dist2
-        
         return dist_.mean(),ind2
 
 
@@ -144,8 +142,7 @@ def compute_token_map_consistency_loss(cls_scores, ema_cls_scores,map_ind,mask=N
         #todo does  it need to multiple by 2 according to  SESS? 
         # return (class_consistency_loss.mean(-1).sum(-1)/(mask.sum(-1)+1e-10)).sum()/B
 
-
-        return F.kl_div(cls_log_prob_aligned[mask], ema_cls_prob[mask], reduction='sum')
+        return F.kl_div(cls_log_prob_aligned[mask], ema_cls_prob[mask], reduction='mean')
     else :
         class_consistency_loss = F.kl_div(cls_log_prob_aligned, ema_cls_prob, reduction='none')
         return class_consistency_loss.mean()*2
@@ -216,19 +213,16 @@ def compute_size_consistency_loss(size, ema_size, map_ind, mask):
     B,N,_=size.shape
     size_aligned = torch.cat([torch.index_select(a, 0, i).unsqueeze(0) for a, i in zip(size, map_ind)])
 
-    
-
 
     if mask is not None:    
         dist2= F.mse_loss(size_aligned, ema_size,reduction='none')
 
-        dist2 = (dist2<torch.quantile(dist2, 0.85)) * dist2
+        # dist2 = (dist2<torch.quantile(dist2, 0.85)) * dist2
+        # return dist2[mask].mean()
 
-        return dist2[mask].mean()
+        return dist2[mask].sum()
 
-
-        # size_consistency_loss[~mask] =0
-        # return (size_consistency_loss.sum(-1).sum(-1)/(mask.sum(-1)+1e-10)).sum()/B
+        
 
     else :
         size_consistency_loss = F.mse_loss(size_aligned, ema_size,reduction='none')
@@ -257,15 +251,15 @@ def compute_refer_consistency_loss(end_points, ema_end_points,augmentation, pref
     
     #* ignore teacher 匹配到255的 query
     #!============
-    mask=None
-    mask= teacher_out['pred_obj_logit']>0.4
-    
-    # mask =teacher_out["pred_sem_cls"]!=255
+    mask= teacher_out['pred_sem_cls'] != 255
     #!============
-    
+
+    #todo compute consistency loss by the hugariun matching
+
+
+
     center_loss,teacher2student_map_idx = compute_bbox_center_consistency_loss(student_out['pred_boxes'][:,:,:3],teacher_out['pred_boxes'][:,:,:3],mask)
     size_loss = compute_size_consistency_loss(student_out['pred_boxes'][:,:,3:],teacher_out['pred_boxes'][:,:,3:],teacher2student_map_idx,mask)
-
 
     soft_token_loss=compute_token_map_consistency_loss(student_out['pred_logits'],teacher_out['pred_logits'],teacher2student_map_idx,mask= mask)
 
@@ -347,17 +341,13 @@ def get_consistency_loss(end_points, ema_end_points,augmentation):
 
 
     for prefix in prefixes:
+
         center_loss,soft_token_loss,size_loss,query_consistent_loss,text_consistent_loss = compute_refer_consistency_loss(end_points, ema_end_points, augmentation,prefix=prefix)
-
-
-        
         center_consistency_loss_sum+=center_loss
         soft_token_consistency_loss_sum+=soft_token_loss
         size_consistency_loss_sum+=size_loss
-
         query_consistency_loss_sum+=query_consistent_loss
         text_consistency_loss_sum+=text_consistent_loss
-        
         
     end_points['soft_token_consistency_loss'] = soft_token_consistency_loss_sum / len(prefixes)
     end_points['center_consistency_loss'] = center_consistency_loss_sum / len(prefixes)

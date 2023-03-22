@@ -2,7 +2,7 @@
 ###
  # @Author: daniel
  # @Date: 2022-11-19 10:39:17
- # @LastEditTime: 2023-02-04 11:45:32
+ # @LastEditTime: 2023-03-22 20:12:26
  # @LastEditors: daniel
  # @Description: 
  # @FilePath: /butd_detr/my_shell_scripts/train_det.sh
@@ -22,8 +22,8 @@ DATA_ROOT=datasets/
 
 
 #* GPU id you need to run this shell 
-gpu_ids="1,2,3,4,8";
-gpu_num=5;
+gpu_ids="0,1,2,3,5,6";
+gpu_num=6;
 
 
 
@@ -41,9 +41,7 @@ rampup_length=30;#*  let it as  100  if SR3D
 ema_decay=0.999;
 ema_decay_after_rampup=0.99;
 
-
 val_freq=1;
-
 
 print_freq=5;
 save_freq=$val_freq;

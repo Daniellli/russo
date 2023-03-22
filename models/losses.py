@@ -519,15 +519,23 @@ class HungarianMatcher(nn.Module):
         out_bbox = outputs["pred_boxes"].flatten(0, 1)  #* [B*Q, 6]
 
         # Also concat the target labels and boxes
-        positive_map = torch.cat([t["positive_map"] for t in targets])
-        tgt_ids = torch.cat([v["labels"] for v in targets])
-        tgt_bbox = torch.cat([v["boxes"] for v in targets])
+        positive_map = torch.cat([t["positive_map"] for t in targets]) #* size:[4,256], 4 is the labeled size, 256 is the token span range 
+        tgt_ids = torch.cat([v["labels"] for v in targets])#* size:[4]; label information, such as 0-19 , 
+        tgt_bbox = torch.cat([v["boxes"] for v in targets]) #* size: [4,6], 4 is the labeled size, 6 is xyzhwl
 
+        #* 让每个query的 token span 和 gt token span 算相似度, actually
         if self.soft_token:
             # pad if necessary
             if out_prob.shape[-1] != positive_map.shape[-1]:
                 positive_map = positive_map[..., :out_prob.shape[-1]]
-            cost_class = -torch.matmul(out_prob, positive_map.transpose(0, 1)) #* generating [BxQ, positive_map_num] 
+            
+            """
+                generating [BxQ, positive_map_num] , torch.matmul is dot production, similar to cosine similarity , 
+                out_prob : [bs*num_queries,token_span_range], 
+                positive_map (gt) : [bs,token_span_range]
+                cost_class:  [bs*num_queries,bs]
+            """
+            cost_class = -torch.matmul(out_prob, positive_map.transpose(0, 1)) 
         else:
             # Compute the classification cost.
             # Contrary to the loss, we don't use the NLL,
@@ -538,27 +546,62 @@ class HungarianMatcher(nn.Module):
             cost_class = -out_prob[:, tgt_ids]
 
         # Compute the L1 cost between boxes
-        cost_bbox = torch.cdist(out_bbox, tgt_bbox, p=1)
+        #* out_bbox 
+        """
+        out_bbox: [bs*num_queries, 6]
+        tgt_bbox: [bs, 6]
+        outpiut:  [bs*num_queries,bs]
+        
+        """
+        cost_bbox = torch.cdist(out_bbox, tgt_bbox, p=1)#* 
+        
 
+        """
+        out_bbox: [bs*num_queries, 6]
+        tgt_bbox: [bs, 6]
+        cost_giou: [bs*num_queries,bs]
+        """
         # Compute the giou cost betwen boxes
         cost_giou = -generalized_box_iou3d(
             box_cxcyczwhd_to_xyzxyz(out_bbox),
             box_cxcyczwhd_to_xyzxyz(tgt_bbox)
         )
 
-        # Final cost matrix, #* multiple the corresponding weights 
+        # Final cost matrix,
+        """
+         1. multiple the corresponding weights 
+         2. resize back 
+        """
+        
         C = (
             self.cost_bbox * cost_bbox
             + self.cost_class * cost_class
             + self.cost_giou * cost_giou
         ).view(bs, num_queries, -1).cpu()
-
+        
         sizes = [len(v["boxes"]) for v in targets]
-        #* scipy 的linear assignment problem solution,  也就是Hungarian match problem, 求助cost最小的 match 
+        
+        """
+            scipy 的linear assignment problem solution,  也就是Hungarian match problem, 求cost最小的 match 
+            输出的是匹配 target的outputs 行列坐标
+
+            1. 按照 target中的 目标数目进行匹配, 
+                也就是如果batch是这样的, 第一个sample 有目标A,B, 第二个sample 有目标C; 
+                那么linear_sum_assignment 就顺序的找ABC对应的output 中目标, 
+                找出来的目标使得cost 矩阵C对应的cost 最小
+            2. 那么linear_sum_assignment 输出两个元素, 如下, 也就是输出i,j,  i和j可能是一个list,   
+                i是固定的0,1,2.... 也就是行坐标
+                j 表示每行中最有元素的坐标
+                所以定位匹配结果就是用 output[i[0],j[0]], 或者 output[i,j]
+
+            
+        """
+
         indices = [
             linear_sum_assignment(c[i])
-            for i, c in enumerate(C.split(sizes, -1))
+            for i, c in enumerate(C.split(sizes, -1)) 
         ]
+
         return [
             (
                 torch.as_tensor(i, dtype=torch.int64),  # matched pred boxes
@@ -566,6 +609,10 @@ class HungarianMatcher(nn.Module):
             )
             for i, j in indices
         ]
+
+
+
+
 
 
 class SetCriterion(nn.Module):
@@ -634,7 +681,7 @@ class SetCriterion(nn.Module):
         idx = self._get_src_permutation_idx(indices)
         src_boxes = outputs['pred_boxes'][idx]#? ==torch.cat([outputs['pred_boxes'][idx[0][0],idx[1][0]].view(-1,6),outputs['pred_boxes'][idx[0][1],idx[1][1]].view(-1,6)])
         target_boxes = torch.cat([
-            t['boxes'][i] for t, (_, i) in zip(targets, indices)
+            t['boxes'][i] for t, (_, i) in zip(targets, indices) #* suppose there are many boxes in  each target sample  
         ], dim=0)
         #*  
         loss_bbox = (
@@ -763,7 +810,7 @@ class SetCriterion(nn.Module):
         # Retrieve the matching between outputs and targets
         indices = self.matcher(outputs, targets) #* return [B,matched_pair_number], 每个数据的格式 是[matched_id , key], key用于区分是第几个pair ,与配对的数据无关
 
-        num_boxes = sum(len(inds[1]) for inds in indices)
+        num_boxes = sum(len(inds[1]) for inds in indices)#* num_boxes represent how many boxes target has.
         num_boxes = torch.as_tensor(
             [num_boxes], dtype=torch.float,
             device=next(iter(outputs.values())).device
