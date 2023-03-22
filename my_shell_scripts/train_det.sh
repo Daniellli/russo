@@ -52,7 +52,7 @@ port=29522
 epoch=1000;
 b_size='8,2';
 
-resume_model_path=logs/bdetr/scanrefer/1675301948/scanrefer20_3332_480.pth;
+resume_model_path=archive/table1_scanrefer/decay_trial/scanrefer20_3332_480.pth;
 
 
 labeled_ratio=0.2;
