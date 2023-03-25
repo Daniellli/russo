@@ -136,7 +136,7 @@ class SemiSuperviseTrainTester(TrainTester):
 
         logger.info(f"unlabeled datasets,ratio {labeled_ratio} , has been loaded ")
 
-
+        
         return JointUnlabeledDataset(
             dataset_dict=train_dataset_dict,
             test_dataset=test_datasets,
@@ -349,26 +349,23 @@ class SemiSuperviseTrainTester(TrainTester):
                 self.logger.info(
                     f'Train: [{epoch}][{batch_idx + 1}/{total_iteration}]  '
                 )
-                self.logger.info(''.join([
-                    f'{key} {stat_dict[key] / args.print_freq:.10f} \t'
-                    for key in sorted(stat_dict.keys())
-                    if 'loss' in key and 'proposal_' not in key
-                    and 'last_' not in key and 'head_' not in key
-                ]))
 
+
+                tmp = {key: '%.10f'%(stat_dict[key] / args.print_freq) for key in sorted(stat_dict.keys()) if 'loss' in key and 'proposal_' not in key and 'last_' not in key and 'head_' not in key and 'consistency' not in key}
+                tmp.update({"center_consistency_loss": '%.10f'%(center_consistency_loss.clone().detach().item()) if center_consistency_loss is not None else None,
+                                "soft_token_consistency_loss": '%.10f'%(soft_token_consistency_loss.clone().detach().item()) if soft_token_consistency_loss is not None else None,
+                                "size_consistency_loss": '%.10f'%(size_consistency_loss.clone().detach().item()) if size_consistency_loss is not None else None,
+                                "query_consistency_loss": '%.10f'%(query_consistency_loss.clone().detach().item()) if query_consistency_loss is not None else None,
+                                "text_consistency_loss": '%.10f'%(text_consistency_loss.clone().detach().item()) if text_consistency_loss is not None else None,
+                                "total_consistent_loss": '%.10f'%(consistent_loss.clone().detach().item()) if consistent_loss is not None else None ,
+                                "total_loss(including consistency)": '%.10f'%(total_loss.clone().detach().item()),
+                                "lr": '%.10f'%(scheduler.get_last_lr()[0])
+                            })
+
+
+                self.logger.info('\t'.join([k+': '+v for k,v in tmp.items()]))
 
                 if args.upload_wandb and args.local_rank==0:
-                    tmp = { f'{key}':stat_dict[key] / args.print_freq  for key in sorted(stat_dict.keys()) if 'loss' in key and 'proposal_' not in key and 'last_' not in key and 'head_' not in key }
-                    tmp.update({"student_supervised_loss":loss.clone().detach().item(),
-                                "center_consistency_loss":center_consistency_loss.clone().detach().item() if center_consistency_loss is not None else None,
-                                "soft_token_consistency_loss":soft_token_consistency_loss.clone().detach().item() if soft_token_consistency_loss is not None else None,
-                                "size_consistency_loss":size_consistency_loss.clone().detach().item() if size_consistency_loss is not None else None,
-                                "query_consistency_loss":query_consistency_loss.clone().detach().item() if query_consistency_loss is not None else None,
-                                "text_consistency_loss":text_consistency_loss.clone().detach().item() if text_consistency_loss is not None else None,
-                                "consistent_loss":consistent_loss.clone().detach().item() if consistent_loss is not None else None ,
-                                "total_loss":total_loss.clone().detach().item(),
-                                "lr": scheduler.get_last_lr()[0]
-                            })
                     wandb.log(tmp)
 
                 for key in sorted(stat_dict.keys()):
