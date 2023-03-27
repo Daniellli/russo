@@ -2,7 +2,7 @@
 ###
  # @Author: daniel
  # @Date: 2022-11-19 10:39:17
- # @LastEditTime: 2023-03-27 16:24:24
+ # @LastEditTime: 2023-03-27 17:12:53
  # @LastEditors: daniel
  # @Description: 
  # @FilePath: /butd_detr/scripts/train_det.sh
@@ -23,7 +23,7 @@ DATA_ROOT=datasets/
 
 #* GPU id you need to run this shell 
 gpu_ids="0,1,2,3";
-gpu_num=1;
+gpu_num=4;
 
 
 
@@ -69,9 +69,10 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --lr_decay_intermediate \
     --labeled_ratio $labeled_ratio \
     --reduce_lr \
+    --upload-wandb \
     2>&1 | tee -a logs/train_det.log
 
-# --upload-wandb \
+
 
 
 
