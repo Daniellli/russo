@@ -1,7 +1,7 @@
 '''
 Author: daniel
 Date: 2023-03-27 12:02:20
-LastEditTime: 2023-03-27 16:59:37
+LastEditTime: 2023-03-27 19:12:49
 LastEditors: daniel
 Description: 
 FilePath: /butd_detr/my_utils/consistency_criterion.py
@@ -40,6 +40,8 @@ DEBUG_FILT = "~/exp/butd_detr/logs/debug"
 
     
 
+import wandb 
+
 def is_dist_avail_and_initialized():
     if not dist.is_available():
         return False
@@ -73,6 +75,7 @@ class ConsistencyCriterion:
     soft_token_consistency_weight = 1,
     object_query_consistency_weight = 1,
     text_token_consistency_weight = 1,
+    EMA_CLIP = 0.90
     ):
         """
         Args:
@@ -98,6 +101,7 @@ class ConsistencyCriterion:
         self.soft_token_consistency_weight = soft_token_consistency_weight
         self.object_query_consistency_weight = object_query_consistency_weight
         self.text_token_consistency_weight = text_token_consistency_weight
+        self.EMA_CLIP = EMA_CLIP
 
         
     def __call__(self,end_points, ema_end_points,augmentation):
@@ -224,7 +228,12 @@ class ConsistencyCriterion:
         entropy = torch.log(target_sim + 1e-6) * target_sim
         # embed()
         loss_ce = (entropy - logits * target_sim).sum(-1)
-        
+
+        #!=====================================
+        loss_ce = loss_ce.sum(-1)
+        loss_ce = (loss_ce<torch.quantile(loss_ce, self.EMA_CLIP )) * loss_ce
+        #!=====================================
+
         loss_ce = loss_ce.sum() / self.num_boxes
         
         return loss_ce
@@ -247,12 +256,20 @@ class ConsistencyCriterion:
                     reduction='none'
                 )
             )
+
+        #* EMA CLIP
+        center_size_consistency_loss = center_size_consistency_loss.sum(-1)
+        center_size_consistency_loss = (center_size_consistency_loss<torch.quantile(center_size_consistency_loss, self.EMA_CLIP )) * center_size_consistency_loss
+
+
         center_size_consistency_loss= center_size_consistency_loss.sum() / self.num_boxes 
-
-
         loss_giou = 1 - torch.diag(generalized_box_iou3d(
             box_cxcyczwhd_to_xyzxyz(src_boxes),
             box_cxcyczwhd_to_xyzxyz(target_boxes)))        
+
+        
+        loss_giou = (loss_giou<torch.quantile(loss_giou, self.EMA_CLIP )) * loss_giou
+
         giou_consistency_loss= loss_giou.sum() / self.num_boxes
 
         return center_size_consistency_loss,giou_consistency_loss

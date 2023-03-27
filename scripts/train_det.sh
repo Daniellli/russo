@@ -2,7 +2,7 @@
 ###
  # @Author: daniel
  # @Date: 2022-11-19 10:39:17
- # @LastEditTime: 2023-03-27 17:12:53
+ # @LastEditTime: 2023-03-27 18:38:15
  # @LastEditors: daniel
  # @Description: 
  # @FilePath: /butd_detr/scripts/train_det.sh
@@ -31,9 +31,9 @@ gpu_num=4;
 #* for not mask 
 box_consistency_weight=1e-2;
 box_giou_consistency_weight=1e-2;
-soft_token_consistency_weight=0;
-object_query_consistency_weight=0;
-text_token_consistency_weight=0;
+soft_token_consistency_weight=1e-3;
+object_query_consistency_weight=1e+2;
+text_token_consistency_weight=1e+2;
 
 
 rampup_length=50;#*  let it as  100  if SR3D 

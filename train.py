@@ -311,6 +311,7 @@ class SemiSuperviseTrainTester(TrainTester):
             optimizer.zero_grad()
             loss.backward()
             
+            #* max grad  == 20.026945, 
             if args.clip_norm > 0:
                 grad_total_norm = torch.nn.utils.clip_grad_norm_(
                     model.parameters(), args.clip_norm
