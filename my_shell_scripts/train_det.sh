@@ -2,7 +2,7 @@
 ###
  # @Author: daniel
  # @Date: 2022-11-19 10:39:17
- # @LastEditTime: 2023-03-22 20:12:26
+ # @LastEditTime: 2023-03-22 21:09:29
  # @LastEditors: daniel
  # @Description: 
  # @FilePath: /butd_detr/my_shell_scripts/train_det.sh
@@ -29,8 +29,8 @@ gpu_num=6;
 
 
 #* for not mask 
-size_consistency_weight=1;
-center_consistency_weight=1;
+size_consistency_weight=1e-2;
+center_consistency_weight=1e-2;
 # token_consistency_weight=1e-2;
 token_consistency_weight=0;
 query_consistency_weight=0;
