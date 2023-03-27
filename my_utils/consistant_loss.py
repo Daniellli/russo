@@ -9,20 +9,35 @@ sys.path.append("~/exp/butd_detr")
 import torch
 
 import os.path as osp
-from my_script.pc_utils import *
+from my_utils.pc_utils import *
 import torch.nn.functional as F
 
 from data.model_util_scannet import ScannetDatasetConfig
 
 from IPython import embed
 
-from my_script.utils import make_dirs,rot_x,rot_y,rot_z,points2box,box2points,focalLoss,nn_distance
+from my_utils.utils import make_dirs,rot_x,rot_y,rot_z,points2box,box2points,focalLoss,nn_distance
 
-from my_script.pc_utils import * 
+from my_utils.pc_utils import * 
 from loguru import logger
+
+from models.losses import ConsistencyHungarianMatcher
+
+import torch.distributed as dist
+from models.losses import generalized_box_iou3d,box_cxcyczwhd_to_xyzxyz
+
+
 
 DEBUG_FILT = "~/exp/butd_detr/logs/debug"
 
+
+
+def is_dist_avail_and_initialized():
+    if not dist.is_available():
+        return False
+    if not dist.is_initialized():
+        return False
+    return True
 
 
 '''
@@ -46,38 +61,16 @@ def parse_endpoint(end_points,prefix):
     #* Get predicted boxes and labels, why the K equals to 256,n_class equals to 256, Q equals to 256
     pred_center = end_points[f'{prefix}center']  # B, K, 3
     pred_size = end_points[f'{prefix}pred_size']  # (B,K,3) (l,w,h)
-    pred_bbox = torch.cat([pred_center, pred_size], dim=-1)
-    pred_logits=torch.nn.functional.softmax(end_points[f'{prefix}sem_cls_scores'],dim=-1)  #* (B, Q, n_class)
-    pred_sem_cls = torch.argmax(pred_logits[..., :], -1)
-    pred_obj_logit = (1 - pred_logits[:,:,-1])
+    output["pred_boxes"] = torch.cat([pred_center, pred_size], dim=-1)
+     
 
+    output['pred_logits'] = end_points[f'{prefix}sem_cls_scores'] #* the soft token span logit, [B,query_number,token_span_range(256)]
 
-    # sem_cls_probs = softmax(end_points[f'{prefix}sem_cls_scores'].detach().cpu().numpy())  
-    # pred_obj_logit = (1 - sem_cls_probs[:,:,-1]) # (B,K) #* 是obj的概率
+    output["pred_sem_cls"] = torch.argmax(torch.nn.functional.softmax(output['pred_logits'],dim=-1) [..., :], -1)
+
     
-    output['pred_logits'] = pred_logits #* the soft token span logit, [B,query_number,token_span_range(256)]
-    output["pred_sem_cls"] = pred_sem_cls #* which token the query point to 
-    output["pred_obj_logit"] = pred_obj_logit #* the last value of token span, which means the query point to an object proability 
-    output["pred_boxes"] = pred_bbox 
     
-
     return output
-
-
-    
-
-'''
-description:  给定一个model 推理输出的 [B,query_num,token_map_size] 的 embedding, 对token_map_size 取响应最大的token position得[B,query_num] 
-param {*} teacher_logit
-return {*}
-'''
-def get_activated_map(teacher_logit):#todo:  默认每个bbox 只响应一个 token ; how to optimize 
-    query_dist_map =teacher_logit.softmax(-1) #* softmax 找到对应的token,  每个channel对应的一个token , 共256个token 
-    target = torch.argmax(query_dist_map, 2).long() #* 等于255 应该是没有匹配到文本token的, 如paper解释的一样
-
-    return target
-
-  
 
 
 
@@ -150,10 +143,6 @@ def compute_token_map_consistency_loss(cls_scores, ema_cls_scores,map_ind,mask=N
 
 
     
-
-
-
-
 
 
 '''
@@ -230,8 +219,26 @@ def compute_size_consistency_loss(size, ema_size, map_ind, mask):
 
     
 
+def _get_src_permutation_idx( indices):
+    # permute predictions following indices
+    batch_idx = torch.cat([
+        torch.full_like(src, i) for i, (src, _) in enumerate(indices)
+    ])
+    src_idx = torch.cat([src for (src, _) in indices])
+    return batch_idx, src_idx 
+
+def _get_tgt_permutation_idx( indices):
+    # permute targets following indices
+    batch_idx = torch.cat([
+        torch.full_like(tgt, i) for i, (_, tgt) in enumerate(indices)
+    ])
+    tgt_idx = torch.cat([tgt for (_, tgt) in indices])
+    return batch_idx, tgt_idx
 
 
+
+
+    
 '''
 description:   
 param {*} end_points
@@ -242,31 +249,108 @@ return {*}
 def compute_refer_consistency_loss(end_points, ema_end_points,augmentation, prefix="last_"):
     
     student_out=parse_endpoint(end_points,prefix)
-    
     teacher_out=parse_endpoint(ema_end_points,prefix)
     
     # processong augmentaiton for 
     if augmentation is not None and len(augmentation.keys()) >0:
         teacher_out['pred_boxes'] = transformation_box(teacher_out['pred_boxes'],augmentation)
     
-    #* ignore teacher 匹配到255的 query
-    #!============
+    
+
+    #* 0. assume there are len(mask) target
+    #*1. end_points['pred_logits'] X ema_end_points['pred_logits'][mask]  as the class cost or  soft token loss ,
+    #*2. end_points['pred_boxes'] X ema_end_points[“pred_boxes”][mask] as box distance/GIoU losses
+
     mask= teacher_out['pred_sem_cls'] != 255
-    #!============
+    target = [
+                {"boxes" :teacher_out['pred_boxes'][idx][m] ,"positive_map":teacher_out['pred_logits'][idx][m]} 
+                for idx, m in enumerate(mask)
+            ]
+    
+    matcher = ConsistencyHungarianMatcher(cost_class=1,cost_bbox=5,cost_giou=2,soft_token=True)
+    indices = matcher(student_out,target)
+
+    num_boxes = sum(len(inds[1]) for inds in indices)#* num_boxes represent how many boxes target has.
+    num_boxes = torch.as_tensor(
+            [num_boxes], dtype=torch.float,
+            device=next(iter(student_out.values())).device
+        )
+
+
+    if is_dist_avail_and_initialized():
+            torch.distributed.all_reduce(num_boxes)
+
 
     #todo compute consistency loss by the hugariun matching
+    #* for boxes 
+    idx = _get_src_permutation_idx(indices)
+    src_boxes = student_out['pred_boxes'][idx]
+    #* suppose there are many boxes in  each target sample  
+    target_boxes = torch.cat([t['boxes'][i] for t, (_, i) in zip(target, indices) ], dim=0)
+    center_size_consistency_loss = (
+            F.l1_loss(
+                src_boxes[..., :3], target_boxes[..., :3],
+                reduction='none'
+            )
+            + 0.2 * F.l1_loss(
+                src_boxes[..., 3:], target_boxes[..., 3:],
+                reduction='none'
+            )
+        )
+    center_size_consistency_loss= center_size_consistency_loss.sum() / num_boxes 
+    
+
+    loss_giou = 1 - torch.diag(generalized_box_iou3d(
+        box_cxcyczwhd_to_xyzxyz(src_boxes),
+        box_cxcyczwhd_to_xyzxyz(target_boxes)))        
+    giou_consistency_loss= loss_giou.sum() / num_boxes
+
+
+    #* for soft token consistency loss
+
+
+    logits = student_out["pred_logits"].log_softmax(-1)  # (B, Q, 256)
+    # todo make target['positive_map'] to be  [0,1]
+    positive_map = torch.cat([t["positive_map"] for t in target])
+
+    # Trick to get target indices across batches
+    src_idx = _get_src_permutation_idx(indices)
+    tgt_idx = []
+    offset = 0
+    for i, (_, tgt) in enumerate(indices):
+        tgt_idx.append(tgt + offset)
+        offset += len(target[i]["boxes"])
+    tgt_idx = torch.cat(tgt_idx)
+
+    #? Labels, by default lines map to the last element, no_object
+    tgt_pos = positive_map[tgt_idx]
+    target_sim = torch.zeros_like(logits)
+    target_sim[:, :, -1] = 1 #* 匹配到最后一个表示no matched
+    target_sim[src_idx] = tgt_pos
+
+    entropy = torch.log(target_sim + 1e-6) * target_sim
+    loss_ce = (entropy - logits * target_sim).sum(-1)
+    loss_ce = loss_ce.sum() / num_boxes
 
 
 
-    center_loss,teacher2student_map_idx = compute_bbox_center_consistency_loss(student_out['pred_boxes'][:,:,:3],teacher_out['pred_boxes'][:,:,:3],mask)
-    size_loss = compute_size_consistency_loss(student_out['pred_boxes'][:,:,3:],teacher_out['pred_boxes'][:,:,3:],teacher2student_map_idx,mask)
 
-    soft_token_loss=compute_token_map_consistency_loss(student_out['pred_logits'],teacher_out['pred_logits'],teacher2student_map_idx,mask= mask)
 
-    query_consistent_loss=compute_query_consistency_loss(student_out['proj_queries'],teacher_out['proj_queries'],teacher2student_map_idx)
-    text_consistent_loss=compute_text_consistency_loss(student_out['proj_tokens'],teacher_out['proj_tokens'],teacher2student_map_idx)
+    query_contrastive_consistency_loss = 1 - F.cosine_similarity(student_out['proj_queries'], teacher_out['proj_queries'])
 
-    # logger.info(f" center_loss:{center_loss}, soft_token_loss : {soft_token_loss}, size_loss(not included ):{size_loss}")
+    token_contrastive_consistency_loss = 1 - F.cosine_similarity(student_out['proj_tokens'], teacher_out['proj_tokens'])
+
+
+
+    # center_loss,teacher2student_map_idx = compute_bbox_center_consistency_loss(student_out['pred_boxes'][:,:,:3],teacher_out['pred_boxes'][:,:,:3],mask)
+    # size_loss = compute_size_consistency_loss(student_out['pred_boxes'][:,:,3:],teacher_out['pred_boxes'][:,:,3:],teacher2student_map_idx,mask)
+
+    # soft_token_loss=compute_token_map_consistency_loss(student_out['pred_logits'],teacher_out['pred_logits'],teacher2student_map_idx,mask= mask)
+
+    # query_consistent_loss=compute_query_consistency_loss(student_out['proj_queries'],teacher_out['proj_queries'],teacher2student_map_idx)
+    
+    # text_consistent_loss=compute_text_consistency_loss(student_out['proj_tokens'],teacher_out['proj_tokens'],teacher2student_map_idx)
+
 
     return center_loss,soft_token_loss,size_loss,query_consistent_loss,text_consistent_loss
     
@@ -275,7 +359,7 @@ def compute_refer_consistency_loss(end_points, ema_end_points,augmentation, pref
 
 '''
 description: 计算queries 之间的 距离
-param {*} student_query
+param {*} student_querys
 param {*} teacher_query
 param {*} map_idx
 return {*}
@@ -445,4 +529,22 @@ def check_transformation(end_points,prefixes,is_student = True,pc_param_name='pc
             np.savetxt(osp.join(DEBUG_FILT,scene_ids[idx],'%s_box_%s_%s.txt'%(scene_ids[idx],FLAG,prefix)),bbox[idx][mask[idx]].clone().detach().cpu().numpy(),fmt='%s')
             
 
+
+
+
+
+    
+
+'''
+description:  给定一个model 推理输出的 [B,query_num,token_map_size] 的 embedding, 对token_map_size 取响应最大的token position得[B,query_num] 
+param {*} teacher_logit
+return {*}
+'''
+def get_activated_map(teacher_logit):#todo:  默认每个bbox 只响应一个 token ; how to optimize 
+    query_dist_map =teacher_logit.softmax(-1) #* softmax 找到对应的token,  每个channel对应的一个token , 共256个token 
+    target = torch.argmax(query_dist_map, 2).long() #* 等于255 应该是没有匹配到文本token的, 如paper解释的一样
+
+    return target
+
+  
 

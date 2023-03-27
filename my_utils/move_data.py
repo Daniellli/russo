@@ -7,7 +7,7 @@ import sys
 import os
 root = "~/exp/butd_detr"
 sys.path.append(root)
-from my_script.utils import make_dirs
+from my_utils.utils import make_dirs
 import shutil 
 
 from tqdm import tqdm 

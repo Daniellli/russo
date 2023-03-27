@@ -22,8 +22,8 @@ from six.moves import cPickle
 
 
 from data.model_util_scannet import ScannetDatasetConfig,rotate_aligned_boxes
-from my_script.utils import print_attr_shape,make_dirs
-import my_script.pc_utils  as pc_util
+from my_utils.utils import print_attr_shape,make_dirs
+import my_utils.pc_utils  as pc_util
 #* debug 
 # import pc_utils  as pc_util
 

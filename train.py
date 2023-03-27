@@ -40,12 +40,14 @@ from main_utils import save_checkpoint,load_checkpoint,get_scheduler
 from torch.utils.data.distributed import DistributedSampler
 from torch.utils.data import DataLoader
 import random 
-from my_script.consistant_loss import get_consistency_loss
-from my_script.utils import parse_semi_supervise_option,save_res,make_dirs,remove_file
+from my_utils.consistant_loss import get_consistency_loss
+from my_utils.utils import parse_semi_supervise_option,save_res,make_dirs,remove_file
 
 from IPython import embed
 
 
+
+from my_utils.consistency_criterion import ConsistencyCriterion
 
 
 class SemiSuperviseTrainTester(TrainTester):
@@ -209,20 +211,40 @@ class SemiSuperviseTrainTester(TrainTester):
     
         logger.info(f"total_iteration == {total_iteration}")
 
-        center_consistency_weight = self.get_current_consistency_weight(args.center_consistency_weight ,epoch,args)
-        size_consistency_weight = self.get_current_consistency_weight(args.size_consistency_weight ,epoch,args)
-        token_consistency_weight = self.get_current_consistency_weight(args.token_consistency_weight ,epoch,args)
+        box_consistency_weight = self.get_current_consistency_weight(args.box_consistency_weight ,epoch,args)
+        box_giou_consistency_weight = self.get_current_consistency_weight(args.box_giou_consistency_weight ,epoch,args)
+        soft_token_consistency_weight = self.get_current_consistency_weight(args.soft_token_consistency_weight ,epoch,args)
+        object_query_consistency_weight = self.get_current_consistency_weight(args.object_query_consistency_weight ,epoch,args)
+        text_token_consistency_weight = self.get_current_consistency_weight(args.text_token_consistency_weight ,epoch,args)
 
-        query_consistency_weight = self.get_current_consistency_weight(args.query_consistency_weight ,epoch,args)
-        text_consistency_weight = self.get_current_consistency_weight(args.text_consistency_weight ,epoch,args)
 
-
-        logger.info(f"center_consistency_weight  : {center_consistency_weight}")
-        logger.info(f"size_consistency_weight  : {size_consistency_weight}")
-        logger.info(f"token_consistency_weight  : {token_consistency_weight}")
-        logger.info(f"query_consistency_weight  : {query_consistency_weight}")
-        logger.info(f"text_consistency_weight  : {text_consistency_weight}")
+        logger.info(f"box_consistency_weight  : {box_consistency_weight}")
+        logger.info(f"box_giou_consistency_weight  : {box_giou_consistency_weight}")
+        logger.info(f"soft_token_consistency_weight  : {soft_token_consistency_weight}")
+        logger.info(f"object_query_consistency_weight  : {object_query_consistency_weight}")
+        logger.info(f"text_token_consistency_weight  : {text_token_consistency_weight}")
+        
         unlabeled_loader_iter=iter(unlabeled_loader)
+        # get_current_consistency_weight
+
+        consistency_criterion = ConsistencyCriterion(box_consistency_weight=box_consistency_weight,
+                            giou_consistency_weight = box_giou_consistency_weight,
+                            soft_token_consistency_weight=soft_token_consistency_weight,
+                            object_query_consistency_weight= object_query_consistency_weight,
+                            text_token_consistency_weight= text_token_consistency_weight )
+
+               
+        def merge_A_to_B(A,B):
+            for key in A: #* 两个batch 合成一个batch, 
+                if  isinstance(B[key],list):
+                    B[key] = B[key]+A[key]
+                elif  isinstance(B[key],dict):
+                    for kkey in B[key]:
+                        B[key][kkey] = torch.cat((B[key][kkey], A[key][kkey]), dim=0)
+                else:
+                    B[key] = torch.cat((B[key], A[key]), dim=0)
+
+                    
 
         
         for batch_idx, batch_data in enumerate(labeled_loader):
@@ -280,26 +302,14 @@ class SemiSuperviseTrainTester(TrainTester):
                 end_points, criterion, set_criterion, args
             )
 
-            end_points = get_consistency_loss(end_points, teacher_end_points,batch_data['augmentations'])
-            consistent_loss =center_consistency_loss=soft_token_consistency_loss=size_consistency_loss=query_consistency_loss=text_consistency_loss=None
+            end_points = consistency_criterion(end_points,teacher_end_points,batch_data['augmentations'])
 
-            center_consistency_loss = end_points['center_consistency_loss'] * center_consistency_weight
-            soft_token_consistency_loss = end_points['soft_token_consistency_loss']* token_consistency_weight
-            size_consistency_loss = end_points['size_consistency_loss'] * size_consistency_weight
-            query_consistency_loss = end_points['query_consistency_loss'] * query_consistency_weight
-            text_consistency_loss = end_points['text_consistency_loss'] * text_consistency_weight
-
-            consistent_loss = soft_token_consistency_loss +center_consistency_loss+size_consistency_loss+query_consistency_loss+text_consistency_loss
-
-
-            #* total loss
-            if consistent_loss is not None:
-                total_loss = loss+consistent_loss
-            else:
-                total_loss = loss
-
+            
+            if hasattr(end_points,'consistency_loss'):
+                loss += end_points['consistency_loss']
+            
             optimizer.zero_grad()
-            total_loss.backward()
+            loss.backward()
             
             if args.clip_norm > 0:
                 grad_total_norm = torch.nn.utils.clip_grad_norm_(
@@ -316,8 +326,6 @@ class SemiSuperviseTrainTester(TrainTester):
             global_step = (batch_idx+1) + (epoch -args.start_epoch) *total_iteration
             alpha = args.ema_decay
 
-        
-
             ran_epoch =  epoch -args.start_epoch
             if ran_epoch>args.rampup_length:
                 alpha=args.ema_decay_after_rampup
@@ -328,33 +336,38 @@ class SemiSuperviseTrainTester(TrainTester):
             #*===================================================
 
             # Accumulate statistics and print out
-            stat_dict = self._accumulate_stats(stat_dict, end_points)
-
-            if (batch_idx + 1) % args.print_freq == 0:
+            if (batch_idx + 1) % args.print_freq == 0 and args.local_rank==0:
+                stat_dict = self._accumulate_stats(stat_dict, end_points)
 
                 logger.info(f"ran_epoch:{ran_epoch},alpha:{alpha}")
                 
                 # Terminal logs
-                self.logger.info(
-                    f'Train: [{epoch}][{batch_idx + 1}/{total_iteration}]  '
-                )
+                self.logger.info(f'Train: [{epoch}][{batch_idx + 1}/{total_iteration}]')
 
 
-                tmp = {key: round(stat_dict[key] / args.print_freq,10) for key in sorted(stat_dict.keys()) if 'loss' in key and 'proposal_' not in key and 'last_' not in key and 'head_' not in key and 'consistency' not in key}
-                tmp.update({"center_consistency_loss": round(center_consistency_loss.clone().detach().item(),10) if center_consistency_loss is not None else None,
-                                "soft_token_consistency_loss": round(soft_token_consistency_loss.clone().detach().item(),10) if soft_token_consistency_loss is not None else None,
-                                "size_consistency_loss": round(size_consistency_loss.clone().detach().item(),10) if size_consistency_loss is not None else None,
-                                "query_consistency_loss": round(query_consistency_loss.clone().detach().item(),10) if query_consistency_loss is not None else None,
-                                "text_consistency_loss": round(text_consistency_loss.clone().detach().item(),10) if text_consistency_loss is not None else None,
-                                "total_consistent_loss": round(consistent_loss.clone().detach().item(),10) if consistent_loss is not None else None ,
-                                "total_loss(including consistency)": round(total_loss.clone().detach().item(),10),
-                                "lr": scheduler.get_last_lr()[0]
-                            })
+                tmp = {key: round(stat_dict[key] / args.print_freq,10) for key in sorted(stat_dict.keys()) \
+                    if 'loss' in key and 'proposal_' not in key and 'last_' not in key and 'head_' not in key and 'consistency' not in key}
+
+
+                tmp.update( {k:round(end_points[k].detach().item(),10)  for k in end_points.keys() if 'consistency' in k})
+
+                tmp.update({"lr":scheduler.get_last_lr()[0]})
+
+
+                # tmp.update({"center_consistency_loss": round(center_consistency_loss.clone().detach().item(),10) if center_consistency_loss is not None else None,
+                #                 "soft_token_consistency_loss": round(soft_token_consistency_loss.clone().detach().item(),10) if soft_token_consistency_loss is not None else None,
+                #                 "size_consistency_loss": round(size_consistency_loss.clone().detach().item(),10) if size_consistency_loss is not None else None,
+                #                 "query_consistency_loss": round(query_consistency_loss.clone().detach().item(),10) if query_consistency_loss is not None else None,
+                #                 "text_consistency_loss": round(text_consistency_loss.clone().detach().item(),10) if text_consistency_loss is not None else None,
+                #                 "total_consistent_loss": round(consistent_loss.clone().detach().item(),10) if consistent_loss is not None else None ,
+                #                 "total_loss(including consistency)": round(total_loss.clone().detach().item(),10),
+                #                 "lr": scheduler.get_last_lr()[0]
+                #             })
 
 
                 self.logger.info('\t'.join([k+': '+"%.10f"%(v) for k,v in tmp.items()]))
 
-                if args.upload_wandb and args.local_rank==0:
+                if args.upload_wandb :
                     wandb.log(tmp)
 
                 for key in sorted(stat_dict.keys()):

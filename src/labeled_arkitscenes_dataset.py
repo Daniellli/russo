@@ -20,9 +20,9 @@ from six.moves import cPickle
 
 
 from data.model_util_scannet import ScannetDatasetConfig,rotate_aligned_boxes
-from my_script.utils import make_dirs
-import my_script.pc_utils  as pc_util
-from my_script.pc_utils import write_pc_as_ply, write_ply
+from my_utils.utils import make_dirs
+import my_utils.pc_utils  as pc_util
+from my_utils.pc_utils import write_pc_as_ply, write_ply
 
 from loguru import logger 
 

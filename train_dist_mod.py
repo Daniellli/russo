@@ -1,3 +1,12 @@
+'''
+Author: daniel
+Date: 2023-03-22 16:49:49
+LastEditTime: 2023-03-27 16:12:29
+LastEditors: daniel
+Description: 
+FilePath: /butd_detr/train_dist_mod.py
+have a nice day
+'''
 # ------------------------------------------------------------------------
 # BEAUTY DETR
 # Copyright (c) 2022 Ayush Jain & Nikolaos Gkanatsios
@@ -42,7 +51,7 @@ from loguru import logger
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(BASE_DIR)
 
-from my_script.utils import make_dirs, save_for_vis,parse_option,save_txt,load_json,move_dir_file
+from my_utils.utils import make_dirs, save_for_vis,parse_option,save_txt,load_json,move_dir_file
 import os.path as osp
 import time
 

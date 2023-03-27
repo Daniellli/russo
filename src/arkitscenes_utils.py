@@ -9,7 +9,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(BASE_DIR)
 sys.path.append(ROOT_DIR)
 # from utils import pc_util
-import  my_script.pc_utils  as pc_util
+import  my_utils.pc_utils  as pc_util
 
 def get_quads(mapping_name, height=2.00, center_z = 1.00):
     with open(os.path.join(BASE_DIR, "data", "annotations", f"{mapping_name}.json")) as f:

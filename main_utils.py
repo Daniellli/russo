@@ -32,8 +32,8 @@ from utils import get_scheduler, setup_logger
 
 
 
-# from my_script.vis_utils import *
-from my_script.pc_utils import *
+from my_utils.vis_utils import *
+from my_utils.pc_utils import *
 
 from loguru import logger
 
@@ -48,7 +48,7 @@ from IPython import embed
 #*=====================================
 from signal import signal, SIGPIPE, SIG_DFL, SIG_IGN
 signal(SIGPIPE, SIG_IGN)
-from my_script.utils import make_dirs, save_res,parse_option,detach_module,load_checkpoint,save_checkpoint
+from my_utils.utils import make_dirs, save_res,parse_option,detach_module,load_checkpoint,save_checkpoint
 
 #*=====================================
 

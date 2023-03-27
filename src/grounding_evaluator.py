@@ -15,7 +15,7 @@ import ipdb
 
 from IPython import embed
 st = ipdb.set_trace
-from my_script.utils import dump_json
+from my_utils.utils import dump_json
 
 
 

@@ -615,6 +615,154 @@ class HungarianMatcher(nn.Module):
 
 
 
+
+class ConsistencyHungarianMatcher(nn.Module):
+    """
+    Assign targets to predictions.
+
+    This class is taken from MDETR and is modified for our purposes.
+
+    For efficiency reasons, the targets don't include the no_object.
+    Because of this, in general, there are more predictions than targets.
+    In this case, we do a 1-to-1 matching of the best predictions,
+    while the others are un-matched (and thus treated as non-objects).
+    """
+
+    def __init__(self, cost_class=1, cost_bbox=5, cost_giou=2,
+                 soft_token=False):
+        """
+        Initialize matcher.
+
+        Args:
+            cost_class: relative weight of the classification error
+            cost_bbox: relative weight of the L1 bounding box regression error
+            cost_giou: relative weight of the giou loss of the bounding box
+            soft_token: whether to use soft-token prediction
+        """
+        super().__init__()
+        self.cost_class = cost_class
+        self.cost_bbox = cost_bbox
+        self.cost_giou = cost_giou
+        assert cost_class != 0 or cost_bbox != 0 or cost_giou != 0
+        self.soft_token = soft_token
+
+    @torch.no_grad()
+    def forward(self, outputs, targets):
+        """
+        Perform the matching.
+
+        Args:
+            outputs: This is a dict that contains at least these entries:
+                "pred_logits" (tensor): [batch_size, num_queries, num_classes]
+                "pred_boxes" (tensor): [batch_size, num_queries, 6], cxcyczwhd
+            targets: list (len(targets) = batch_size) of dict:
+                "labels" (tensor): [num_target_boxes]
+                    (where num_target_boxes is the no. of ground-truth objects)
+                "boxes" (tensor): [num_target_boxes, 6], cxcyczwhd
+                "positive_map" (tensor): [num_target_boxes, 256]
+
+        Returns:
+            A list of size batch_size, containing tuples of (index_i, index_j):
+                - index_i is the indices of the selected predictions
+                - index_j is the indices of the corresponding selected targets
+            For each batch element, it holds:
+            len(index_i) = len(index_j) = min(num_queries, num_target_boxes)
+        """
+        
+        # Notation: {B: batch_size, Q: num_queries, C: num_classes}
+        bs, num_queries = outputs["pred_logits"].shape[:2]
+
+        # We flatten to compute the cost matrices in a batch
+        out_prob = outputs["pred_logits"].flatten(0, 1).softmax(-1)  #* [B*Q, C],#* B,query_num, distribution_for_tokens 前两维铺平, 对最后一维取softmax, 
+        out_bbox = outputs["pred_boxes"].flatten(0, 1)  #* [B*Q, 6]
+
+        # Also concat the target labels and boxes
+        positive_map = torch.cat([t["positive_map"] for t in targets]) #* size:[4,256], 4 is the labeled size, 256 is the token span range 
+        # tgt_ids = torch.cat([v["labels"] for v in targets])#* size:[4]; label information, such as 0-19 , 
+        tgt_bbox = torch.cat([v["boxes"] for v in targets]) #* size: [4,6], 4 is the labeled size, 6 is xyzhwl
+
+        #* 让每个query的 token span 和 gt token span 算相似度, actually
+        if out_prob.shape[-1] != positive_map.shape[-1]:
+            positive_map = positive_map[..., :out_prob.shape[-1]]
+        
+        """
+            generating [BxQ, positive_map_num] , torch.matmul is dot production, similar to cosine similarity , 
+            out_prob : [bs*num_queries,token_span_range], 
+            positive_map (gt) : [bs,token_span_range]
+            cost_class:  [bs*num_queries,bs]
+        """
+        cost_class = -torch.matmul(out_prob, positive_map.transpose(0, 1)) 
+
+        # Compute the L1 cost between boxes
+        #* out_bbox 
+        """
+        out_bbox: [bs*num_queries, 6]
+        tgt_bbox: [bs, 6]
+        outpiut:  [bs*num_queries,bs]
+        
+        """
+        cost_bbox = torch.cdist(out_bbox, tgt_bbox, p=1)#* 
+        
+
+        """
+        out_bbox: [bs*num_queries, 6]
+        tgt_bbox: [bs, 6]
+        cost_giou: [bs*num_queries,bs]
+        """
+        # Compute the giou cost betwen boxes
+        cost_giou = -generalized_box_iou3d(
+            box_cxcyczwhd_to_xyzxyz(out_bbox),
+            box_cxcyczwhd_to_xyzxyz(tgt_bbox)
+        )
+
+        # Final cost matrix,
+        """
+         1. multiple the corresponding weights 
+         2. resize back 
+        """
+        
+        C = (
+            self.cost_bbox * cost_bbox
+            + self.cost_class * cost_class
+            + self.cost_giou * cost_giou
+        ).view(bs, num_queries, -1).cpu()
+        
+        sizes = [len(v["boxes"]) for v in targets]
+        
+        """
+            scipy 的linear assignment problem solution,  也就是Hungarian match problem, 求cost最小的 match 
+            输出的是匹配 target的outputs 行列坐标
+
+            1. 按照 target中的 目标数目进行匹配, 
+                也就是如果batch是这样的, 第一个sample 有目标A,B, 第二个sample 有目标C; 
+                那么linear_sum_assignment 就顺序的找ABC对应的output 中目标, 
+                找出来的目标使得cost 矩阵C对应的cost 最小
+            2. 那么linear_sum_assignment 输出两个元素, 如下, 也就是输出i,j,  i和j可能是一个list,   
+                i是固定的0,1,2.... 也就是行坐标
+                j 表示每行中最有元素的坐标
+                所以定位匹配结果就是用 output[i[0],j[0]], 或者 output[i,j]
+
+            
+        """
+
+        indices = [
+            linear_sum_assignment(c[i])
+            for i, c in enumerate(C.split(sizes, -1)) 
+        ]
+
+        return [
+            (
+                torch.as_tensor(i, dtype=torch.int64),  # matched pred boxes
+                torch.as_tensor(j, dtype=torch.int64)  # corresponding gt boxes
+            )
+            for i, j in indices
+        ]
+
+
+
+
+
+
 class SetCriterion(nn.Module):
     """
     Computes the loss in two steps:
@@ -700,6 +848,7 @@ class SetCriterion(nn.Module):
         loss_giou = 1 - torch.diag(generalized_box_iou3d(
             box_cxcyczwhd_to_xyzxyz(src_boxes),
             box_cxcyczwhd_to_xyzxyz(target_boxes)))
+
         losses['loss_giou'] = loss_giou.sum() / num_boxes
         return losses
 

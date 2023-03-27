@@ -22,12 +22,12 @@ st = ipdb.set_trace
 import sys 
 import wandb
 from loguru import logger 
-from my_script.utils import * 
+from my_utils.utils import * 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(BASE_DIR)
 import os.path as osp
 import time
-from my_script.utils import parse_semi_supervise_option,save_res
+from my_utils.utils import parse_semi_supervise_option,save_res
 
 
 class OmniSuperviseTrainTester(SemiSuperviseTrainTester):

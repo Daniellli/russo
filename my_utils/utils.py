@@ -11,7 +11,7 @@ import torch
 import torch.nn as nn
 from loguru import logger 
 
-from my_script.pc_utils import write_pc_as_ply
+from my_utils.pc_utils import write_pc_as_ply
 
 import argparse
 from collections import OrderedDict
@@ -125,11 +125,11 @@ def parse_semi_supervise_option():
 
     #* mine args 
     #* semi supervise 
-    parser.add_argument('--size_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
-    parser.add_argument('--center_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
-    parser.add_argument('--token_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
-    parser.add_argument('--query_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
-    parser.add_argument('--text_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
+    parser.add_argument('--box_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
+    parser.add_argument('--box_giou_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
+    parser.add_argument('--soft_token_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
+    parser.add_argument('--object_query_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
+    parser.add_argument('--text_token_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
     parser.add_argument('--rampup_length', type=float, default=None, help='rampup_length')
     parser.add_argument('--labeled_ratio', default=None, type=float,help=' labeled datasets ratio ')
     

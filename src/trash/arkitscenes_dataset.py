@@ -14,8 +14,8 @@ sys.path.append(ROOT_DIR)
 
 #!+=====================
 from data.model_util_scannet import ScannetDatasetConfig
-import my_script.pc_utils as pc_util
-from  my_script.pc_utils  import dump_pc
+import my_utils.pc_utils as pc_util
+from  my_utils.pc_utils  import dump_pc
 from data.model_util_scannet import rotate_aligned_boxes
 import src.arkitscenes_utils as arkitscenes_utils
 from loguru import logger 

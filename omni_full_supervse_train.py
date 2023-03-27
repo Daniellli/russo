@@ -1,3 +1,12 @@
+'''
+Author: daniel
+Date: 2023-03-22 16:49:44
+LastEditTime: 2023-03-27 16:12:32
+LastEditors: daniel
+Description: 
+FilePath: /butd_detr/omni_full_supervse_train.py
+have a nice day
+'''
 # 1.和其他main function 不同的是需要 加载labeledARKitScenes ,
 # 2.  然后loss 计算需要考虑 query loss  ,   
 # 3. batch size 需要考虑 所有的labeled datsets 和ARKitScenes datasets , 和这些一样
@@ -31,7 +40,7 @@ import sys
 
 import wandb
 from loguru import logger 
-from my_script.utils import * 
+from my_utils.utils import * 
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -41,7 +50,7 @@ import os.path as osp
 import time
 
 
-from my_script.utils import save_res
+from my_utils.utils import save_res
 from torch.nn.parallel import DistributedDataParallel
 from main_utils import save_checkpoint,load_checkpoint,get_scheduler
 
