@@ -447,7 +447,7 @@ class BaseTrainTester:
                     if performance is not None and performance[acc_key] > best_performce:
                         best_performce =  performance[acc_key]
                         spath = save_checkpoint(args, epoch, model, optimizer, scheduler ,is_best=True)
-                        wandb.log({'best_acc':best_performce})
+                        wandb.log({'Metrics/best_acc':best_performce})
 
                         if last_best_epoch_path is not None:
                             os.remove(last_best_epoch_path)

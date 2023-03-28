@@ -242,8 +242,8 @@ def parse_option():
     parser.add_argument('--log_dir', default='logs/bdetr',
                         help='Dump dir to save model checkpoint')
     parser.add_argument('--print_freq', type=int, default=10)  # batch-wise
-    parser.add_argument('--save_freq', type=int, default=10)  # epoch-wise
-    parser.add_argument('--val_freq', type=int, default=5)  # epoch-wise
+    parser.add_argument('--save_freq', type=int, default=1)  # epoch-wise
+    parser.add_argument('--val_freq', type=int, default=1)  # epoch-wise
 
     # others
     parser.add_argument("--local_rank", type=int,default=-1,
