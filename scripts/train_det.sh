@@ -2,7 +2,7 @@
 ###
  # @Author: daniel
  # @Date: 2022-11-19 10:39:17
- # @LastEditTime: 2023-03-27 18:38:15
+ # @LastEditTime: 2023-03-28 11:55:33
  # @LastEditors: daniel
  # @Description: 
  # @FilePath: /butd_detr/scripts/train_det.sh
@@ -31,7 +31,7 @@ gpu_num=4;
 #* for not mask 
 box_consistency_weight=1e-2;
 box_giou_consistency_weight=1e-2;
-soft_token_consistency_weight=1e-3;
+soft_token_consistency_weight=1e-4;
 object_query_consistency_weight=1e+2;
 text_token_consistency_weight=1e+2;
 
@@ -45,7 +45,7 @@ print_freq=5;
 save_freq=$val_freq;
 port=29522
 epoch=1000;
-b_size='8,4';
+b_size='8,1';
 resume_model_path=archive/table1_scanrefer/decay_trial/scanrefer20_3332_480.pth;
 labeled_ratio=0.2;
 topk=8;
@@ -68,11 +68,10 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --lr_decay_epochs $decay_epoch \
     --lr_decay_intermediate \
     --labeled_ratio $labeled_ratio \
-    --reduce_lr \
     --upload-wandb \
     2>&1 | tee -a logs/train_det.log
 
-
+# --reduce_lr \
 
 
 

@@ -1,7 +1,7 @@
 '''
 Author: daniel
 Date: 2023-03-27 12:02:20
-LastEditTime: 2023-03-27 19:12:49
+LastEditTime: 2023-03-28 11:54:51
 LastEditors: daniel
 Description: 
 FilePath: /butd_detr/my_utils/consistency_criterion.py
@@ -231,7 +231,10 @@ class ConsistencyCriterion:
 
         #!=====================================
         loss_ce = loss_ce.sum(-1)
-        loss_ce = (loss_ce<torch.quantile(loss_ce, self.EMA_CLIP )) * loss_ce
+        if loss_ce.numel() != 0:
+            loss_ce = (loss_ce<torch.quantile(loss_ce, self.EMA_CLIP )) * loss_ce
+        else:
+            print(f" loss_ce is empty: {loss_ce}")
         #!=====================================
 
         loss_ce = loss_ce.sum() / self.num_boxes
@@ -259,7 +262,10 @@ class ConsistencyCriterion:
 
         #* EMA CLIP
         center_size_consistency_loss = center_size_consistency_loss.sum(-1)
-        center_size_consistency_loss = (center_size_consistency_loss<torch.quantile(center_size_consistency_loss, self.EMA_CLIP )) * center_size_consistency_loss
+        if center_size_consistency_loss.numel() != 0:
+            center_size_consistency_loss = (center_size_consistency_loss<torch.quantile(center_size_consistency_loss, self.EMA_CLIP )) * center_size_consistency_loss
+        else:
+            print(f" center_size_consistency_loss is empty:{center_size_consistency_loss}")
 
 
         center_size_consistency_loss= center_size_consistency_loss.sum() / self.num_boxes 
@@ -267,8 +273,11 @@ class ConsistencyCriterion:
             box_cxcyczwhd_to_xyzxyz(src_boxes),
             box_cxcyczwhd_to_xyzxyz(target_boxes)))        
 
-        
-        loss_giou = (loss_giou<torch.quantile(loss_giou, self.EMA_CLIP )) * loss_giou
+        if loss_giou.numel() != 0:
+            loss_giou = (loss_giou<torch.quantile(loss_giou, self.EMA_CLIP )) * loss_giou
+        else:
+            print(f" loss_giou is empty: {loss_giou}")
+
 
         giou_consistency_loss= loss_giou.sum() / self.num_boxes
 
