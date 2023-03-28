@@ -2,10 +2,10 @@
 ###
  # @Author: daniel
  # @Date: 2023-03-28 23:07:11
- # @LastEditTime: 2023-03-28 23:11:01
+ # @LastEditTime: 2023-03-28 23:15:07
  # @LastEditors: daniel
  # @Description: 
- # @FilePath: /butd_detr/scripts/pretrain_det_scanrefer.sh
+ # @FilePath: /butd_detr/scripts/pretrain_det_sr3d.sh
  # have a nice day
 ### 
 export PYTHONWARNINGS='ignore:semaphore_tracker:UserWarning'
@@ -15,13 +15,13 @@ export PYTHONWARNINGS='ignore:semaphore_tracker:UserWarning'
 #!  To train on multiple datasets, e.g. on SR3D and NR3D simultaneously, set --TRAIN_DATASET sr3d nr3d.
 
 #* dataset you want to train ,  could be nr3d or sr3d ,for cls 
-train_data=scanrefer
-test_data=scanrefer
+train_data=sr3d
+test_data=sr3d
 DATA_ROOT=datasets/
 
 #* GPU id you need to run this shell 
-gpu_ids="0,1,2,3";
-gpu_num=4;
+gpu_ids="1,2,3,4,5";
+gpu_num=5;
 
 #* batch size 
 b_size=12;
@@ -31,10 +31,8 @@ port=29530
 labeled_ratio=0.2;
 topk=8;
 
-decay_epoch="1000";
+decay_epoch="25 26";
 epoch=1000;
-
-
 
 
 
