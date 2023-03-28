@@ -19,10 +19,10 @@ b_size=12;
 port=29530
 
 #* for  semi supervision architecture  : step1 x
-labeled_ratio=0.3;
+labeled_ratio=0.2;
 topk=8;
 
-decay_epoch="65";
+decay_epoch="1000";
 epoch=1000;
 
 

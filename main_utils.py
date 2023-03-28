@@ -577,7 +577,7 @@ class BaseTrainTester:
                 if args.upload_wandb and args.local_rank==0:
                     
                     tmp = { f'Loss/{key}':stat_dict[key] / args.print_freq  for key in sorted(stat_dict.keys()) if 'loss' in key and 'proposal_' not in key and 'last_' not in key and 'head_' not in key }
-                    tmp.update({"Misc/lr": scheduler.get_last_lr()[0],'Misc/grad_norm':stat_dict['grad_norm']})
+                    tmp.update({"Misc/lr": scheduler.get_last_lr()[0],'Misc/grad_norm':stat_dict['grad_norm'],'epoch':epoch})
                     wandb.log(tmp)
 
                 for key in sorted(stat_dict.keys()):
