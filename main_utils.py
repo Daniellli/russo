@@ -62,6 +62,9 @@ class BaseTrainTester:
 
         self.args = args
 
+        self.init_wandb()
+
+
 
         """Initialize."""
         name = args.log_dir.split('/')[-1]
@@ -87,10 +90,18 @@ class BaseTrainTester:
             path = os.path.join(args.log_dir, "config.json")
             with open(path, 'w') as f:
                 json.dump(vars(args), f, indent=2)
-            self.logger.info("Full config saved to {}".format(path))
-            self.logger.info(str(vars(args)))
+            self.log("Full config saved to {}".format(path))
+            self.log(str(vars(args)))
             
 
+
+    def init_wandb(self):
+        if self.args.upload_wandb and self.args.local_rank == 0:
+            run=wandb.init(project="BUTD_DETR")
+            # run.name = "test_"+run.name
+            for k, v in self.args.__dict__.items():
+                setattr(wandb.config,k,v)
+            self.use_wandb = True
     
     def log(self,message):
 
@@ -100,8 +111,7 @@ class BaseTrainTester:
 
         
     def wandb_log(self,message):
-
-        if self.args.local_rank == 0 or self.args.local_rank == -1:
+        if (self.args.local_rank == 0 or self.args.local_rank == -1 ) and hasattr(self,'use_wandb') and self.use_wandb:
             wandb.log(message)
 
             
@@ -215,9 +225,6 @@ class BaseTrainTester:
 
 
         torch.cuda.set_device(args.local_rank)
-        logger.info(f"args.local_rank == {args.local_rank}")
-
-
         
         """Run main training/testing pipeline."""
         if args.eval_scanrefer:
@@ -291,7 +298,7 @@ class BaseTrainTester:
             )
 
         if performance is not None :
-            logger.info(','.join(['student_%s:%.04f'%(k,round(v,4)) for k,v in performance.items()]))
+            self.log(','.join(['student_%s:%.04f'%(k,round(v,4)) for k,v in performance.items()]))
             is_best,snew_performance = save_res(save_dir,args.start_epoch-1,performance,best_performce)
 
 
@@ -378,7 +385,7 @@ class BaseTrainTester:
             #* load model 之后 schedule 也变了 , 变成上次训练的,这次的就不见了, 重新加载
             if args.lr_decay_intermediate:
                 
-                logger.info(f"current step :{scheduler._step_count},last epoch {scheduler.last_epoch} , warm up epoch :{args.warmup_epoch},args.lr_decay_epochs :{args.lr_decay_epochs},len(train_loader):{len(train_loader)}")
+                self.log(f"current step :{scheduler._step_count},last epoch {scheduler.last_epoch} , warm up epoch :{args.warmup_epoch},args.lr_decay_epochs :{args.lr_decay_epochs},len(train_loader):{len(train_loader)}")
                 
                 
                 # tmp = {scheduler._step_count+len(train_loader):1 } #* 一个epoch 后decay learning rate 
@@ -395,7 +402,7 @@ class BaseTrainTester:
                 )
                 
                 if performance is not None :
-                    logger.info(','.join(['student_%s:%.04f'%(k,round(v,4)) for k,v in performance.items()]))
+                    self.log(','.join(['student_%s:%.04f'%(k,round(v,4)) for k,v in performance.items()]))
                     is_best,snew_performance = save_res(save_dir,args.start_epoch-1,performance,best_performce)
 
                     if is_best:
@@ -408,7 +415,7 @@ class BaseTrainTester:
             broadcast_buffers=True  # , find_unused_parameters=True
         )
 
-        logger.info(scheduler.milestones)
+        self.log(scheduler.milestones)
         last_best_epoch_path = None
         for epoch in range(args.start_epoch, args.max_epoch + 1):
             train_loader.sampler.set_epoch(epoch)
@@ -418,7 +425,7 @@ class BaseTrainTester:
                 criterion, set_criterion,
                 optimizer, scheduler, args
             )
-            self.logger.info(
+            self.log(
                 'epoch {}, total time {:.2f}, '
                 'lr_base {:.5f}, lr_pointnet {:.5f}'.format(
                     epoch, (time.time() - tic),
@@ -460,7 +467,7 @@ class BaseTrainTester:
 
 
         saved_path = os.path.join(args.log_dir, 'ckpt_epoch_last.pth')
-        self.logger.info("Saved in {}".format(saved_path))
+        self.log("Saved in {}".format(saved_path))
         self.evaluate_one_epoch(
             args.max_epoch, test_loader,
             model, criterion, set_criterion, args
@@ -556,10 +563,10 @@ class BaseTrainTester:
 
             if (batch_idx + 1) % args.print_freq == 0:
                 # Terminal logs
-                self.logger.info(
+                self.log(
                     f'Train: [{epoch}][{batch_idx + 1}/{len(train_loader)}]  '
                 )
-                self.logger.info(''.join([
+                self.log(''.join([
                     f'{key} {stat_dict[key] / args.print_freq:.4f} \t'
                     for key in sorted(stat_dict.keys())
                     if 'loss' in key and 'proposal_' not in key
@@ -612,8 +619,8 @@ class BaseTrainTester:
         # Accumulate statistics and print out
         stat_dict = self._accumulate_stats(stat_dict, end_points)
         if (batch_idx + 1) % args.print_freq == 0:
-            self.logger.info(f'Eval: [{batch_idx + 1}/{len(test_loader)}]  ')
-            self.logger.info(''.join([
+            self.log(f'Eval: [{batch_idx + 1}/{len(test_loader)}]  ')
+            self.log(''.join([
                 f'{key} {stat_dict[key] / (float(batch_idx + 1)):.4f} \t'
                 for key in sorted(stat_dict.keys())
                 if 'loss' in key and 'proposal_' not in key
@@ -682,8 +689,8 @@ class BaseTrainTester:
         # Accumulate statistics and print out
         stat_dict = self._accumulate_stats(stat_dict, end_points)
         if (batch_idx + 1) % args.print_freq == 0:
-            self.logger.info(f'Eval: [{batch_idx + 1}/{len(test_loader)}]  ')
-            self.logger.info(''.join([
+            self.log(f'Eval: [{batch_idx + 1}/{len(test_loader)}]  ')
+            self.log(''.join([
                 f'{key} {stat_dict[key] / (float(batch_idx + 1)):.4f} \t'
                 for key in sorted(stat_dict.keys())
                 if 'loss' in key and 'proposal_' not in key

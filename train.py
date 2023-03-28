@@ -74,7 +74,7 @@ class SemiSuperviseTrainTester(TrainTester):
             rampup_length = args.rampup_length
             if rampup_length == 0:
                 return 1
-            logger.info(f"rampup_length:{rampup_length}")
+            self.log(f"rampup_length:{rampup_length}")
             
             current=  current-args.start_epoch
             current = np.clip(current,0,rampup_length)
@@ -136,7 +136,7 @@ class SemiSuperviseTrainTester(TrainTester):
                     detect_intermediate,use_multiview,butd,butd_gt,butd_cls,
                     augment_det=False,debug=False,labeled_ratio=None,unlabel_dataset_root=None):
 
-        logger.info(f"unlabeled datasets,ratio {labeled_ratio} , has been loaded ")
+        self.log(f"unlabeled datasets,ratio {labeled_ratio} , has been loaded ")
 
         
         return JointUnlabeledDataset(
@@ -184,7 +184,7 @@ class SemiSuperviseTrainTester(TrainTester):
     def update_ema_variables(self,model, ema_model, alpha, global_step):
         # Use the true average until the exponential average is more correct
         alpha = min(1 - 1 / (global_step + 1), alpha)
-        # logger.info(f"alpha:{alpha} ,global_step :{global_step}")
+        # self.log(f"alpha:{alpha} ,global_step :{global_step}")
         for ema_param, param in zip(ema_model.parameters(), model.parameters()):
             # ema_param.data.mul_(alpha).add_(1 - alpha, param.data)
             #* dismiss the warning
@@ -205,24 +205,23 @@ class SemiSuperviseTrainTester(TrainTester):
         stat_dict = {}  # collect statistics
         model.train()  # set model to training mode
 
-        # Loop over batches
-
         total_iteration=len(labeled_loader)
     
-        logger.info(f"total_iteration == {total_iteration}")
-
         box_consistency_weight = self.get_current_consistency_weight(args.box_consistency_weight ,epoch,args)
         box_giou_consistency_weight = self.get_current_consistency_weight(args.box_giou_consistency_weight ,epoch,args)
         soft_token_consistency_weight = self.get_current_consistency_weight(args.soft_token_consistency_weight ,epoch,args)
         object_query_consistency_weight = self.get_current_consistency_weight(args.object_query_consistency_weight ,epoch,args)
         text_token_consistency_weight = self.get_current_consistency_weight(args.text_token_consistency_weight ,epoch,args)
 
-
-        logger.info(f"box_consistency_weight  : {box_consistency_weight}")
-        logger.info(f"box_giou_consistency_weight  : {box_giou_consistency_weight}")
-        logger.info(f"soft_token_consistency_weight  : {soft_token_consistency_weight}")
-        logger.info(f"object_query_consistency_weight  : {object_query_consistency_weight}")
-        logger.info(f"text_token_consistency_weight  : {text_token_consistency_weight}")
+        
+        self.wandb_log({
+            "EMAMisc/box_consistency_weight":box_consistency_weight,
+            "EMAMisc/box_giou_consistency_weight":box_giou_consistency_weight,
+            "EMAMisc/soft_token_consistency_weight":soft_token_consistency_weight,
+            "EMAMisc/object_query_consistency_weight":object_query_consistency_weight,
+            "EMAMisc/text_token_consistency_weight":text_token_consistency_weight
+        })
+        
         
         unlabeled_loader_iter=iter(unlabeled_loader)
         # get_current_consistency_weight
@@ -340,36 +339,22 @@ class SemiSuperviseTrainTester(TrainTester):
             if (batch_idx + 1) % args.print_freq == 0 and args.local_rank==0:
                 stat_dict = self._accumulate_stats(stat_dict, end_points)
 
-                logger.info(f"ran_epoch:{ran_epoch},alpha:{alpha}")
+                self.log(f"ran_epoch:{ran_epoch},alpha:{alpha} \n Train: [{epoch}][{batch_idx + 1}/{total_iteration}]")
                 
-                # Terminal logs
-                self.logger.info(f'Train: [{epoch}][{batch_idx + 1}/{total_iteration}]')
 
-
-                tmp = {key: round(stat_dict[key] / args.print_freq,10) for key in sorted(stat_dict.keys()) \
+                tmp =  { "Loss/%s"%(key) : round(stat_dict[key] / args.print_freq,10) for key in sorted(stat_dict.keys()) \
                     if 'loss' in key and 'proposal_' not in key and 'last_' not in key and 'head_' not in key and 'consistency' not in key}
 
 
-                tmp.update( {k:round(end_points[k].detach().item(),10)  for k in end_points.keys() if 'consistency' in k})
+                tmp.update( {"EMALoss/%s"%(k) :round(end_points[k].detach().item(),10) 
+                                for k in end_points.keys() if 'consistency' in k})
+                tmp.update({"Misc/lr":scheduler.get_last_lr()[0],
+                            'EMAMisc/alpha':alpha,"EMAMisc/global_step":global_step,
+                            "Misc/grad_norm":stat_dict['grad_norm'],
+                            "Misc/Epoch":epoch})
 
-                tmp.update({"lr":scheduler.get_last_lr()[0]})
-
-
-                # tmp.update({"center_consistency_loss": round(center_consistency_loss.clone().detach().item(),10) if center_consistency_loss is not None else None,
-                #                 "soft_token_consistency_loss": round(soft_token_consistency_loss.clone().detach().item(),10) if soft_token_consistency_loss is not None else None,
-                #                 "size_consistency_loss": round(size_consistency_loss.clone().detach().item(),10) if size_consistency_loss is not None else None,
-                #                 "query_consistency_loss": round(query_consistency_loss.clone().detach().item(),10) if query_consistency_loss is not None else None,
-                #                 "text_consistency_loss": round(text_consistency_loss.clone().detach().item(),10) if text_consistency_loss is not None else None,
-                #                 "total_consistent_loss": round(consistent_loss.clone().detach().item(),10) if consistent_loss is not None else None ,
-                #                 "total_loss(including consistency)": round(total_loss.clone().detach().item(),10),
-                #                 "lr": scheduler.get_last_lr()[0]
-                #             })
-
-
-                self.logger.info('\t'.join([k+': '+"%.10f"%(v) for k,v in tmp.items()]))
-
-                if args.upload_wandb :
-                    wandb.log(tmp)
+                self.log('\t'.join([k+': '+"%.10f"%(v) for k,v in tmp.items()]))
+                self.wandb_log(tmp)
 
                 for key in sorted(stat_dict.keys()):
                     stat_dict[key] = 0
@@ -394,7 +379,7 @@ class SemiSuperviseTrainTester(TrainTester):
 
         total_iteration=len(labeled_loader)
     
-        logger.info(f"total_iteration == {total_iteration}")
+        self.log(f"total_iteration == {total_iteration}")
 
         center_consistency_weight = self.get_current_consistency_weight(args.center_consistency_weight ,epoch,args)
         size_consistency_weight = self.get_current_consistency_weight(args.size_consistency_weight ,epoch,args)
@@ -404,13 +389,11 @@ class SemiSuperviseTrainTester(TrainTester):
         text_consistency_weight = self.get_current_consistency_weight(args.text_consistency_weight ,epoch,args)
 
 
-        logger.info(f"center_consistency_weight  : {center_consistency_weight}")
-        logger.info(f"size_consistency_weight  : {size_consistency_weight}")
-        logger.info(f"token_consistency_weight  : {token_consistency_weight}")
-        logger.info(f"query_consistency_weight  : {query_consistency_weight}")
-        logger.info(f"text_consistency_weight  : {text_consistency_weight}")
-
-
+        self.log(f"center_consistency_weight  : {center_consistency_weight}")
+        self.log(f"size_consistency_weight  : {size_consistency_weight}")
+        self.log(f"token_consistency_weight  : {token_consistency_weight}")
+        self.log(f"query_consistency_weight  : {query_consistency_weight}")
+        self.log(f"text_consistency_weight  : {text_consistency_weight}")
 
         
         for batch_idx, batch_data in enumerate(labeled_loader):
@@ -480,10 +463,10 @@ class SemiSuperviseTrainTester(TrainTester):
 
             if (batch_idx + 1) % args.print_freq == 0:
                 # Terminal logs
-                self.logger.info(
+                self.log(
                     f'Train: [{epoch}][{batch_idx + 1}/{total_iteration}]  '
                 )
-                self.logger.info(''.join([
+                self.log(''.join([
                     f'{key} {stat_dict[key] / args.print_freq:.4f} \t'
                     for key in sorted(stat_dict.keys())
                     if 'loss' in key and 'proposal_' not in key
@@ -512,7 +495,7 @@ class SemiSuperviseTrainTester(TrainTester):
     def main(self, args):
         #!======================= 避免数据跑到其他卡上
         torch.cuda.set_device(args.local_rank)
-        logger.info(f"args.local_rank == {args.local_rank}")
+        self.log(f"args.local_rank == {args.local_rank}")
         #!=======================
 
         """Run main training/testing pipeline."""
@@ -558,11 +541,11 @@ class SemiSuperviseTrainTester(TrainTester):
         labeled_loader = self.get_dataloader(labeled_dataset,int(batch_size_list[0]),args.num_workers,shuffle = True)
         unlabeled_loader = self.get_dataloader(unlabeled_datasets,int(batch_size_list[1]),args.num_workers,shuffle = True)
         test_loader = self.get_dataloader(test_dataset,int(batch_size_list.sum().astype(np.int64)),args.num_workers,shuffle = False)
-        logger.info(f"un supervised mask :{unlabeled_loader.dataset.__getitem__(0)['supervised_mask']}")
+        self.log(f"un supervised mask :{unlabeled_loader.dataset.__getitem__(0)['supervised_mask']}")
         
 
 
-        logger.info(f"length of  labeled dataset: {len(labeled_loader.dataset)} \t  length of  unlabeled dataset: {len(unlabeled_loader.dataset)} \t length of testing dataset: {len(test_loader.dataset)}")
+        self.log(f"length of  labeled dataset: {len(labeled_loader.dataset)} \t  length of  unlabeled dataset: {len(unlabeled_loader.dataset)} \t length of testing dataset: {len(test_loader.dataset)}")
         
         # Get model
         model = self.get_model(args)
@@ -611,11 +594,11 @@ class SemiSuperviseTrainTester(TrainTester):
                 # tmp = {scheduler._step_count+len(labeled_loader):1 } #* 一个epoch 后decay learning rate 
                 # tmp.update({ k:v for  idx, (k,v) in enumerate(scheduler.milestones.items()) if idx != 0})
                 # scheduler.milestones = tmp
-                logger.info(f"scheduler._step_count :{scheduler._step_count},args.start_epoch:{args.start_epoch},args.warmup_epoch:{args.warmup_epoch}")
+                self.log(f"scheduler._step_count :{scheduler._step_count},args.start_epoch:{args.start_epoch},args.warmup_epoch:{args.warmup_epoch}")
                 decay_epoch = [( l-args.warmup_epoch - args.start_epoch ) for l in args.lr_decay_epochs]
 
                 scheduler.milestones ={len(labeled_loader)*( l-args.warmup_epoch - args.start_epoch )+scheduler.last_epoch : 1 for l in args.lr_decay_epochs}
-                logger.info(scheduler.milestones )
+                self.log(scheduler.milestones )
 
             #* eval student model 
             if args.eval:
@@ -625,7 +608,7 @@ class SemiSuperviseTrainTester(TrainTester):
                 )
                 
                 if performance is not None :
-                    logger.info(','.join(['student_%s:%.04f'%(k,round(v,4)) for k,v in performance.items()]))
+                    self.log(','.join(['student_%s:%.04f'%(k,round(v,4)) for k,v in performance.items()]))
                     is_best,snew_performance = save_res(save_dir,args.start_epoch-1,performance,best_performce)
 
                     if is_best:
@@ -638,7 +621,7 @@ class SemiSuperviseTrainTester(TrainTester):
                 )
 
                 if ema_performance is not None :
-                    logger.info(','.join(['teacher_%s:%.04f'%(k,round(v,4)) for k,v in ema_performance.items()]))
+                    self.log(','.join(['teacher_%s:%.04f'%(k,round(v,4)) for k,v in ema_performance.items()]))
                     is_best,tnew_performance = save_res(ema_save_dir,args.start_epoch-1,ema_performance,ema_best_performce)
                     if is_best:
                         ema_best_performce= tnew_performance
@@ -666,7 +649,7 @@ class SemiSuperviseTrainTester(TrainTester):
                 optimizer, scheduler, args
             )
 
-            self.logger.info(
+            self.log(
                 'epoch {}, total time {:.2f}, '
                 'lr_base {:.5f}, lr_pointnet {:.5f}'.format(
                     epoch, (time.time() - tic),
@@ -685,7 +668,7 @@ class SemiSuperviseTrainTester(TrainTester):
                 )
                 
                 if performance is not None :
-                    logger.info(','.join(['student_%s:%.04f'%(k,round(v,4)) for k,v in performance.items()]))
+                    self.log(','.join(['student_%s:%.04f'%(k,round(v,4)) for k,v in performance.items()]))
                     is_best,snew_performance = save_res(save_dir,epoch,performance,best_performce)
                     if is_best:
                         best_performce =  snew_performance
@@ -701,7 +684,7 @@ class SemiSuperviseTrainTester(TrainTester):
                 )
 
                 if ema_performance is not None :
-                    logger.info(','.join(['teacher_%s:%.04f'%(k,round(v,4)) for k,v in ema_performance.items()]))
+                    self.log(','.join(['teacher_%s:%.04f'%(k,round(v,4)) for k,v in ema_performance.items()]))
                     ema_is_best,tnew_performance = save_res(ema_save_dir,epoch,ema_performance,ema_best_performce)
                     if ema_is_best:
                         ema_best_performce =  tnew_performance
@@ -729,7 +712,7 @@ class SemiSuperviseTrainTester(TrainTester):
         # Training is over, evaluate
         save_checkpoint(args, 'last', model, optimizer, scheduler, True)
         saved_path = os.path.join(args.log_dir, 'ckpt_epoch_last.pth')
-        self.logger.info("Saved in {}".format(saved_path))
+        self.log("Saved in {}".format(saved_path))
         self.evaluate_one_epoch(
             args.max_epoch, test_loader,
             model, criterion, set_criterion, args
@@ -746,7 +729,7 @@ class SemiSuperviseTrainTester(TrainTester):
     def full_supervise_main(self, args):
         #!======================= 避免数据跑到其他卡上
         torch.cuda.set_device(args.local_rank)
-        logger.info(f"args.local_rank == {args.local_rank}")
+        self.log(f"args.local_rank == {args.local_rank}")
         #!=======================
 
         """Run main training/testing pipeline."""
@@ -786,7 +769,7 @@ class SemiSuperviseTrainTester(TrainTester):
         test_loader = self.get_dataloader(test_dataset,int(batch_size_list.sum().astype(np.int64)),args.num_workers,shuffle = False)
 
 
-        logger.info(f"length of  labeled dataset: {len(labeled_loader.dataset)} \t length of testing dataset: {len(test_loader.dataset)}")
+        self.log(f"length of  labeled dataset: {len(labeled_loader.dataset)} \t length of testing dataset: {len(test_loader.dataset)}")
 
         
         # Get model
@@ -833,11 +816,11 @@ class SemiSuperviseTrainTester(TrainTester):
 
             #* update lr decay milestones
             if args.lr_decay_intermediate:    
-                logger.info(f"scheduler._step_count :{scheduler._step_count},args.start_epoch:{args.start_epoch},args.warmup_epoch:{args.warmup_epoch}")
+                self.log(f"scheduler._step_count :{scheduler._step_count},args.start_epoch:{args.start_epoch},args.warmup_epoch:{args.warmup_epoch}")
                 decay_epoch = [( l-args.warmup_epoch - args.start_epoch ) for l in args.lr_decay_epochs]
 
                 scheduler.milestones ={len(labeled_loader)*( l-args.warmup_epoch - args.start_epoch )+scheduler.last_epoch : 1 for l in args.lr_decay_epochs}
-                logger.info(scheduler.milestones )
+                self.log(scheduler.milestones )
 
             #* eval student model 
             if args.eval:
@@ -847,7 +830,7 @@ class SemiSuperviseTrainTester(TrainTester):
                 )
                 
                 if performance is not None :
-                    logger.info(','.join(['student_%s:%.04f'%(k,round(v,4)) for k,v in performance.items()]))
+                    self.log(','.join(['student_%s:%.04f'%(k,round(v,4)) for k,v in performance.items()]))
                     is_best,snew_performance = save_res(save_dir,args.start_epoch-1,performance,best_performce)
 
                     if is_best:
@@ -860,7 +843,7 @@ class SemiSuperviseTrainTester(TrainTester):
                 )
 
                 if ema_performance is not None :
-                    logger.info(','.join(['teacher_%s:%.04f'%(k,round(v,4)) for k,v in ema_performance.items()]))
+                    self.log(','.join(['teacher_%s:%.04f'%(k,round(v,4)) for k,v in ema_performance.items()]))
                     is_best,tnew_performance = save_res(ema_save_dir,args.start_epoch-1,ema_performance,ema_best_performce)
                     if is_best:
                         ema_best_performce= tnew_performance
@@ -889,7 +872,7 @@ class SemiSuperviseTrainTester(TrainTester):
                 optimizer, scheduler, args
             )
 
-            self.logger.info(
+            self.log(
                 'epoch {}, total time {:.2f}, '
                 'lr_base {:.5f}, lr_pointnet {:.5f}'.format(
                     epoch, (time.time() - tic),
@@ -908,7 +891,7 @@ class SemiSuperviseTrainTester(TrainTester):
                 )
                 
                 if performance is not None :
-                    logger.info(','.join(['student_%s:%.04f'%(k,round(v,4)) for k,v in performance.items()]))
+                    self.log(','.join(['student_%s:%.04f'%(k,round(v,4)) for k,v in performance.items()]))
                     is_best,snew_performance = save_res(save_dir,epoch,performance,best_performce)
                     if is_best:
                         best_performce =  snew_performance
@@ -924,7 +907,7 @@ class SemiSuperviseTrainTester(TrainTester):
                 )
 
                 if ema_performance is not None :
-                    logger.info(','.join(['teacher_%s:%.04f'%(k,round(v,4)) for k,v in ema_performance.items()]))
+                    self.log(','.join(['teacher_%s:%.04f'%(k,round(v,4)) for k,v in ema_performance.items()]))
                     ema_is_best,tnew_performance = save_res(ema_save_dir,epoch,ema_performance,ema_best_performce)
                     if ema_is_best:
                         ema_best_performce =  tnew_performance
@@ -952,7 +935,7 @@ class SemiSuperviseTrainTester(TrainTester):
         # Training is over, evaluate
         save_checkpoint(args, 'last', model, optimizer, scheduler, True)
         saved_path = os.path.join(args.log_dir, 'ckpt_epoch_last.pth')
-        self.logger.info("Saved in {}".format(saved_path))
+        self.log("Saved in {}".format(saved_path))
         self.evaluate_one_epoch(
             args.max_epoch, test_loader,
             model, criterion, set_criterion, args
@@ -967,21 +950,15 @@ if __name__ == '__main__':
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
     opt = parse_semi_supervise_option()
     
-    # logger.info(f"gpu ids == {opt.gpu_ids}")
-    # logger.info(os.environ["CUDA_VISIBLE_DEVICES"] )
+    # self.log(f"gpu ids == {opt.gpu_ids}")
+    # self.log(os.environ["CUDA_VISIBLE_DEVICES"] )
     # torch.distributed.init_process_group(backend='nccl', init_method='env://')
     torch.distributed.init_process_group(backend='nccl')
-
     torch.backends.cudnn.enabled = True
     torch.backends.cudnn.benchmark = True
     torch.backends.cudnn.deterministic = True
     # torch.cuda.set_device(opt.local_rank)
     train_tester = SemiSuperviseTrainTester(opt)
-    if opt.upload_wandb and opt.local_rank==0:
-        run=wandb.init(project="BUTD_DETR")
-        run.name = "test_"+run.name
-        for k, v in opt.__dict__.items():
-            setattr(wandb.config,k,v)
 
 
 

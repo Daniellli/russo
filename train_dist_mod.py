@@ -1,7 +1,7 @@
 '''
 Author: daniel
 Date: 2023-03-22 16:49:49
-LastEditTime: 2023-03-27 16:12:29
+LastEditTime: 2023-03-28 15:29:40
 LastEditors: daniel
 Description: 
 FilePath: /butd_detr/train_dist_mod.py
@@ -95,7 +95,7 @@ class TrainTester(BaseTrainTester):
     def get_dataset(self,data_root,train_dataset_dict,test_datasets,split,use_color,use_height,
                     detect_intermediate,use_multiview,butd,butd_gt,butd_cls,augment_det=False,debug=False,labeled_ratio=None):
 
-        logger.info(f"labeled ratio :{labeled_ratio}")
+        self.log(f"labeled ratio :{labeled_ratio}")
         return JointLabeledDataset(
             dataset_dict=train_dataset_dict,
             test_dataset=test_datasets,
@@ -118,7 +118,7 @@ class TrainTester(BaseTrainTester):
                     debug=False,labeled_ratio=None):
 
 
-        logger.info(f"labeled ratio :{labeled_ratio}")
+        self.log(f"labeled ratio :{labeled_ratio}")
 
         
         return ScanReferTestDataset(
@@ -517,12 +517,12 @@ class TrainTester(BaseTrainTester):
             #!=================================================================================
         
         #* dump for upload evaluation server ========================================
-        logger.info("dumping...")
+        self.log("dumping...")
         pred_path = os.path.join(args.log_dir, "pred.json")
         with open(pred_path, "w") as f:
             json.dump(pred_bboxes, f, indent=4)
             
-        logger.info("done!")
+        self.log("done!")
         #*===========================================================================
 
 
@@ -631,20 +631,20 @@ class TrainTester(BaseTrainTester):
         # Evaluate average precision
         for i, ap_calculator in enumerate(ap_calculator_list):
             metrics_dict = ap_calculator.compute_metrics()
-            self.logger.info(
+            self.log(
                 '=====================>'
                 f'{prefix} IOU THRESH: {args.ap_iou_thresholds[i]}'
                 '<====================='
             )
             for key in metrics_dict:
-                self.logger.info(f'{key} {metrics_dict[key]}')
+                self.log(f'{key} {metrics_dict[key]}')
             if prefix == 'last_' and ap_calculator.ap_iou_thresh > 0.3:
                 mAP = metrics_dict['mAP']
             mAPs[i][1][prefix] = metrics_dict['mAP']
             ap_calculator.reset()
 
         for mAP in mAPs:
-            self.logger.info(
+            self.log(
                 f'IoU[{mAP[0]}]:\t'
                 + ''.join([
                     f'{key}: {mAP[1][key]:.4f} \t'
@@ -659,9 +659,6 @@ class TrainTester(BaseTrainTester):
 if __name__ == '__main__':
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
     opt = parse_option()
-    
-    # logger.info(f"gpu ids == {opt.gpu_ids}")
-    # logger.info(os.environ["CUDA_VISIBLE_DEVICES"] )
      
     # torch.distributed.init_process_group(backend='nccl', init_method='env://')
     torch.distributed.init_process_group(backend='nccl')
@@ -674,11 +671,7 @@ if __name__ == '__main__':
     # torch.cuda.set_device(opt.local_rank)
     train_tester = TrainTester(opt)
 
-    if opt.upload_wandb and opt.local_rank==0:
-        run=wandb.init(project="BUTD_DETR")
-        run.name = "test_"+run.name
-        for k, v in opt.__dict__.items():
-            setattr(wandb.config,k,v)
+
 
     if opt.eval:
         train_tester.evaluation(opt)

@@ -2,7 +2,7 @@
 ###
  # @Author: daniel
  # @Date: 2022-11-19 10:39:17
- # @LastEditTime: 2023-03-28 11:55:33
+ # @LastEditTime: 2023-03-28 16:12:38
  # @LastEditors: daniel
  # @Description: 
  # @FilePath: /butd_detr/scripts/train_det.sh
@@ -28,15 +28,16 @@ gpu_num=4;
 
 
 
+
 #* for not mask 
-box_consistency_weight=1e-2;
-box_giou_consistency_weight=1e-2;
-soft_token_consistency_weight=1e-4;
-object_query_consistency_weight=1e+2;
-text_token_consistency_weight=1e+2;
+box_consistency_weight=1e-3;
+box_giou_consistency_weight=1e-3;
+soft_token_consistency_weight=1e-5;
+object_query_consistency_weight=1e+1;
+text_token_consistency_weight=1e+1;
 
 
-rampup_length=50;#*  let it as  100  if SR3D 
+rampup_length=30;#*  let it as  100  if SR3D 
 ema_decay=0.999;
 ema_decay_after_rampup=0.99;
 
@@ -45,7 +46,7 @@ print_freq=5;
 save_freq=$val_freq;
 port=29522
 epoch=1000;
-b_size='8,1';
+b_size='10,2';
 resume_model_path=archive/table1_scanrefer/decay_trial/scanrefer20_3332_480.pth;
 labeled_ratio=0.2;
 topk=8;
@@ -71,9 +72,7 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --upload-wandb \
     2>&1 | tee -a logs/train_det.log
 
-# --reduce_lr \
-
-
+    
 
 # --joint_det --ema-full-supervise \
 #* full supervise need extra parameter : 
