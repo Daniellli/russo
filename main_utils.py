@@ -59,6 +59,10 @@ class BaseTrainTester:
     """Basic train/test class to be inherited."""
 
     def __init__(self, args):
+
+        self.args = args
+
+
         """Initialize."""
         name = args.log_dir.split('/')[-1]
         # Create log dir
@@ -88,6 +92,22 @@ class BaseTrainTester:
             
 
     
+    def log(self,message):
+
+        if self.args.local_rank == 0 or self.args.local_rank == -1:
+            # print((message))
+            self.logger.info(message)
+
+        
+    def wandb_log(self,message):
+
+        if self.args.local_rank == 0 or self.args.local_rank == -1:
+            wandb.log(message)
+
+            
+
+
+
     def get_dataset(self):
         """Initialize datasets."""
         raise NotImplementedError
@@ -281,7 +301,7 @@ class BaseTrainTester:
     def main(self, args):
 
         torch.cuda.set_device(args.local_rank)
-        logger.info(f"args.local_rank == {args.local_rank}")
+        self.log(f"args.local_rank == {args.local_rank}")
         
         
         """Run main training/testing pipeline."""
@@ -315,9 +335,9 @@ class BaseTrainTester:
         
 
         n_data = len(train_loader.dataset)
-        self.logger.info(f"length of training dataset: {n_data}")
+        self.log(f"length of training dataset: {n_data}")
         n_data = len(test_loader.dataset)
-        self.logger.info(f"length of testing dataset: {n_data}")
+        self.log(f"length of testing dataset: {n_data}")
 
         # Get model
         model = self.get_model(args)
@@ -549,8 +569,8 @@ class BaseTrainTester:
                 
                 if args.upload_wandb and args.local_rank==0:
                     
-                    tmp = { f'{key}':stat_dict[key] / args.print_freq  for key in sorted(stat_dict.keys()) if 'loss' in key and 'proposal_' not in key and 'last_' not in key and 'head_' not in key }
-                    tmp.update({"lr": scheduler.get_last_lr()[0]})
+                    tmp = { f'Loss/{key}':stat_dict[key] / args.print_freq  for key in sorted(stat_dict.keys()) if 'loss' in key and 'proposal_' not in key and 'last_' not in key and 'head_' not in key }
+                    tmp.update({"Misc/lr": scheduler.get_last_lr()[0],'Misc/grad_norm':stat_dict['grad_norm']})
                     wandb.log(tmp)
 
                 for key in sorted(stat_dict.keys()):
