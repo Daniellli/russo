@@ -166,11 +166,17 @@ def parse_semi_supervise_option():
     # --self_attend
     # --use-tkps
 
+    if args.labeled_ratio is not None :
+        print(f"origin decay epoch : {args.lr_decay_epochs},opt.labeled_ratio : {args.labeled_ratio}")
+        args.lr_decay_epochs  = (np.array(args.lr_decay_epochs) //  args.labeled_ratio).astype(np.int64).tolist()
+        print(f"after calibration, decay epoch : {args.lr_decay_epochs}")
+
     return args
 
 
 
 def parse_option():
+
     """Parse cmd arguments."""
     parser = argparse.ArgumentParser()
     # Model
@@ -276,6 +282,13 @@ def parse_option():
     args.use_contrastive_align=True
     args.self_attend=True
     args.use_tkps=True
+
+
+    if args.labeled_ratio is not None :
+        print(f"origin decay epoch : {args.lr_decay_epochs},opt.labeled_ratio : {args.labeled_ratio}")
+        args.lr_decay_epochs  = (np.array(args.lr_decay_epochs) //  args.labeled_ratio).astype(np.int64).tolist()
+        print(f"after calibration, decay epoch : {args.lr_decay_epochs}")
+
 
 
     return args

@@ -65,7 +65,6 @@ class BaseTrainTester:
         self.init_wandb()
 
 
-
         """Initialize."""
         name = args.log_dir.split('/')[-1]
         # Create log dir
