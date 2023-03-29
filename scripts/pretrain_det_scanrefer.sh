@@ -20,8 +20,8 @@ test_data=scanrefer
 DATA_ROOT=datasets/
 
 #* GPU id you need to run this shell 
-gpu_ids="0,1,2,3";
-gpu_num=4;
+gpu_ids="0,1,2,3,4,5,6";
+gpu_num=7;
 
 #* batch size 
 b_size=12;
@@ -31,7 +31,7 @@ port=29530
 labeled_ratio=0.2;
 topk=8;
 
-decay_epoch="1000";
+decay_epoch="65";
 epoch=1000;
 
 

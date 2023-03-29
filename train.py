@@ -949,18 +949,18 @@ class SemiSuperviseTrainTester(TrainTester):
 if __name__ == '__main__':
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
     opt = parse_semi_supervise_option()
+
     
-    # self.log(f"gpu ids == {opt.gpu_ids}")
-    # self.log(os.environ["CUDA_VISIBLE_DEVICES"] )
+    # logger.info(f"gpu ids == {opt.gpu_ids}")
+    # logger.info(os.environ["CUDA_VISIBLE_DEVICES"] )
     # torch.distributed.init_process_group(backend='nccl', init_method='env://')
     torch.distributed.init_process_group(backend='nccl')
     torch.backends.cudnn.enabled = True
     torch.backends.cudnn.benchmark = True
     torch.backends.cudnn.deterministic = True
     # torch.cuda.set_device(opt.local_rank)
+
     train_tester = SemiSuperviseTrainTester(opt)
-
-
 
     if opt.ema_full_supervise:
         ckpt_path = train_tester.full_supervise_main(opt)
