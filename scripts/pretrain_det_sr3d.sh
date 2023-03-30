@@ -2,7 +2,7 @@
 ###
  # @Author: daniel
  # @Date: 2023-03-28 23:07:11
- # @LastEditTime: 2023-03-28 23:15:07
+ # @LastEditTime: 2023-03-30 00:09:36
  # @LastEditors: daniel
  # @Description: 
  # @FilePath: /butd_detr/scripts/pretrain_det_sr3d.sh
@@ -20,8 +20,8 @@ test_data=sr3d
 DATA_ROOT=datasets/
 
 #* GPU id you need to run this shell 
-gpu_ids="1,2,3,4,5";
-gpu_num=5;
+gpu_ids="0,1,2,3";
+gpu_num=4;
 
 #* batch size 
 b_size=12;
@@ -43,7 +43,7 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --dataset $train_data --test_dataset $test_data \
     --detect_intermediate \
     --use_soft_token_loss --use_contrastive_align \
-    --self_attend --use-tkps \
+    --self_attend \
     --query_points_obj_topk $topk \
     --labeled_ratio $labeled_ratio \
     --max_epoch $epoch \
@@ -52,6 +52,7 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     2>&1 | tee -a logs/pretrain_cls.log
 
 
+#  --use-tkps
 # --lr-scheduler '
 # --checkpoint_path $resume_model_path 
 # --lr_decay_intermediate \
