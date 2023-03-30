@@ -158,7 +158,6 @@ def parse_semi_supervise_option():
     args.use_soft_token_loss=True
     args.use_contrastive_align=True
     args.self_attend=True
-    args.use_tkps=True
     
     # --use_color
     # --use_soft_token_loss
@@ -281,7 +280,6 @@ def parse_option():
     args.use_soft_token_loss=True
     args.use_contrastive_align=True
     args.self_attend=True
-    args.use_tkps=True
 
 
     if args.labeled_ratio is not None :

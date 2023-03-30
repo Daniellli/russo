@@ -45,13 +45,15 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --dataset $train_data --test_dataset $test_data \
     --detect_intermediate \
     --use_soft_token_loss --use_contrastive_align \
-    --self_attend --use-tkps \
+    --self_attend \
     --query_points_obj_topk $topk \
     --labeled_ratio $labeled_ratio \
     --max_epoch $epoch \
     --lr_decay_epochs $decay_epoch \
     --upload-wandb \
     2>&1 | tee -a logs/pretrain_cls.log
+
+# --use-tkps
 
 
 # --lr-scheduler '
