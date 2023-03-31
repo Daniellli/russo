@@ -18,7 +18,6 @@ export PYTHONWARNINGS='ignore:semaphore_tracker:UserWarning'
 #* dataset you want to train ,  could be nr3d or sr3d ,for cls 
 train_data=scanrefer
 test_data=scanrefer
-DATA_ROOT=datasets/
 
 
 #* GPU id you need to run this shell 
@@ -50,26 +49,25 @@ topk=8;
 decay_epoch="1000 1001";
 
 
-TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
-    train.py --data_root $DATA_ROOT --pp_checkpoint $DATA_ROOT/gf_detector_l6o256.pth \
-    --batch_size $b_size --dataset $train_data --test_dataset $test_data --detect_intermediate --max_epoch $epoch \
+TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python \
+    -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
+    train.py --pp_checkpoint datasets/gf_detector_l6o256.pth \
+    --batch_size $b_size --dataset $train_data --test_dataset $test_data \
+    --detect_intermediate --max_epoch $epoch \
     --box_consistency_weight $box_consistency_weight \
     --box_giou_consistency_weight $box_giou_consistency_weight \
     --soft_token_consistency_weight $soft_token_consistency_weight \
     --object_query_consistency_weight $object_query_consistency_weight \
     --text_token_consistency_weight $text_token_consistency_weight \
-    --ema-decay $ema_decay \
-    --ema-decay-after-rampup $ema_decay_after_rampup \
-    --rampup_length $rampup_length \
-    --checkpoint_path $resume_model_path \
-    --lr_decay_epochs $decay_epoch \
-    --lr_decay_intermediate \
-    --labeled_ratio $labeled_ratio \
+    --ema-decay $ema_decay --ema-decay-after-rampup $ema_decay_after_rampup \
+    --rampup_length $rampup_length --checkpoint_path $resume_model_path \
+    --lr_decay_epochs $decay_epoch --labeled_ratio $labeled_ratio \
     2>&1 | tee -a logs/train_det.log
     
-# --upload-wandb \
-    
 
+
+
+# --upload-wandb \
 # --joint_det --ema-full-supervise \
 #* full supervise need extra parameter : 
 #* 1. --joint_det

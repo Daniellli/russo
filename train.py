@@ -304,11 +304,41 @@ class SemiSuperviseTrainTester(TrainTester):
             end_points = consistency_criterion(end_points,teacher_end_points,batch_data['augmentations'])
 
             
-            if hasattr(end_points,'consistency_loss'):
+            # if hasattr(end_points,'consistency_loss'):
+            if end_points.get('consistency_loss')  is not None  :
                 loss += end_points['consistency_loss']
             
             optimizer.zero_grad()
+
+            
+            """
+            #todo statistics of gradient of consistency loss 
+            optimizer.zero_grad()
+            end_points['consistency_loss'].backward()
+            consistency_grad_list  = np.array([x.grad.mean().cpu().numpy() for x in model.parameters() if x.grad is not None ] ) #* 557 elements
+
+
+                consistency_grad_list.mean(): -0.0014226101
+                np.quantile(consistency_grad_list, 0.25): -0.0002210534003097564
+                np.quantile(consistency_grad_list, 0.5) : 1.9099388737231493e-11
+                np.quantile(consistency_grad_list, 0.75): 0.00017880617815535516
+          
+
+
+
+          
+            first iteration: 
+            optimizer.zero_grad()
             loss.backward()
+            supervised_loss_grad_list = np.array([x.grad.mean().cpu().numpy() for x in model.parameters() if x.grad is not None ] ) #* 557 elements
+            np.quantile(supervised_loss_grad_list, 0.5)
+            loss.backward()
+                gradient mean: 0.000799805
+                np.quantile(supervised_loss_grad_list, 0.25): -3.105378709733486e-05
+                np.quantile(supervised_loss_grad_list, 0.5) : 2.0074569784256369e-10
+                np.quantile(supervised_loss_grad_list, 0.75): 5.573853923124261e-05
+            """
+            
             
             #* max grad  == 20.026945, 
             if args.clip_norm > 0:

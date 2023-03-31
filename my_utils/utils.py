@@ -68,7 +68,7 @@ def parse_semi_supervise_option():
     #!+=======
     parser.add_argument('--unlabel-dataset-root', default=None)
     #!+=======
-    parser.add_argument('--data_root', default='./')
+    parser.add_argument('--data_root', default='datasets/')
     parser.add_argument('--use_height', action='store_true',
                         help='Use height signal in input.')
     parser.add_argument('--use_color', action='store_true',
@@ -206,7 +206,7 @@ def parse_option():
                         nargs='+', help='list of datasets to train on')
     
     parser.add_argument('--test_dataset', default='sr3d')
-    parser.add_argument('--data_root', default='./')
+    parser.add_argument('--data_root', default='datasets/')
     parser.add_argument('--use_height', action='store_true',
                         help='Use height signal in input.')
     parser.add_argument('--use_color', action='store_true',
