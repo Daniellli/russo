@@ -22,8 +22,9 @@ DATA_ROOT=datasets/
 
 
 #* GPU id you need to run this shell 
-gpu_ids="0,1,2,3";
-gpu_num=4;
+# gpu_ids="0,1,2,3";
+gpu_ids="5";
+gpu_num=1;
 
 
 
@@ -37,16 +38,12 @@ object_query_consistency_weight=1e+1;
 text_token_consistency_weight=1e+1;
 
 
-rampup_length=30;#*  let it as  100  if SR3D 
+rampup_length=0;#*  let it as  100  if SR3D 
 ema_decay=0.999;
 ema_decay_after_rampup=0.99;
-
-val_freq=1;
-print_freq=5;
-save_freq=$val_freq;
 port=29522
 epoch=1000;
-b_size='10,2';
+b_size='6,6';
 resume_model_path=archive/table1_scanrefer/decay_trial/scanrefer20_3332_480.pth;
 labeled_ratio=0.2;
 topk=8;
@@ -55,8 +52,7 @@ decay_epoch="1000 1001";
 
 TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distributed.launch --nproc_per_node $gpu_num --master_port $port \
     train.py --data_root $DATA_ROOT --pp_checkpoint $DATA_ROOT/gf_detector_l6o256.pth \
-    --batch_size $b_size --val_freq $val_freq --save_freq $save_freq --print_freq $print_freq \
-    --dataset $train_data --test_dataset $test_data --detect_intermediate --max_epoch $epoch \
+    --batch_size $b_size --dataset $train_data --test_dataset $test_data --detect_intermediate --max_epoch $epoch \
     --box_consistency_weight $box_consistency_weight \
     --box_giou_consistency_weight $box_giou_consistency_weight \
     --soft_token_consistency_weight $soft_token_consistency_weight \
@@ -69,9 +65,9 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --lr_decay_epochs $decay_epoch \
     --lr_decay_intermediate \
     --labeled_ratio $labeled_ratio \
-    --upload-wandb \
     2>&1 | tee -a logs/train_det.log
-
+    
+# --upload-wandb \
     
 
 # --joint_det --ema-full-supervise \

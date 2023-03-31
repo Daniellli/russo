@@ -21,7 +21,7 @@ import numpy as np
 from IPython import embed
 
 from loguru import logger
-
+from my_utils.pc_utils import *
 
 def is_dist_avail_and_initialized():
     if not dist.is_available():
@@ -198,8 +198,20 @@ def compute_points_obj_cls_loss_hard_topk(end_points, topk):
     B = gt_center.shape[0]  # batch size
     K = seed_xyz.shape[1]  # number if points from p++ output
     G = gt_center.shape[1]  # number of gt boxes (with padding)
-
     
+
+    """
+    debug plot code :
+        write_pc_as_ply(end_points['point_clouds'][0][:,:3].cpu().numpy(),'logs/debug/a2.ply')
+        write_bbox(torch.cat([gt_center[box_label_mask==1][0],
+                            gt_center[box_label_mask==1][0]]).view(-1,6).cpu().numpy(),
+                    'logs/debug/referred_center.ply')
+        write_pc_as_ply(gt_center[box_label_mask==1][0].view(-1,3).cpu().numpy(),'logs/debug/gt_center2.ply')
+        write_pc_as_ply(seed_xyz[0].view(-1,3).cpu().numpy(),'logs/debug/prediction_proposal_points2.ply')
+    """
+    
+
+
     """
     # Assign each point to a GT object
     end_points['point_instance_label'] contain foreground and background information, -1 background,0 foreground 
@@ -221,14 +233,14 @@ def compute_points_obj_cls_loss_hard_topk(end_points, topk):
 
     
     """
-    # Normalized distances of points and gt centroids, 
-    # calcualte the  distance between proposals and  referred target, 
+        # Normalized distances of points and gt centroids, 
+        # calcualte the  distance between proposals and  referred target, 
 
-    seed_xyz.unsqueeze(2): torch.Size([12, 1024, 1, 3])
-    gt_center.unsqueeze(2): torch.Size([12, 1, 132, 3])
-    namely, the distances between the 1024 proposals and 132 targets
-    - there are large number of padding target in 132 targets
-    
+        seed_xyz.unsqueeze(2): torch.Size([12, 1024, 1, 3])
+        gt_center.unsqueeze(2): torch.Size([12, 1, 132, 3])
+        namely, the distances between the 1024 proposals and 132 targets
+        - there are large number of padding target in 132 targets
+        
     """
     delta_xyz = seed_xyz.unsqueeze(2) - gt_center.unsqueeze(1)  # (B, K, G, 3)
     delta_xyz = delta_xyz / (gt_size.unsqueeze(1) + 1e-6)  # (B, K, G, 3)
@@ -286,29 +298,44 @@ def compute_points_obj_cls_loss_hard_topk(end_points, topk):
         objectness_label.unsqueeze(-1), #* [12, 1024, 1]
         weights=cls_weights
     )
+    
+
     objectness_loss = cls_loss_src.sum() / B
 
     end_points['objectness_loss'] = objectness_loss.clone()
 
+    
+
     """
+        # objectness_label.sum()/torch.tensor(objectness_label.shape).prod()
+        # write_pc_as_ply(seed_xyz[0][objectness_label[0]==1].cpu().numpy(),'logs/debug/generated_by_topk2.ply')
+
+
         how many point is true positive in the topk close to referred target point.
+        total_num_points = B * K
+        data_dict[f'points_hard_topk{topk}_pos_ratio'] = \
+            torch.sum(objectness_label.float()) / float(total_num_points)
+        data_dict[f'points_hard_topk{topk}_neg_ratio'] = 1 - data_dict[f'points_hard_topk{topk}_pos_ratio']
     """
-    # total_num_points = B * K
-    # data_dict[f'points_hard_topk{topk}_pos_ratio'] = \
-    #     torch.sum(objectness_label.float()) / float(total_num_points)
-    # data_dict[f'points_hard_topk{topk}_neg_ratio'] = 1 - data_dict[f'points_hard_topk{topk}_pos_ratio']
+    
 
     ref_use_obj_mask= False
     if 'kps_ref_score' in end_points.keys():
-        #*====================================
-        #* data_dict['point_instance_label'] : 不太一样, 这个point_instance_label 有多个 target 
-        #* 3D SPS 每个sample 默认只有一个目标 by default
-        #*====================================
+        """
+            #*====================================
+            #* data_dict['point_instance_label'] : 不太一样, 这个point_instance_label 有多个 target 
+            #* 3D SPS 每个sample 默认只有一个目标 by default
+            #*====================================
+            write_pc_as_ply(seed_xyz[0][point_ref_mask[0]==1].view(-1,3).cpu().numpy(),'logs/debug/one.ply')
+            write_pc_as_ply(end_points['query_points_xyz'][0][point_ref_mask[0]==1].view(-1,3).cpu().numpy(),'logs/debug/two.ply')
+        """
 
         point_ref_mask = point_instance_label #! error
         point_ref_mask = (point_ref_mask!=-1)*1 #* -1 表示背景, 其他都表示referred target
         point_ref_mask = torch.gather(point_ref_mask, 1, seed_inds)
 
+        
+        
         if 'ref_query_points_sample_inds' in end_points.keys():
 
             query_points_sample_inds = end_points['query_points_sample_inds'].long()[supervised_inds,:]
@@ -318,7 +345,6 @@ def compute_points_obj_cls_loss_hard_topk(end_points, topk):
                 obj_mask = torch.gather(objectness_label, 1, query_points_sample_inds)
                 point_ref_mask = point_ref_mask * obj_mask
 
-        #* CLS 计算的score 
         kps_ref_score = end_points['kps_ref_score'][supervised_inds,:,:]      # [B, 1, N]
         cls_weights = torch.ones((B, kps_ref_score.shape[-1])).cuda().float()
         cls_normalizer = cls_weights.sum(dim=1, keepdim=True).float()
