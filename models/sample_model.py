@@ -54,29 +54,40 @@ class SamplingModule(nn.Module):
             data_dict['seeds_obj_cls_logits'] = points_obj_cls_logits
             points_obj_cls_scores = torch.sigmoid(points_obj_cls_logits).squeeze(1)
             sample_inds = torch.topk(points_obj_cls_scores, self.num_proposal)[1].int()
+
             xyz, features, sample_inds = self.gsample_module(xyz, features, sample_inds)
             # cluster_feature = features
             # cluster_xyz = xyz
             data_dict['query_points_xyz'] = xyz  # (batch_size, num_proposal, 3)
             data_dict['query_points_feature'] = features  # (batch_size, C, num_proposal)
             data_dict['query_points_sample_inds'] = sample_inds  # (bsz, num_proposal) # should be 0,1,...,num_proposal
+
         elif self.sampling_method == 'kpsa-lang-filter':
-            B,C,M=features.shape#* M = 1024
+            """
+                from 1024 proposals to  640 porposals which appear in the scene with large proability. 
+                from 640 proposals  to  256 proposals which mentioned by the sentence with large proability      
+            """
+            B,C,M=features.shape#* M = 1024, namely, proposal is 1024, channel is 256, 
             points_obj_cls_logits = self.points_obj_cls(features)  #* (batch_size, 1, num_seed) , 分类每个点是否在near the object center ? 
-            data_dict['seeds_obj_cls_logits'] = points_obj_cls_logits
+            data_dict['seeds_obj_cls_logits'] = points_obj_cls_logits #* object score, play as 3D detector!
             points_obj_cls_scores = torch.sigmoid(points_obj_cls_logits).squeeze(1)
-            sample_inds = torch.topk(points_obj_cls_scores, int((M + self.num_proposal) / 2))[1].int()#* 取得分最大的 int((1024 + self.num_proposal) / 2) 个点的index , 
+            sample_inds = torch.topk(points_obj_cls_scores, int((M + self.num_proposal) / 2))[1].int()#* 取得分最大的 int((1024 + self.num_proposal) / 2) 个点的index ,  namely, 640 proposals
             xyz, features, sample_inds = self.sa_module(xyz, features, sample_inds)
             # cluster_feature = features
             # cluster_xyz = xyz
             data_dict['query_points_xyz'] = xyz  # (batch_size, num_proposal, 3)
             data_dict['query_points_feature'] = features  # (batch_size, C, num_proposal)
             data_dict['query_points_sample_inds'] = sample_inds  # (bsz, num_proposal) # should be 0,1,...,num_proposal
-            ref_scores = self.match_module(features, data_dict['lang_hidden'], data_dict)#* data_dict['lang_hidden'] : [B, lang_feature_dim]
+
+            #* data_dict['lang_hidden'] : [B, lang_feature_dim]
+            ref_scores = self.match_module(features, 
+                            data_dict['lang_hidden'])
+
+            data_dict['kps_ref_score'] = ref_scores
 
             ref_scores = torch.sigmoid(ref_scores).squeeze(1)   # [B, N]
             sample_inds = torch.topk(ref_scores, self.num_proposal)[1].int()
-            xyz, features, sample_inds = self.gsample_module(xyz, features, sample_inds)
+            xyz, features, sample_inds = self.gsample_module(xyz, features, sample_inds) #* 256 proposal left, 
             data_dict['ref_query_points_xyz'] = xyz  # (batch_size, num_proposal, 3)
             data_dict['ref_query_points_feature'] = features  # (batch_size, C, num_proposal)
             data_dict['ref_query_points_sample_inds'] = sample_inds  # (bsz, num_proposal) # should be 0,1,...,num_proposal
@@ -189,7 +200,7 @@ class MatchModule(nn.Module):
             nn.Conv1d(fusion_dim, 1, 1),
         )
 
-    def forward(self, object_feat, lang_feat, data_dict):
+    def forward(self, object_feat, lang_feat):
         """
         Args:
             object_feat: (B,C,num_proposal)
@@ -205,8 +216,6 @@ class MatchModule(nn.Module):
         #todo: 直接concat 然后若干个卷机得到 是否是与文本相关的 similarity , 这个可以改进成计算相似度???
         # match 
         confidences = self.match(features)          # [B, 1, N]
-        
-        data_dict['kps_ref_score'] = confidences
 
         return confidences
 
