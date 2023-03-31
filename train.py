@@ -309,6 +309,7 @@ class SemiSuperviseTrainTester(TrainTester):
                 loss += end_points['consistency_loss']
             
             optimizer.zero_grad()
+            loss.backward()
 
             
             """
@@ -339,8 +340,6 @@ class SemiSuperviseTrainTester(TrainTester):
                 np.quantile(supervised_loss_grad_list, 0.5) : 3.329723404021934e-05
                 np.quantile(supervised_loss_grad_list, 0.75): 0.00023653818061575294
             """
-
-
 
 
             
