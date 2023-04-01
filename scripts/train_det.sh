@@ -23,7 +23,7 @@ test_data=scanrefer
 #* GPU id you need to run this shell 
 gpu_ids="1,2,3,4,5";
 # gpu_ids="5";
-gpu_num=5;
+gpu_num=4;
 
 
 
@@ -34,7 +34,7 @@ box_consistency_weight=1e-2;
 box_giou_consistency_weight=1e-2;
 soft_token_consistency_weight=1e-2;
 object_query_consistency_weight=1;
-text_token_consistency_weight=0;
+text_token_consistency_weight=1e-2;
 
 
 
@@ -44,8 +44,9 @@ ema_decay=0.999;
 ema_decay_after_rampup=0.999;
 port=29522
 epoch=1000;
-b_size='8,4';
-resume_model_path=archive/table1_scanrefer/decay_trial/scanrefer20_3332_480.pth;
+b_size='6,6';
+# resume_model_path=archive/table1_scanrefer/decay_trial/scanrefer20_3332_480.pth;
+resume_model_path=archive/table1_scanrefer/decay_trial/scanrefer20_3301_419.pth;
 labeled_ratio=0.2;
 topk=8;
 decay_epoch="65";
