@@ -21,6 +21,7 @@ import numpy as np
 from IPython import embed
 
 from loguru import logger
+from my_utils.utils import nn_distance
 from my_utils.pc_utils import *
 
 def is_dist_avail_and_initialized():
@@ -225,6 +226,7 @@ def compute_points_obj_cls_loss_hard_topk(end_points, topk):
     rest of the positions equal to 0 
 
     """
+    # todo:  end_points['scene_objs_point_instance_label'][supervised_inds,:]
     point_instance_label = end_points['point_instance_label'][supervised_inds,:]  #* B, num_points
     obj_assignment = torch.gather(point_instance_label, 1, seed_inds)  #* B, K 
     obj_assignment[obj_assignment < 0] = G - 1  #* bg points to last gt, namely, 132; and the foreground points to 0
@@ -330,7 +332,7 @@ def compute_points_obj_cls_loss_hard_topk(end_points, topk):
             write_pc_as_ply(end_points['query_points_xyz'][0][point_ref_mask[0]==1].view(-1,3).cpu().numpy(),'logs/debug/two.ply')
         """
 
-        point_ref_mask = point_instance_label #! error
+        point_ref_mask = end_points['point_instance_label'][supervised_inds,:]  #! error
         point_ref_mask = (point_ref_mask!=-1)*1 #* -1 表示背景, 其他都表示referred target
         point_ref_mask = torch.gather(point_ref_mask, 1, seed_inds)
 
@@ -958,6 +960,28 @@ def compute_labeled_hungarian_loss(end_points, num_decoder_layers, set_criterion
     else:
         query_points_generation_loss = 0.0  
 
+
+    
+
+    #!==========================================
+    
+    
+    """
+    compute the obj loss
+
+    check code : 
+        [end_points['all_bboxes'][idx][x.unique()] for idx, x in enumerate(ind1)]
+    """
+    
+    # all_box = end_points['all_bboxes']
+    # all_box[~end_points['all_bbox_label_mask']] = 1e+6
+    
+    # dist1, ind1, dist2, ind2 = nn_distance(end_points['seed_xyz'],all_box[:,:,:3])
+    # dist1.mean()
+    #!==========================================
+
+
+
     # loss
     loss = (
         8 * query_points_generation_loss
@@ -976,6 +1000,10 @@ def compute_labeled_hungarian_loss(end_points, num_decoder_layers, set_criterion
     end_points['loss'] = loss
 
     return loss, end_points
+
+
+
+
 
 
 ''' 

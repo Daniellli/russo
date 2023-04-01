@@ -24,7 +24,7 @@ from data.model_util_scannet import ScannetDatasetConfig
 from src.joint_det_dataset import *
 from loguru import logger 
 
-
+from my_utils.pc_utils import *
 
 NUM_CLASSES = 485
 DC = ScannetDatasetConfig(NUM_CLASSES)
@@ -243,8 +243,12 @@ class JointSemiSupervisetDataset(Joint3DDataset):
 
         #* Scene gt boxes, 
         (
-            class_ids, all_bboxes, all_bbox_label_mask
+            class_ids, all_bboxes, all_bbox_label_mask,scene_objs_point_instance_label
         ) = self._get_scene_objects(scan)
+
+
+
+
 
         #* Detected boxes
         (
@@ -252,14 +256,21 @@ class JointSemiSupervisetDataset(Joint3DDataset):
             detected_class_ids, detected_logits
         ) = self._get_detected_objects(split, anno['scan_id'], augmentations)
 
-        #!===================
+
         #* wrong
         # teacher_box = all_bboxes.copy()
         # teacher_box = self.transformation_box(teacher_box,augmentations)
         #* right 
         teacher_box = origin_box
 
-        #!===================
+
+        """
+        write_ply(point_cloud[:,:3], 'logs/debug/ddebug/pc.ply')
+        write_ply(point_cloud[scene_objs_point_instance_label>=0][:,:3], 'logs/debug/ddebug/scene_obj.ply')
+        """
+        
+        
+        
 
         # Assume a perfect object detector 
         if self.butd_gt:
@@ -346,7 +357,9 @@ class JointSemiSupervisetDataset(Joint3DDataset):
             "point_instance_label": point_instance_label.astype(np.int64),
             "all_bboxes": all_bboxes.astype(np.float32),
             "all_bbox_label_mask": all_bbox_label_mask.astype(np.bool8),
+            "scene_objs_point_instance_label":scene_objs_point_instance_label.astype(np.int64),
             "all_class_ids": class_ids.astype(np.int64),
+
             "distractor_ids": np.array(
                 anno['distractor_ids']
                 + [-1] * (32 - len(anno['distractor_ids']))
@@ -355,6 +368,8 @@ class JointSemiSupervisetDataset(Joint3DDataset):
                 anno['anchor_ids']
                 + [-1] * (32 - len(anno['anchor_ids']))
             ).astype(int),
+
+
             "all_detected_boxes": all_detected_bboxes.astype(np.float32),
             "all_detected_bbox_label_mask": all_detected_bbox_label_mask.astype(np.bool8),
             "all_detected_class_ids": detected_class_ids.astype(np.int64),

@@ -552,10 +552,12 @@ class Joint3DDataset(Dataset):
             if self.detect_intermediate:
                 tids += anno.get('anchor_ids', [])
 
+        
         point_instance_label = -np.ones(len(scan.pc))
         for t, tid in enumerate(tids):
             point_instance_label[scan.three_d_objects[tid]['points']] = t
 
+        
         bboxes[:len(tids)] = np.stack([
             scan.get_object_bbox(tid).reshape(-1) for tid in tids
         ])
@@ -593,6 +595,16 @@ class Joint3DDataset(Dataset):
         class_ids = np.zeros((MAX_NUM_OBJ,))
         class_ids[keep] = cid
 
+        #!===================================================
+        """
+        get obj instance informantion 
+        """
+        point_instance_label = -np.ones(len(scan.pc))
+        for k,kept in enumerate(keep):
+            if kept:
+                point_instance_label[scan.three_d_objects[k]['points']] = k
+        #!===================================================
+
         # Object boxes
         all_bboxes = np.zeros((MAX_NUM_OBJ, 6))
         all_bboxes_ = np.stack([
@@ -610,7 +622,7 @@ class Joint3DDataset(Dataset):
 
         # Which boxes we're interested for
         all_bbox_label_mask = keep
-        return class_ids, all_bboxes, all_bbox_label_mask
+        return class_ids, all_bboxes, all_bbox_label_mask,point_instance_label
 
 
     
@@ -857,7 +869,7 @@ class Joint3DDataset(Dataset):
 
         #* Scene gt boxes, 
         (
-            class_ids, all_bboxes, all_bbox_label_mask
+            class_ids, all_bboxes, all_bbox_label_mask,all_scene_obj_instance,
         ) = self._get_scene_objects(scan)
 
 
@@ -939,6 +951,7 @@ class Joint3DDataset(Dataset):
             "point_instance_label": point_instance_label.astype(np.int64),
             "all_bboxes": all_bboxes.astype(np.float32),
             "all_bbox_label_mask": all_bbox_label_mask.astype(np.bool8),
+            "scene_objs_point_instance_label":scene_objs_point_instance_label.astype(np.int64),
             "all_class_ids": class_ids.astype(np.int64),
             "distractor_ids": np.array(
                 anno['distractor_ids']
