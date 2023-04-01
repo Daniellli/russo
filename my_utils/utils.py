@@ -94,7 +94,7 @@ def parse_semi_supervise_option():
                         nargs='+', help='when to decay lr, can be a list')
     parser.add_argument('--lr_decay_rate', type=float, default=0.1,
                         help='for step scheduler. decay rate for lr')
-    parser.add_argument('--clip_norm', default=10, type=float,
+    parser.add_argument('--clip_norm', default=0.1, type=float,
                         help='gradient clipping max norm')
     parser.add_argument('--bn_momentum', type=float, default=0.1)
     parser.add_argument('--syncbn', action='store_true')
