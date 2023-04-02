@@ -29,8 +29,7 @@ port=29530
 
 #* for  semi supervision architecture  : step1 x
 labeled_ratio=0.2;
-topk=8;
-
+topk=4;
 decay_epoch="25 26";
 epoch=1000;
 

@@ -334,7 +334,7 @@ class SemiSuperviseTrainTester(TrainTester):
 
 
                 #todo  box_consistency_loss
-                ! 1e-1
+                ! 1e-2
                 optimizer.zero_grad()
                 end_points['box_consistency_loss'].backward()
                 consistency_grad_list  = np.array([ x.grad.mean().abs().cpu().numpy() for x in model.parameters() if x.grad is not None ] ) #* shape == 469 
@@ -345,7 +345,7 @@ class SemiSuperviseTrainTester(TrainTester):
 
 
                 #todo  box_giou_consistency_loss
-                ! 1e-2
+                ! 1e-3
                 optimizer.zero_grad()
                 end_points['box_giou_consistency_loss'].backward()
                 consistency_grad_list  = np.array([ x.grad.mean().abs().cpu().numpy() for x in model.parameters() if x.grad is not None ] ) #*  469
@@ -355,7 +355,7 @@ class SemiSuperviseTrainTester(TrainTester):
                 np.quantile(consistency_grad_list, 0.75): 3.0471810532617383e-05
 
                 #todo  soft_token_consistency
-                ! 1e-1
+                ! 1e-2
                 optimizer.zero_grad()
                 end_points['soft_token_consistency'].backward()
                 consistency_grad_list  = np.array([ x.grad.mean().abs().cpu().numpy() for x in model.parameters() if x.grad is not None ] ) #*  413
@@ -367,7 +367,7 @@ class SemiSuperviseTrainTester(TrainTester):
 
 
                 #todo  object_query_consistency_loss
-                ! 1e+5
+                ! 1e+4
                 optimizer.zero_grad()
                 end_points['object_query_consistency_loss'].backward()
                 consistency_grad_list  = np.array([ x.grad.mean().abs().cpu().numpy() for x in model.parameters() if x.grad is not None ] ) #* 363
@@ -377,7 +377,7 @@ class SemiSuperviseTrainTester(TrainTester):
                 np.quantile(consistency_grad_list, 0.75): 2.25773642836824e-10
 
                 #todo  text_token_consistency_loss
-                ! 1e+5
+                ! 1e+4
                 optimizer.zero_grad()
                 end_points['text_token_consistency_loss'].backward()
                 consistency_grad_list  = np.array([ x.grad.mean().abs().cpu().numpy() for x in model.parameters() if x.grad is not None ] ) #* 160

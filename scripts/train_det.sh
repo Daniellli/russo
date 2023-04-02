@@ -31,10 +31,10 @@ gpu_num=4;
 
 #* for not mask 
 box_consistency_weight=1e-2;
-box_giou_consistency_weight=1e-2;
+box_giou_consistency_weight=1e-3;
 soft_token_consistency_weight=1e-2;
-object_query_consistency_weight=1;
-text_token_consistency_weight=0;
+object_query_consistency_weight=1e+4;
+text_token_consistency_weight=1e+4;
 
 
 
