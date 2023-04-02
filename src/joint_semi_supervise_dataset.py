@@ -303,11 +303,6 @@ class JointSemiSupervisetDataset(Joint3DDataset):
             ])
 
 
-
-       
-
-            
-
         ret_dict = {
             'box_label_mask': box_label_mask.astype(np.float32),
             'center_label': gt_bboxes[:, :3].astype(np.float32),

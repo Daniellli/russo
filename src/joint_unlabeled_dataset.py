@@ -382,9 +382,9 @@ class JointUnlabeledDataset(JointSemiSupervisetDataset):
         tokens_positive, positive_map = self._get_token_positive_map(anno)
 
         #* Scene gt boxes, 
-        (
-            class_ids, all_bboxes, all_bbox_label_mask
-        ) = self._get_scene_objects(scan)
+        # (
+        #     class_ids, all_bboxes, all_bbox_label_mask
+        # ) = self._get_scene_objects(scan)
 
         #* Detected boxes
         (
@@ -393,51 +393,42 @@ class JointUnlabeledDataset(JointSemiSupervisetDataset):
         ) = self._get_detected_objects(split, anno['scan_id'], augmentations)
 
         #!===================
-        #* wrong
-        # teacher_box = all_bboxes.copy()
-        # teacher_box = self.transformation_box(teacher_box,augmentations)
-        #* right 
-        teacher_box = origin_box
-
+        # teacher_box = origin_box
         #!===================
 
         # Assume a perfect object detector 
-        if self.butd_gt:
-            all_detected_bboxes = all_bboxes #* 使用groundtruth bbox
-            all_detected_bbox_label_mask = all_bbox_label_mask
-            detected_class_ids = class_ids
+        # if self.butd_gt:
+        #     all_detected_bboxes = all_bboxes #* 使用groundtruth bbox
+        #     all_detected_bbox_label_mask = all_bbox_label_mask
+        #     detected_class_ids = class_ids
 
         # Assume a perfect object proposal stage
-        if self.butd_cls:
-            all_detected_bboxes = all_bboxes #? 那么  这个detected box 和 auged  pc 能对应上吗? 
-            all_detected_bbox_label_mask = all_bbox_label_mask
-            detected_class_ids = np.zeros((len(all_bboxes,)))
-            classes = np.array(self.cls_results[anno['scan_id']])
-            detected_class_ids[all_bbox_label_mask] = classes[classes > -1]
+        # if self.butd_cls:
+        #     all_detected_bboxes = all_bboxes #? 那么  这个detected box 和 auged  pc 能对应上吗? 
+        #     all_detected_bbox_label_mask = all_bbox_label_mask
+        #     detected_class_ids = np.zeros((len(all_bboxes,)))
+        #     classes = np.array(self.cls_results[anno['scan_id']])
+        #     detected_class_ids[all_bbox_label_mask] = classes[classes > -1]
 
 
         # Visualize for debugging
-        if self.visualize and anno['dataset'].startswith('sr3d'):
-            self._visualize_scene(anno, point_cloud, og_color, all_bboxes)
+        # if self.visualize and anno['dataset'].startswith('sr3d'):
+        #     self._visualize_scene(anno, point_cloud, og_color, all_bboxes)
 
 
         # Return
-        _labels = np.zeros(MAX_NUM_OBJ)
-        if not isinstance(anno['target_id'], int) and not self.random_utt:
-            _labels[:len(anno['target_id'])] = np.array([
-                DC18.nyu40id2class[self.label_map18[
-                    scan.get_object_instance_label(ind)
-                ]]
-                for ind in anno['target_id']
-            ])
-
-
-
-       
-
+        # _labels = np.zeros(MAX_NUM_OBJ)
+        # if not isinstance(anno['target_id'], int) and not self.random_utt:
+        #     _labels[:len(anno['target_id'])] = np.array([
+        #         DC18.nyu40id2class[self.label_map18[
+        #             scan.get_object_instance_label(ind)
+        #         ]]
+        #         for ind in anno['target_id']
+        #     ])
             
 
         ret_dict = {
+
 
         }
         
@@ -452,11 +443,14 @@ class JointUnlabeledDataset(JointSemiSupervisetDataset):
             "all_detected_bbox_label_mask": all_detected_bbox_label_mask.astype(np.bool8),
             "all_detected_class_ids": detected_class_ids.astype(np.int64),
             "all_detected_logits": detected_logits.astype(np.float32),
+
             "is_view_dep": self._is_view_dep(anno['utterance']),
             "is_hard": len(anno['distractor_ids']) > 1,
             "is_unique": len(anno['distractor_ids']) == 0,
             "pc_before_aug":origin_pc.astype(np.float32),
-            "teacher_box":teacher_box.astype(np.float32),
+
+            # "teacher_box":teacher_box.astype(np.float32),
+
             "augmentations":augmentations,
             "supervised_mask":np.array(0).astype(np.int64)
 

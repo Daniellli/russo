@@ -305,21 +305,27 @@ class SemiSuperviseTrainTester(TrainTester):
 
             
             # if hasattr(end_points,'consistency_loss'):
-            if end_points.get('consistency_loss')  is not None  :
+            if end_points.get('consistency_loss')  is not None :
                 loss += end_points['consistency_loss']
             
             optimizer.zero_grad()
             loss.backward()
 
-            
+
+
+
+
+
+
             """
             #todo statistics of gradient of consistency loss 
+            #todo all  consistency loss
             optimizer.zero_grad()
             end_points['consistency_loss'].backward()
             consistency_grad_list  = np.array([ x.grad.mean().abs().cpu().numpy() for x in model.parameters() if x.grad is not None ] ) #!  shape == 537
+                ! 1e-2
 
-
-                consistency_grad_list.mean(): 0.0026668846
+                consistency_grad_list.mean(): 0.0026668846 ~= 1e-3
                 np.quantile(consistency_grad_list, 0.25): 1.2040888577757869e-05
                 np.quantile(consistency_grad_list, 0.5) : 0.000193803571164608
                 np.quantile(consistency_grad_list, 0.75): 0.00132876040879637
@@ -327,7 +333,64 @@ class SemiSuperviseTrainTester(TrainTester):
 
 
 
-          
+                #todo  box_consistency_loss
+                ! 1e-1
+                optimizer.zero_grad()
+                end_points['box_consistency_loss'].backward()
+                consistency_grad_list  = np.array([ x.grad.mean().abs().cpu().numpy() for x in model.parameters() if x.grad is not None ] ) #* shape == 469 
+                consistency_grad_list.mean() : 0.00063412037 ~= 1e-4
+                np.quantile(consistency_grad_list, 0.25): 4.6748300519539043e-07
+                np.quantile(consistency_grad_list, 0.50): 4.3347858991182875e-06
+                np.quantile(consistency_grad_list, 0.75): 1.6983083696686663e-05
+
+
+                #todo  box_giou_consistency_loss
+                ! 1e-2
+                optimizer.zero_grad()
+                end_points['box_giou_consistency_loss'].backward()
+                consistency_grad_list  = np.array([ x.grad.mean().abs().cpu().numpy() for x in model.parameters() if x.grad is not None ] ) #*  469
+                consistency_grad_list.mean() : 0.0012814564  ~= 1e-3
+                np.quantile(consistency_grad_list, 0.25): 1.029473992275598e-06
+                np.quantile(consistency_grad_list, 0.50): 7.392642601189436e-06
+                np.quantile(consistency_grad_list, 0.75): 3.0471810532617383e-05
+
+                #todo  soft_token_consistency
+                ! 1e-1
+                optimizer.zero_grad()
+                end_points['soft_token_consistency'].backward()
+                consistency_grad_list  = np.array([ x.grad.mean().abs().cpu().numpy() for x in model.parameters() if x.grad is not None ] ) #*  413
+                consistency_grad_list.mean() :0.00094349677 ~= 1e-4
+                np.quantile(consistency_grad_list, 0.25): 1.0237007700197864e-05
+                np.quantile(consistency_grad_list, 0.50): 0.00016761098231654614 ~= 1e-4
+                np.quantile(consistency_grad_list, 0.75) : 0.0009315624483861029 ~=1e-4
+
+
+
+                #todo  object_query_consistency_loss
+                ! 1e+5
+                optimizer.zero_grad()
+                end_points['object_query_consistency_loss'].backward()
+                consistency_grad_list  = np.array([ x.grad.mean().abs().cpu().numpy() for x in model.parameters() if x.grad is not None ] ) #* 363
+                consistency_grad_list.mean(): 3.8844977e-10 
+                np.quantile(consistency_grad_list, 0.25):  6.471348196895876e-12
+                np.quantile(consistency_grad_list, 0.50): 6.054316770143231e-11
+                np.quantile(consistency_grad_list, 0.75): 2.25773642836824e-10
+
+                #todo  text_token_consistency_loss
+                ! 1e+5
+                optimizer.zero_grad()
+                end_points['text_token_consistency_loss'].backward()
+                consistency_grad_list  = np.array([ x.grad.mean().abs().cpu().numpy() for x in model.parameters() if x.grad is not None ] ) #* 160
+                consistency_grad_list.mean(): 5.797127e-10
+                np.quantile(consistency_grad_list, 0.25): 2.237391955733914e-11
+                np.quantile(consistency_grad_list, 0.50): 1.6997551977038228e-10
+                np.quantile(consistency_grad_list, 0.75): 5.581175244184777e-10
+
+
+
+
+
+            #todo   supervised loss
             first iteration: 
             optimizer.zero_grad()
             loss.backward()
