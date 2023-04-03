@@ -30,9 +30,24 @@ gpu_num=4;
 
 
 #* for not mask 
-box_consistency_weight=1e-2;
-box_giou_consistency_weight=1e-3;
-soft_token_consistency_weight=1e-2;
+# box_consistency_weight=1e-2;
+# box_giou_consistency_weight=1e-3;
+# soft_token_consistency_weight=1e-2;
+# object_query_consistency_weight=1e+4;
+# text_token_consistency_weight=1e+4;
+
+
+# """
+# #todo 
+# 1. consistency between decoder 
+# 1.1. the object-level consistency
+# 1.2. the target-level consistency 
+# 1.3. the feature-level consistency ----doing 
+# """
+
+box_consistency_weight=0;
+box_giou_consistency_weight=0;
+soft_token_consistency_weight=0;
 object_query_consistency_weight=1e+4;
 text_token_consistency_weight=1e+4;
 

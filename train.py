@@ -219,7 +219,8 @@ class SemiSuperviseTrainTester(TrainTester):
             "EMAMisc/box_giou_consistency_weight":box_giou_consistency_weight,
             "EMAMisc/soft_token_consistency_weight":soft_token_consistency_weight,
             "EMAMisc/object_query_consistency_weight":object_query_consistency_weight,
-            "EMAMisc/text_token_consistency_weight":text_token_consistency_weight
+            "EMAMisc/text_token_consistency_weight":text_token_consistency_weight,
+            "epoch":epoch
         })
         
         
