@@ -2,7 +2,7 @@
 ###
  # @Author: daniel
  # @Date: 2023-03-28 23:07:11
- # @LastEditTime: 2023-03-30 00:09:36
+ # @LastEditTime: 2023-04-03 08:40:19
  # @LastEditors: daniel
  # @Description: 
  # @FilePath: /butd_detr/scripts/pretrain_det_sr3d.sh
@@ -20,7 +20,7 @@ test_data=sr3d
 DATA_ROOT=datasets/
 
 #* GPU id you need to run this shell 
-gpu_ids="0,1,2,3";
+gpu_ids="1,2,3,4";
 gpu_num=4;
 
 #* batch size 
@@ -29,7 +29,8 @@ port=29530
 
 #* for  semi supervision architecture  : step1 x
 labeled_ratio=0.2;
-topk=4;
+topk=50;
+
 decay_epoch="25 26";
 epoch=1000;
 
@@ -47,11 +48,11 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --labeled_ratio $labeled_ratio \
     --max_epoch $epoch \
     --lr_decay_epochs $decay_epoch \
-    --upload-wandb \
+    --upload-wandb --use-tkps \
     2>&1 | tee -a logs/pretrain_cls.log
 
 
-#  --use-tkps
+ 
 # --lr-scheduler '
 # --checkpoint_path $resume_model_path 
 # --lr_decay_intermediate \
