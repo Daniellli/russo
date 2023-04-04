@@ -2,7 +2,7 @@
 ###
  # @Author: daniel
  # @Date: 2023-03-28 23:07:11
- # @LastEditTime: 2023-04-04 09:36:47
+ # @LastEditTime: 2023-04-04 15:19:31
  # @LastEditors: daniel
  # @Description: 
  # @FilePath: /butd_detr/scripts/pretrain_det_sr3d.sh
@@ -49,9 +49,9 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --labeled_ratio $labeled_ratio \
     --max_epoch $epoch \
     --lr_decay_epochs $decay_epoch \
-    --use-tkps \
+    --use-tkps --upload-wandb \
     2>&1 | tee -a logs/pretrain_cls.log
-# --upload-wandb 
+
 
  
 # --lr-scheduler '

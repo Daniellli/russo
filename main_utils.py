@@ -443,7 +443,7 @@ class BaseTrainTester:
                 
                 if dist.get_rank() == 0:
                     if args.upload_wandb:
-                        wandb.log(performance)
+                        self.wandb_log(performance)
                         
                         
                     with open(save_dir, 'a+')as f :
@@ -453,7 +453,8 @@ class BaseTrainTester:
                     if performance is not None and performance[acc_key] > best_performce:
                         best_performce =  performance[acc_key]
                         spath = save_checkpoint(args, epoch, model, optimizer, scheduler ,is_best=True)
-                        wandb.log({'Metrics/best_acc':best_performce})
+                        self.wandb_log({'Metrics/best_acc':best_performce})
+                        
 
                         if last_best_epoch_path is not None:
                             os.remove(last_best_epoch_path)
@@ -577,7 +578,7 @@ class BaseTrainTester:
                     
                     tmp = { f'Loss/{key}':stat_dict[key] / args.print_freq  for key in sorted(stat_dict.keys()) if 'loss' in key and 'proposal_' not in key and 'last_' not in key and 'head_' not in key }
                     tmp.update({"Misc/lr": scheduler.get_last_lr()[0],'Misc/grad_norm':stat_dict['grad_norm'],'epoch':epoch})
-                    wandb.log(tmp)
+                    self.wandb_log(tmp)
 
                 for key in sorted(stat_dict.keys()):
                     stat_dict[key] = 0
