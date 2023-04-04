@@ -19,7 +19,7 @@ import os.path as osp
 import numpy as np
 
 from IPython import embed
-
+from my_utils.pc_utils import * 
 from loguru import logger
 from my_utils.utils import nn_distance
 from my_utils.pc_utils import *
@@ -191,10 +191,21 @@ def compute_points_obj_cls_loss_hard_topk(end_points, topk):
     seed_inds = end_points['seed_inds'][supervised_inds,:].long()  # B, K
     seed_xyz = end_points['seed_xyz'][supervised_inds,:,:]  # B, K, 3
     seeds_obj_cls_logits = end_points['seeds_obj_cls_logits'][supervised_inds,:,:]  # B, 1, K
+    
 
-    box_label_mask = end_points['box_label_mask'][supervised_inds,:]
-    gt_center = end_points['center_label'][supervised_inds, :, :3]  # B, G, 3
-    gt_size = end_points['size_gts'][supervised_inds, :, :3]  # B, G, 3
+    #!+=====================================================================================================
+    # box_label_mask = end_points['box_label_mask'][supervised_inds,:]
+    # gt_center = end_points['center_label'][supervised_inds, :, :3]  # B, G, 3
+    # gt_size = end_points['size_gts'][supervised_inds, :, :3]  # B, G, 3
+
+    box_label_mask = end_points['all_bbox_label_mask'][supervised_inds,:].int()
+    gt_center = end_points['all_bboxes'][supervised_inds, :, :3]  # B, G, 3
+    gt_size = end_points['all_bboxes'][supervised_inds, :, 3:]  # B, G, 3
+
+    # write_pc_as_ply(seed_xyz[0].view(-1,3).cpu().numpy(),'logs/debug/prediction_proposal_points.ply')
+    # write_bbox(torch.cat([gt_center[0],gt_size[0]],axis=-1)[box_label_mask[0]==1].view(-1,6).cpu().numpy(),'logs/debug/scene_boxes.ply')
+    # write_pc_as_ply(gt_center[0][box_label_mask[0]==1].view(-1,3).cpu().numpy(),'logs/debug/scene_center.ply')
+    #!+=====================================================================================================
 
     B = gt_center.shape[0]  # batch size
     K = seed_xyz.shape[1]  # number if points from p++ output
@@ -227,7 +238,11 @@ def compute_points_obj_cls_loss_hard_topk(end_points, topk):
 
     """
     # todo:  end_points['scene_objs_point_instance_label'][supervised_inds,:]
-    point_instance_label = end_points['point_instance_label'][supervised_inds,:]  #* B, num_points
+    #!+=====================================================================================================
+    # point_instance_label = end_points['point_instance_label'][supervised_inds,:]  #* B, num_points
+    point_instance_label = end_points['scene_objs_point_instance_label'][supervised_inds,:]  #* B, num_points
+    
+    #!+=====================================================================================================
     obj_assignment = torch.gather(point_instance_label, 1, seed_inds)  #* B, K 
     obj_assignment[obj_assignment < 0] = G - 1  #* bg points to last gt, namely, 132; and the foreground points to 0
     obj_assignment_one_hot = torch.zeros((B, K, G)).to(seed_xyz.device)
@@ -280,12 +295,16 @@ def compute_points_obj_cls_loss_hard_topk(end_points, topk):
         namely, through there are large number of repeated objects (repeated indices)
 
         so the 
+
+        write_pc_as_ply(seed_xyz[0][objectness_label[0]==1].view(-1,3).cpu().numpy(),'logs/debug/prediction_proposal_gt_generated_by_scene_boxes.ply')
     """
     objectness_label = torch.zeros((B, K + 1)).long().to(seed_xyz.device)
     objectness_label[batch_topk_inds[:, 0], batch_topk_inds[:, 1]] = 1 #? how does it wori
     objectness_label = objectness_label[:, :K]
     objectness_label_mask = torch.gather(point_instance_label, 1, seed_inds)
     objectness_label[objectness_label_mask < 0] = 0 #* mark the bg points to 0 
+
+ 
 
     # Compute objectness loss
     criterion = SigmoidFocalClassificationLoss()
@@ -321,7 +340,7 @@ def compute_points_obj_cls_loss_hard_topk(end_points, topk):
     """
     
 
-    ref_use_obj_mask= False
+    ref_use_obj_mask= True
     if 'kps_ref_score' in end_points.keys():
         """
             #*====================================
@@ -332,7 +351,7 @@ def compute_points_obj_cls_loss_hard_topk(end_points, topk):
             write_pc_as_ply(end_points['query_points_xyz'][0][point_ref_mask[0]==1].view(-1,3).cpu().numpy(),'logs/debug/two.ply')
         """
 
-        point_ref_mask = end_points['point_instance_label'][supervised_inds,:]  #! error
+        point_ref_mask = end_points['point_instance_label'][supervised_inds,:]  
         point_ref_mask = (point_ref_mask!=-1)*1 #* -1 表示背景, 其他都表示referred target
         point_ref_mask = torch.gather(point_ref_mask, 1, seed_inds)
 
