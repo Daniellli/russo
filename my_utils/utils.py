@@ -258,7 +258,7 @@ def parse_option():
     parser.add_argument("--rng_seed", type=int, default=0, help='manual seed')
     parser.add_argument("--debug", action='store_true',
                         help="try to overfit few samples")
-    parser.add_argument('--eval', default=False, action='store_true')
+    parser.add_argument('--eval', action='store_true')
     parser.add_argument('--eval-scanrefer', default=False, action='store_true',help=' generate the pred.json for the ')
     parser.add_argument('--eval_train', action='store_true')
     parser.add_argument('--pp_checkpoint', default=None)
@@ -771,8 +771,7 @@ def my_parse_prediction(end_points):
 def save_box(box,path):
     np.savetxt(path,box,fmt='%s')
 
-def save_pc(pc,path):
-    write_pc_as_ply(pc,path)
+
 
 
 '''

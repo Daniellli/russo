@@ -2,7 +2,7 @@
 ###
  # @Author: daniel
  # @Date: 2023-03-28 23:07:11
- # @LastEditTime: 2023-04-04 15:19:31
+ # @LastEditTime: 2023-04-06 09:05:10
  # @LastEditors: daniel
  # @Description: 
  # @FilePath: /butd_detr/scripts/pretrain_det_sr3d.sh
@@ -32,7 +32,7 @@ labeled_ratio=0.2;
 #* 10-18 for scene obj boxes as supervised signal 
 topk=16;
 
-decay_epoch="25 26";
+decay_epoch="20 23";
 epoch=1000;
 
 
@@ -50,8 +50,12 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --max_epoch $epoch \
     --lr_decay_epochs $decay_epoch \
     --use-tkps --upload-wandb \
+    --checkpoint_path logs/bdetr/sr3d/1680711156/ckpt_epoch_111_best.pth \
+    --lr_decay_intermediate \
     2>&1 | tee -a logs/pretrain_cls.log
 
+# logs/bdetr/sr3d/1680657105/ckpt_epoch_96_best.pth
+# logs/bdetr/sr3d/1680711156/ckpt_epoch_111_best.pth
 
  
 # --lr-scheduler '

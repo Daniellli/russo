@@ -84,8 +84,20 @@ class JointLabeledDataset(JointSemiSupervisetDataset):
             for anno in reader
             if anno['scene_id'] in scan_ids
         ]
-        # Fix missing target reference
-        for anno in annos:
+        """"
+        # Fix missing target reference 
+        for example: 
+            target label : kitchen counter , which not appear in the sentence:
+            'it is a light gray counter . it sit on top of wooden cabinets that go along one side of the kitchen . it is on the same side of the kitchen as the refrigerator .' 
+
+            so after fixing, the sentence become :
+
+            'it is a light gray kitchen counter . it sit on top of wooden cabinets that go along one side of the kitchen . it is on the same side of the kitchen as the refrigerator .'
+
+        
+        """
+        
+        for anno in annos: 
             if anno['target'] not in anno['utterance']:
                 anno['utterance'] = (
                     ' '.join(anno['utterance'].split(' . ')[0].split()[:-1])
@@ -104,13 +116,20 @@ class JointLabeledDataset(JointSemiSupervisetDataset):
                 range(len(self.scans[anno['scan_id']].three_d_objects))
             ]
             labels = [DC18.type2class.get(lbl, 17) for lbl in nyu_labels]
+
+            """
+                distractor: the obj has same label with target.  
+
+                #* the max distractor number is 32... 
+            """
             anno['distractor_ids'] = [
                 ind
                 for ind in
                 range(len(self.scans[anno['scan_id']].three_d_objects))
                 if labels[ind] == labels[anno['target_id']]
                 and ind != anno['target_id']
-            ][:32]
+            ][:32] 
+
             if anno['target_id'] not in sceneobj2used[anno['scan_id']]:
                 sceneobj2used[anno['scan_id']].append(anno['target_id'])
                 scene2obj[anno['scan_id']].append(labels[anno['target_id']])
@@ -124,11 +143,26 @@ class JointLabeledDataset(JointSemiSupervisetDataset):
                 range(len(self.scans[anno['scan_id']].three_d_objects))
             ]
             labels = [DC18.type2class.get(lbl, 17) for lbl in nyu_labels]
+            """"
+                np.array(scene2obj[anno['scan_id']]): return all label of object existing in the scene 
+                labels[anno['target_id']]: the label of refered target  
+            """
             anno['unique'] = (
                 np.array(scene2obj[anno['scan_id']])
                 == labels[anno['target_id']]
             ).sum() == 1
+
+        #!+=====================================================1. for plot qualitive result ===============================================
+        # pick_up_list = np.loadtxt('logs/find_by05iou_list.txt',dtype=np.str0)
+        # new_annos = []
+        # for ann in annos:
+        #     scene_name  = "__".join([ann['scan_id'],str(ann['target_id']), ann['ann_id']])
+        #     if scene_name in pick_up_list:
+        #         new_annos.append(ann)
+        # return new_annos
+        #!+==================================================================================================================================
         return annos
+        
 
 
         

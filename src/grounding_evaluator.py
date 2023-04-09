@@ -13,13 +13,14 @@ import utils.misc as misc
 
 import ipdb
 
+
 from IPython import embed
 st = ipdb.set_trace
 from my_utils.utils import dump_json
 
-
-
-
+import json
+import numpy as np
+from collections import Counter
 
 class GroundingEvaluator:
     """
@@ -131,7 +132,7 @@ class GroundingEvaluator:
 
         # Parse predictions
         sem_scores = end_points[f'{prefix}sem_cls_scores'].softmax(-1)
-
+       
         if sem_scores.shape[-1] != positive_map.shape[-1]:
             sem_scores_ = torch.zeros(
                 sem_scores.shape[0], sem_scores.shape[1],
@@ -145,21 +146,38 @@ class GroundingEvaluator:
         assert (pred_size < 0).sum() == 0
         pred_bbox = torch.cat([pred_center, pred_size], dim=-1)
 
+        
+        """"
         # Highest scoring box -> iou
+        
+        calculate the metric for each  sample.
+        
+        """
         for bid in range(len(positive_map)):
             # Keep scores for annotated objects only
             num_obj = int(end_points['box_label_mask'][bid].sum())
             pmap = positive_map[bid, :num_obj]
+            """
+                use the predict soft token span to filter the predicted topk target;
+
+                specifically: pred_score X  gt_span, then get the topk k  query for each gt target. 
+            """
             scores = (
                 sem_scores[bid].unsqueeze(0)  # (1, Q, 256)
                 * pmap.unsqueeze(1)  # (obj, 1, 256)
             ).sum(-1)  # (obj, Q)
 
-            # 10 predictions per gt box
+            #* 10 predictions per gt box
             top = scores.argsort(1, True)[:, :10]  # (obj, 10)
             pbox = pred_bbox[bid, top.reshape(-1)]
 
-            # IoU
+            
+            """"
+                after attain the topk span_score predicted  object, 
+                we use the iou to calculate the metrics
+
+                # IoU
+            """
             ious, _ = _iou3d_par(
                 box_cxcyczwhd_to_xyzxyz(gt_bboxes[bid][:num_obj]),  # (obj, 6)
                 box_cxcyczwhd_to_xyzxyz(pbox)  # (obj*10, 6)
@@ -167,14 +185,38 @@ class GroundingEvaluator:
             ious = ious.reshape(top.size(0), top.size(0), top.size(1))
             ious = ious[torch.arange(len(ious)), torch.arange(len(ious))]
 
-            # Measure IoU>threshold, ious are (obj, 10)
+            #* Measure IoU>threshold, ious are (obj, 10)
             topks = self.topks
-            for t in self.thresholds:
+            for t in self.thresholds: #* self.thresholds : [0.25,0.50]
                 thresholded = ious > t
-                for k in topks:
+                for k in topks:#* topks == [1,5,10]
                     found = thresholded[:, :k].any(1)
                     self.dets[(prefix, t, k, 'bbs')] += found.sum().item()
                     self.gts[(prefix, t, k, 'bbs')] += len(thresholded)
+
+            
+            """
+                #todo  save the best scene  
+                the metric is calculated by 
+                    Acc: {self.dets[(prefix, mode)] / self.gts[(prefix, mode)]}
+            """
+            # if prefix == 'last_':
+            #     curent_scene_name = '__'.join(
+            #             [end_points['scan_ids'][bid],
+            #             end_points['target_id'][bid].cpu().numpy().astype(np.str0).tolist(),
+            #             end_points['ann_id'][bid]])
+                        
+            #     metric = {}
+            #     thresholded = ious > 0.5
+            #     current_found = 0
+            #     for k in topks: #* topks == [1,5,10]
+            #         found = thresholded[:, :k].any(1)
+            #         current_found += found.sum().item()
+            #     metric['0.5'] = round(current_found/(len(thresholded) * len(topks)),4)
+                
+            #     with open(f'logs/debug/scanrefer_eval_score_for_each_scene/{curent_scene_name}.json', 'w') as f :
+            #         json.dump(metric,f)
+                    
 
 
         
@@ -198,16 +240,31 @@ class GroundingEvaluator:
         assert (pred_size < 0).sum() == 0
         pred_bbox = torch.cat([pred_center, pred_size], dim=-1)
 
-        proj_tokens = end_points['proj_tokens']  # (B, tokens, 64)
-        proj_queries = end_points[f'{prefix}proj_queries']  # (B, Q, 64)
-        sem_scores = torch.matmul(proj_queries, proj_tokens.transpose(-1, -2))
-        sem_scores_ = (sem_scores / 0.07).softmax(-1)  # (B, Q, tokens)
+        """
+            the predicted target score is represented by :  
+                cosine_similarty(proj_tokens,proj_queries),
+            
+            after the similarity calculation, using softmax transfer the output value range from [-1,1] to [0,1]
+        """
+        proj_tokens = end_points['proj_tokens']  # (B, tokens, 64), token == 32 by defayult
+        proj_queries = end_points[f'{prefix}proj_queries']  # (B, Q, 64), Q == 256 by default
+        sem_scores = torch.matmul(proj_queries, proj_tokens.transpose(-1, -2))  #* the cosine similarity between text token and object query 
+        sem_scores_ = (sem_scores / 0.07).softmax(-1)  # (B, Q, tokens), the range become 0 and 1 
         sem_scores = torch.zeros(sem_scores_.size(0), sem_scores_.size(1), 256)
         sem_scores = sem_scores.to(sem_scores_.device)
+        """"
+        #* sem_scores shape is [B,Q,256], but the [:B,:Q,:token_num] is set as sem_scores_, 
+            namely , the [:B,:Q,token_num:] is zero 
+        """
+        
         sem_scores[:, :sem_scores_.size(1), :sem_scores_.size(2)] = sem_scores_
 
-        # Highest scoring box -> iou
-
+        
+        """
+            # Highest scoring box -> iou
+            the code below is same as  `evaluate_bbox_by_span`
+        
+        """
         for bid in range(len(positive_map)): #* 便利每个batch
             # Keep scores for annotated objects only
             num_obj = int(end_points['box_label_mask'][bid].sum())
@@ -230,7 +287,6 @@ class GroundingEvaluator:
             ious = ious[torch.arange(len(ious)), torch.arange(len(ious))]
 
             # Measure IoU>threshold, ious are (obj, 10)
-            
             for t in self.thresholds:
                 thresholded = ious > t
                 for k in self.topks:
@@ -240,18 +296,21 @@ class GroundingEvaluator:
                     if prefix == 'last_':
                         found = found[0].item()
                         if k == 1 and t == self.thresholds[0]:
+
                             if end_points['is_view_dep'][bid]:
                                 self.gts['vd'] += 1
                                 self.dets['vd'] += found
                             else:
                                 self.gts['vid'] += 1
                                 self.dets['vid'] += found
+
                             if end_points['is_hard'][bid]:
                                 self.gts['hard'] += 1
                                 self.dets['hard'] += found
                             else:
                                 self.gts['easy'] += 1
                                 self.dets['easy'] += found
+
                             if end_points['is_unique'][bid]:
                                 self.gts['unique'] += 1
                                 self.dets['unique'] += found
@@ -260,133 +319,36 @@ class GroundingEvaluator:
                                 self.dets['multi'] += found
                         elif k == 1 and t == self.thresholds[1]:
                             #* ACC@ 0.5
-                            
                             if end_points['is_unique'][bid]:
                                 self.gts['unique@0.50'] += 1
                                 self.dets['unique@0.50'] += found
                             else:
                                 self.gts['multi@0.50'] += 1
                                 self.dets['multi@0.50'] += found
-                   
+            """"
+                calculate the metric for each scene 
+            """
+            # if prefix == 'last_':
+            #     # curent_scene_name = end_points['scan_ids'][bid]
+            #     curent_scene_name = '__'.join(
+            #             [end_points['scan_ids'][bid],
+            #             end_points['target_id'][bid].cpu().numpy().astype(np.str0).tolist(),
+            #             end_points['ann_id'][bid]])
+                        
 
+            #     end_points['scan_ids'][bid],end_points['target_id'][bid].cpu().numpy().astype(np.str0)
 
+            #     metric = {}
 
+            #     thresholded = ious > 0.5
+            #     current_found = 0
+            #     for k in self.topks:
+            #         found = thresholded[:, :k].any(1)
+            #         current_found += found.sum().item()
+            #     metric['0.5'] = round(current_found/(len(thresholded) * len(self.topks)),4)
 
-
-
-
-    def evaluate_bbox_by_contrast_for_vis(self, end_points, prefix):
-        """
-        Evaluate bounding box IoU by contrasting with span features.
-
-        Args:
-            end_points (dict): contains predictions and gt
-            prefix (str): layer name
-        """
-        # Parse gt
-        positive_map, gt_bboxes = self._parse_gt(end_points)
-
-        # Parse predictions
-        pred_center = end_points[f'{prefix}center']  # B, Q, 3
-        pred_size = end_points[f'{prefix}pred_size']  # (B,Q,3) (l,w,h)
-        assert (pred_size < 0).sum() == 0
-        pred_bbox = torch.cat([pred_center, pred_size], dim=-1)
-
-        proj_tokens = end_points['proj_tokens']  # (B, tokens, 64)
-        proj_queries = end_points[f'{prefix}proj_queries']  # (B, Q, 64)
-        sem_scores = torch.matmul(proj_queries, proj_tokens.transpose(-1, -2))
-        sem_scores_ = (sem_scores / 0.07).softmax(-1)  # (B, Q, tokens)
-        sem_scores = torch.zeros(sem_scores_.size(0), sem_scores_.size(1), 256)
-        sem_scores = sem_scores.to(sem_scores_.device)
-        sem_scores[:, :sem_scores_.size(1), :sem_scores_.size(2)] = sem_scores_
-
-        # Highest scoring box -> iou
-
-        #!====================
-        debug_path = 'logs/debug/vis_refer_%d.json'%(sem_scores.device.index)
-        if prefix == "last_":
-            save_for_vis = {}
-            dump_json(debug_path,save_for_vis)#* 清空上一次的数据
-        #!====================
-
-        for bid in range(len(positive_map)): #* 便利每个batch
-            # Keep scores for annotated objects only
-            num_obj = int(end_points['box_label_mask'][bid].sum())
-            pmap = positive_map[bid, :num_obj]
-            scores = (
-                sem_scores[bid].unsqueeze(0)  # (1, Q, 256)
-                * pmap.unsqueeze(1)  # (obj, 1, 256)
-            ).sum(-1)  # (obj, Q)
-
-            # 10 predictions per gt box
-            top = scores.argsort(1, True)[:, :10]  # (obj, 10)
-            pbox = pred_bbox[bid, top.reshape(-1)]
-
-            # IoU
-            ious, _ = _iou3d_par(
-                box_cxcyczwhd_to_xyzxyz(gt_bboxes[bid][:num_obj]),  # (obj, 6)
-                box_cxcyczwhd_to_xyzxyz(pbox)  # (obj*10, 6)
-            )  # (obj, obj*10)
-            ious = ious.reshape(top.size(0), top.size(0), top.size(1))
-            ious = ious[torch.arange(len(ious)), torch.arange(len(ious))]
-
-            # Measure IoU>threshold, ious are (obj, 10)
-            
-            for t in self.thresholds:
-                thresholded = ious > t
-                for k in self.topks:
-                    found = thresholded[:, :k].any(1)
-                    self.dets[(prefix, t, k, 'bbf')] += found.sum().item()
-                    self.gts[(prefix, t, k, 'bbf')] += len(thresholded)
-                    if prefix == 'last_':
-                        found = found[0].item()
-                        if k == 1 and t == self.thresholds[0]:
-                            if end_points['is_view_dep'][bid]:
-                                self.gts['vd'] += 1
-                                self.dets['vd'] += found
-                            else:
-                                self.gts['vid'] += 1
-                                self.dets['vid'] += found
-                            if end_points['is_hard'][bid]:
-                                self.gts['hard'] += 1
-                                self.dets['hard'] += found
-                            else:
-                                self.gts['easy'] += 1
-                                self.dets['easy'] += found
-                            if end_points['is_unique'][bid]:
-                                self.gts['unique'] += 1
-                                self.dets['unique'] += found
-                            else:
-                                self.gts['multi'] += 1
-                                self.dets['multi'] += found
-                        elif k == 1 and t == self.thresholds[1]:
-                            #* ACC@ 0.5
-                            
-                            if end_points['is_unique'][bid]:
-                                self.gts['unique@0.50'] += 1
-                                self.dets['unique@0.50'] += found
-                            else:
-                                self.gts['multi@0.50'] += 1
-                                self.dets['multi@0.50'] += found
-                            #!=========================
-                            if found and prefix == "last_":
-                                save_for_vis.update({       
-                                    bid:
-                                    {
-                                        "utterances":end_points['utterances'][bid],
-                                        "scan_ids":end_points['scan_ids'][bid],
-                                    }
-                                })
-                            #!=========================
-
-
-
-        #!=========================
-        if prefix == "last_":
-            dump_json(debug_path,save_for_vis)
-        #!=========================
-
-                            
+            #     with open(f'logs/debug/scanrefer_eval_score_for_each_scene/{curent_scene_name}_bbf.json', 'w') as f :
+            #         json.dump(metric,f)                            
 
 
     def _parse_gt(self, end_points):

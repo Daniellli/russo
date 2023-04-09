@@ -13,8 +13,9 @@ sys.path.append(BASE_DIR)
 sys.path.append(os.path.join(os.getcwd(), "lib"))
 sys.path.append(os.path.join(os.getcwd(), "lib", 'pointnet2'))
 import models.pointnet2.pointnet2_utils as  pointnet2_utils
-from my_utils.utils import make_dirs,save_pc
-
+from my_utils.utils import make_dirs
+from my_utils.pc_utils import * 
+from os.path import split,exists, isdir,isfile,join
 class SamplingModule(nn.Module):
     """
     Sample object proposal.
@@ -105,7 +106,20 @@ class SamplingModule(nn.Module):
     param {*} debug
     return {*}
     '''
-    def forward_for_debug(self, xyz, features, data_dict,debug):
+    def forward_for_debug(self, xyz, features, data_dict):
+
+        def save_for_attention_vis(xyz,prefix="object"):
+            
+            debug_path =join('logs/debug/scene',np.loadtxt('logs/debug/tmp_name.txt',dtype=np.str0).tolist())
+            # radius = 0.01
+            for idx in range(xyz.shape[0]):
+                
+                current_xyz = xyz[idx].clone().cpu().numpy()
+                current_xyz[:,2] =current_xyz[:,2] +0.08
+                # current_xyz = np.concatenate([np.array(create_sphere(p,radius).vertices).tolist() for p in current_xyz])
+                # write_pc_as_ply(xyz[idx],os.path.join(debug_path,'%s_tmp_%d_%d.ply'%(prefix,idx,xyz.device.index)))
+                write_pc_as_ply(current_xyz,os.path.join(debug_path,'%s.ply'%(prefix)))
+
         # xyz, features, sample_inds = (None, None, None)
         # points_obj_cls_logits = None
         if self.sampling_method == 'fps':
@@ -128,34 +142,45 @@ class SamplingModule(nn.Module):
             data_dict['query_points_sample_inds'] = sample_inds  # (bsz, num_proposal) # should be 0,1,...,num_proposal
         elif self.sampling_method == 'kpsa-lang-filter':
 
-
-
-
+            """
+                from 1024 proposals to  640 porposals which appear in the scene with large proability. 
+                from 640 proposals  to  256 proposals which mentioned by the sentence with large proability      
+            """
+            B,C,M=features.shape#* M = 1024, namely, proposal is 1024, channel is 256, 
             points_obj_cls_logits = self.points_obj_cls(features)  #* (batch_size, 1, num_seed) , 分类每个点是否在near the object center ? 
-            data_dict['seeds_obj_cls_logits'] = points_obj_cls_logits
+            data_dict['seeds_obj_cls_logits'] = points_obj_cls_logits #* object score, play as 3D detector!
             points_obj_cls_scores = torch.sigmoid(points_obj_cls_logits).squeeze(1)
-            sample_inds = torch.topk(points_obj_cls_scores, int((1024 + self.num_proposal) / 2))[1].int()#* 取得分最大的 int((1024 + self.num_proposal) / 2) 个点的index , 
-            xyz, features, sample_inds = self.sa_module(xyz, features, sample_inds)
+            sample_inds = torch.topk(points_obj_cls_scores, int((M + self.num_proposal) / 2))[1].int()#* 取得分最大的 int((1024 + self.num_proposal) / 2) 个点的index ,  namely, 640 proposals
             #!========================================================
-            if debug:
-                save_for_attention_vis(xyz,prefix="object")
+            save_for_attention_vis(xyz,prefix="origin")
+            #!========================================================
+
+
+            xyz, features, sample_inds = self.sa_module(xyz, features, sample_inds)
+
+            #!========================================================
+            save_for_attention_vis(xyz,prefix="object")
             #!========================================================
             # cluster_feature = features
             # cluster_xyz = xyz
             data_dict['query_points_xyz'] = xyz  # (batch_size, num_proposal, 3)
             data_dict['query_points_feature'] = features  # (batch_size, C, num_proposal)
             data_dict['query_points_sample_inds'] = sample_inds  # (bsz, num_proposal) # should be 0,1,...,num_proposal
-            ref_scores = self.match_module(features, data_dict['lang_hidden'], data_dict)#* data_dict['lang_hidden'] : [B, lang_feature_dim]
 
+            #* data_dict['lang_hidden'] : [B, lang_feature_dim]
+            ref_scores = self.match_module(features, 
+                            data_dict['lang_hidden'])
+
+            data_dict['kps_ref_score'] = ref_scores
 
             ref_scores = torch.sigmoid(ref_scores).squeeze(1)   # [B, N]
             sample_inds = torch.topk(ref_scores, self.num_proposal)[1].int()
-            xyz, features, sample_inds = self.gsample_module(xyz, features, sample_inds)
+            xyz, features, sample_inds = self.gsample_module(xyz, features, sample_inds) #* 256 proposal left, 
 
             #!========================================================
-            if debug:
-                save_for_attention_vis(xyz,prefix="text")
+            save_for_attention_vis(xyz,prefix="text")
             #!========================================================
+
             data_dict['ref_query_points_xyz'] = xyz  # (batch_size, num_proposal, 3)
             data_dict['ref_query_points_feature'] = features  # (batch_size, C, num_proposal)
             data_dict['ref_query_points_sample_inds'] = sample_inds  # (bsz, num_proposal) # should be 0,1,...,num_proposal
@@ -169,19 +194,6 @@ class SamplingModule(nn.Module):
 
             
 
-'''
-description: 可视化  
-param {*} xyz
-return {*}
-'''
-def save_for_attention_vis(xyz,prefix="object"):
-    debug_path = "logs/debug"
-    make_dirs(debug_path)
-    batch_size =xyz.shape[0]
-    save_format='%s_tmp_%d_%d.ply'
-    for idx in range(batch_size):
-        save_pc(xyz[idx],os.path.join(debug_path,save_format%(prefix,idx,xyz.device.index)))
-        
 
 
 

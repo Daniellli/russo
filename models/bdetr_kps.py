@@ -303,10 +303,11 @@ class BeaUTyDETRTKPS(nn.Module):
             end_points, cluster_xyz, cluster_feature  = self.sampling_module(
                 points_xyz, points_features, end_points
             )
-            #todo :  如果是 debug 需要手动改成使用另一个function forward
+            #!==============================================================4. plot teh qualitative results================================
             # end_points, cluster_xyz, cluster_feature  = self.sampling_module.forward_for_debug(
-            #     points_xyz, points_features, end_points,debug=True,
+            #     points_xyz, points_features, end_points
             # )
+            #!==============================================================================================================================
         else :
             end_points = self._generate_queries(
                 points_xyz, points_features, end_points

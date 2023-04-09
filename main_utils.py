@@ -601,6 +601,12 @@ class BaseTrainTester:
         else:
             inputs["train"] = False
 
+        #!============================================3. pass the gt information for ploting the qualtative result====================================================
+        # assert len(batch_data['scan_ids']) == 1
+        # scene_name  = "__".join([batch_data['scan_ids'][0],str(batch_data['target_id'][0].clone().cpu().numpy().tolist()), batch_data['ann_id'][0]])
+        # np.savetxt('logs/debug/tmp_name.txt',[scene_name],fmt='%s')
+        #!=============================================================================================================================================================
+
         # Forward pass
         end_points = model(inputs)#* the length of end_points  == 60, last item ==  last_sem_cls_scores
 
@@ -608,6 +614,7 @@ class BaseTrainTester:
         for key in batch_data: 
             assert (key not in end_points)
             end_points[key] = batch_data[key]#*  the length of end_points == 86, last item ==  target_cid 
+
         _, end_points = self._compute_loss(#*  the length of end_points == 120
             end_points, criterion, set_criterion, args 
         )

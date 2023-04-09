@@ -30,8 +30,8 @@ NUM_CLASSES = 485
 DC = ScannetDatasetConfig(NUM_CLASSES)
 DC18 = ScannetDatasetConfig(18)
 MAX_NUM_OBJ = 132
-
-
+from my_utils.utils import *
+from os.path import join, split,exists,isdir,isfile
 
 class JointSemiSupervisetDataset(Joint3DDataset):
     """Dataset utilities for ReferIt3D."""
@@ -325,7 +325,7 @@ class JointSemiSupervisetDataset(Joint3DDataset):
 
 
 
-            
+
 
         ret_dict.update({
             "scan_ids": anno['scan_id'],
@@ -383,6 +383,25 @@ class JointSemiSupervisetDataset(Joint3DDataset):
             "supervised_mask":np.array(1).astype(np.int64)
 
         })
+
+
+        #!=================================== 2. for plot  qualitative results =================================== 
+        # debug = True
+        # if debug == True:
+        #     scene_name  = "__".join([anno['scan_id'],str(anno['target_id']), anno['ann_id']])
+        #     save_path = f"logs/debug/scene/{scene_name}"
+        #     make_dirs(save_path)
+        #     #* scene 
+        #     write_ply_rgb(point_cloud[:,:3],og_color*256,join(save_path,'scene.ply'))
+
+        #     #* utterances 
+        #     np.savetxt(join(save_path,'utterances.txt'),[ret_dict['utterances']],fmt='%s')
+
+        #     #* box 
+        #     write_bbox(np.concatenate([ret_dict['center_label'],
+        #                 ret_dict['size_gts']],axis=-1)[ret_dict['box_label_mask']==1],
+        #                 join(save_path,'target_box.ply'))
+        #!========================================================================================================= 
         return ret_dict
 
 

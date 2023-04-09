@@ -34,6 +34,8 @@ import trimesh
 
 import matplotlib.pyplot as pyplot
 
+import open3d as o3d
+
 # ----------------------------------------
 # Point Cloud Sampling
 # ----------------------------------------
@@ -268,17 +270,13 @@ def write_ply_color(points, labels, filename, num_classes=None, colormap=pyplot.
 
 
 
-
-def write_ply_rgb(points, colors, out_filename, num_classes=None):
+def write_ply_rgb(points, colors, filename, text=True, num_classes=None):
     """ Color (N,3) points with RGB colors (N,3) within range [0,255] as OBJ file """
     colors = colors.astype(int)
-    N = points.shape[0]
-    fout = open(out_filename, 'w')
-    for i in range(N):
-        c = colors[i,:]
-        fout.write('v %f %f %f %d %d %d\n' % (points[i,0],points[i,1],points[i,2],c[0],c[1],c[2]))
-    fout.close()
-
+    points = [(points[i,0], points[i,1], points[i,2], colors[i,0], colors[i,1], colors[i,2]) for i in range(points.shape[0])]
+    vertex = np.array(points, dtype=[('x', 'f4'), ('y', 'f4'),('z', 'f4'),('red', 'u1'), ('green', 'u1'),('blue', 'u1')])
+    el = PlyElement.describe(vertex, 'vertex', comments=['vertices'])
+    PlyData([el], text=text).write(filename)
 
 
 
@@ -606,6 +604,13 @@ def save_txt(string_,name):
     else :
         np.savetxt(name,string_,fmt="%s")
 
+
+
+
+def create_sphere(center, radius):
+    sphere = o3d.geometry.TriangleMesh.create_sphere(radius=radius)
+    sphere.translate(center)
+    return sphere
 
 
 
