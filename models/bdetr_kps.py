@@ -299,14 +299,11 @@ class BeaUTyDETRTKPS(nn.Module):
         #!==============================================================
         
         if self.use_tkps:
-            
             end_points, cluster_xyz, cluster_feature  = self.sampling_module(
-                points_xyz, points_features, end_points
-            )
+                points_xyz, points_features, end_points)
             #!==============================================================4. plot teh qualitative results================================
             # end_points, cluster_xyz, cluster_feature  = self.sampling_module.forward_for_debug(
-            #     points_xyz, points_features, end_points
-            # )
+            #     points_xyz, points_features, end_points)
             #!==============================================================================================================================
         else :
             end_points = self._generate_queries(

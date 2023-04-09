@@ -43,7 +43,8 @@ from loguru import logger
 import os.path as osp
 
 from IPython import embed
-
+from models.ap_helper import my_parse_predictions
+from data.model_util_scannet import ScannetDatasetConfig
 
 #*=====================================
 from signal import signal, SIGPIPE, SIG_DFL, SIG_IGN
@@ -614,76 +615,29 @@ class BaseTrainTester:
         for key in batch_data: 
             assert (key not in end_points)
             end_points[key] = batch_data[key]#*  the length of end_points == 86, last item ==  target_cid 
-
-        _, end_points = self._compute_loss(#*  the length of end_points == 120
-            end_points, criterion, set_criterion, args 
-        )
-        for key in end_points:
-            if 'pred_size' in key:
-                end_points[key] = torch.clamp(end_points[key], min=1e-6)
-
-
-        # Accumulate statistics and print out
-        stat_dict = self._accumulate_stats(stat_dict, end_points)
-        if (batch_idx + 1) % args.print_freq == 0:
-            self.log(f'Eval: [{batch_idx + 1}/{len(test_loader)}]  ')
-            self.log(''.join([
-                f'{key} {stat_dict[key] / (float(batch_idx + 1)):.4f} \t'
-                for key in sorted(stat_dict.keys())
-                if 'loss' in key and 'proposal_' not in key
-                and 'last_' not in key and 'head_' not in key
-            ]))
-            
-        return stat_dict, end_points
-
-
-
-
-
-
-    '''
-    description:  with debug 
-    return {*}
-    '''
-    def _main_eval_branch_debug(self, batch_idx, batch_data, test_loader, model,
-                        stat_dict,criterion, set_criterion, args,debug):
-        # Move to GPU
-        batch_data = self._to_gpu(batch_data)
-        inputs = self._get_inputs(batch_data)
-        if "train" not in inputs:
-            inputs.update({"train": False})
-        else:
-            inputs["train"] = False
-
-        # Forward pass
-        #todo 如何把debug 信息传给 model 里面的 DKS? 
-        end_points = model(inputs)#* the length of end_points  == 60, last item ==  last_sem_cls_scores
-
-        # Compute loss
-        for key in batch_data: 
-            assert (key not in end_points)
-            end_points[key] = batch_data[key]#*  the length of end_points == 86, last item ==  target_cid 
-
-
-        #!==================================================      
-        #* 1. rename file 
-        if  debug:
-            # self.check_input(inputs,end_points['scan_ids'])
-            prefixes = ['object','text']
-            debug_path = "logs/debug"
-            save_format='%s_tmp_%d_%d.ply'
-            new_save_format='%s_%s_%d_%s.ply'
-            device_idx = batch_data['box_label_mask'].device.index
-            for prefix in prefixes:
-                print(prefix)
-                for idx, scan_name in enumerate(end_points['scan_ids']):
-                    target_save_path = osp.join(debug_path,scan_name+"_%d_%s"%(end_points['target_id'][idx],end_points['ann_id'][idx]))
-                    make_dirs(target_save_path)
-                    new_name = osp.join(target_save_path, new_save_format%(prefix,scan_name,end_points['target_id'][idx],end_points['ann_id'][idx]))
-
-                    old_name = osp.join(debug_path, save_format%(prefix,idx,device_idx))
-                    os.rename(old_name,new_name)
-        #!==================================================
+        #!============================================5. save predict box ===========================================================================================
+        # #* according to contrast 
+        # CONFIG_DICT = {
+        #     'remove_empty_box': False, 'use_3d_nms': True,
+        #     'nms_iou': 0.25, 'use_old_type_nms': False, 'cls_nms': True,
+        #     'per_class_proposal': True, 'conf_thresh': 0.5,
+        #     'dataset_config': ScannetDatasetConfig(18),
+        #     'hungarian_loss': True
+        # }
+        
+        # batch_pred_map_cls = my_parse_predictions(end_points,CONFIG_DICT,'last_')
+        # #* 已经假设bs == 1 
+        # batch_res = batch_pred_map_cls[0]
+        # #* 1. 获取target id 
+        # #* 2. 根据target id 获取这个target 对应的 score 最大的target  
+        # #* 3. 保存对应的 box等信息
+        # batch_res=  np.array(batch_res)
+        # # target_id = batch_data['target_cid'].cpu().numpy().tolist()[idx]
+        # # batch_res = batch_res[batch_res[:,0]==target_id]
+        # max_idx = np.argmax(np.array([x[2] for x in batch_res])) #* 只取confidence 最大的, 不管是什么哪个target  , 这个对应的是target id , 也就是第几个目标
+        # boxes = np.array([ box.tolist() for box in batch_res[max_idx][1]])[None]
+        # write_bbox(boxes,f'logs/debug/scene/{scene_name}/pred_box.ply')
+        #!=============================================================================================================================================================
 
         _, end_points = self._compute_loss(#*  the length of end_points == 120
             end_points, criterion, set_criterion, args 
