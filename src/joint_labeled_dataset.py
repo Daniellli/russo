@@ -155,10 +155,15 @@ class JointLabeledDataset(JointSemiSupervisetDataset):
         #!+=====================================================1. for plot qualitive result ===============================================
         # pick_up_list = np.loadtxt('logs/find_by05iou_list.txt',dtype=np.str0)
         # new_annos = []
-        # for ann in annos:
+        # early_out_idx = 100 
+        # for idx,ann in enumerate(annos):
         #     scene_name  = "__".join([ann['scan_id'],str(ann['target_id']), ann['ann_id']])
         #     if scene_name in pick_up_list:
         #         new_annos.append(ann)
+
+        #     if idx == early_out_idx:
+        #         break
+                
         # return new_annos
         #!+==================================================================================================================================
         return annos
