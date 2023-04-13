@@ -340,7 +340,7 @@ def compute_points_obj_cls_loss_hard_topk(end_points, topk):
     """
     
 
-    ref_use_obj_mask= True
+    ref_use_obj_mask= False
     if 'kps_ref_score' in end_points.keys():
         """
             #*====================================
