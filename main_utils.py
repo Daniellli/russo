@@ -420,11 +420,13 @@ class BaseTrainTester:
         for epoch in range(args.start_epoch, args.max_epoch + 1):
             train_loader.sampler.set_epoch(epoch)
             tic = time.time()
+
             self.train_one_epoch(
                 epoch, train_loader, model,
                 criterion, set_criterion,
                 optimizer, scheduler, args
             )
+
             self.log(
                 'epoch {}, total time {:.2f}, '
                 'lr_base {:.5f}, lr_pointnet {:.5f}'.format(
@@ -495,7 +497,8 @@ class BaseTrainTester:
         loss, end_points = criterion(
             end_points, args.num_decoder_layers,
             set_criterion,
-            query_points_obj_topk=args.query_points_obj_topk
+            ref_use_obj_mask = args.ref_use_obj_mask,
+            query_points_obj_topk=args.query_points_obj_topk,
         )
         return loss, end_points
 
