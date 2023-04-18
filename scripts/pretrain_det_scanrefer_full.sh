@@ -2,7 +2,7 @@
 ###
  # @Author: daniel
  # @Date: 2023-03-28 23:07:11
- # @LastEditTime: 2023-04-18 14:18:23
+ # @LastEditTime: 2023-04-18 21:09:45
  # @LastEditors: daniel
  # @Description: 
  # @FilePath: /butd_detr/scripts/pretrain_det_scanrefer_full.sh

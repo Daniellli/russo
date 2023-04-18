@@ -270,6 +270,7 @@ def parse_option():
     parser.add_argument('--upload-wandb',action='store_true', help="upload to wandb or not ?")
     parser.add_argument('--labeled_ratio', default=None, type=float,help=' labeled datasets ratio ')
     parser.add_argument('--use-tkps',action='store_true', help="use-tkps")
+    parser.add_argument('--ref_use_obj_mask',action='store_true', help="ref_use_obj_mask")
     parser.add_argument('--lr_decay_intermediate',action='store_true')
 
     args, _ = parser.parse_known_args()
