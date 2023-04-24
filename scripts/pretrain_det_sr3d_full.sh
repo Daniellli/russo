@@ -2,7 +2,7 @@
 ###
  # @Author: daniel
  # @Date: 2023-03-28 23:07:11
- # @LastEditTime: 2023-04-14 00:20:54
+ # @LastEditTime: 2023-04-24 13:10:56
  # @LastEditors: daniel
  # @Description: 
  # @FilePath: /butd_detr/scripts/pretrain_det_sr3d_full.sh
@@ -30,10 +30,11 @@ port=29530
 #* for  semi supervision architecture  : step1 x
 # labeled_ratio=0.2;
 #* 10-18 for scene obj boxes as supervised signal 
-topk=4;
+topk=8;
 
 # decay_epoch="37 50";
-decay_epoch="50 100";
+# decay_epoch="50 100";
+decay_epoch="1000";
 epoch=1000;
 # resume_model_path=/home/DISCOVER_summer2022/xusc/exp/butd_detr/logs/bdetr/sr3d/1681201971/ckpt_epoch_36_best.pth;
 # resume_model_path=/home/DISCOVER_summer2022/xusc/exp/butd_detr/logs/bdetr/sr3d/1681260910/ckpt_epoch_45_best.pth;

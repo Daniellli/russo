@@ -2,7 +2,7 @@
 ###
  # @Author: daniel
  # @Date: 2023-03-28 23:07:11
- # @LastEditTime: 2023-04-18 21:09:45
+ # @LastEditTime: 2023-04-21 18:16:12
  # @LastEditors: daniel
  # @Description: 
  # @FilePath: /butd_detr/scripts/pretrain_det_scanrefer_full.sh
@@ -29,11 +29,16 @@ port=29530
 
 #* for  semi supervision architecture  : step1 x
 topk=8;
-decay_epoch="119";
+# decay_epoch="119 136";
+decay_epoch="120 140";
 epoch=1000;
 
 
-resume_mode_path=/data/hdd01/xusc/exp/butd_detr/logs/bdetr/scanrefer/1681659189/ckpt_epoch_118_best.pth;
+# resume_mode_path=/data/hdd01/xusc/exp/butd_detr/logs/bdetr/scanrefer/1681659189/ckpt_epoch_118_best.pth;
+# resume_mode_path=/data/hdd01/xusc/exp/butd_detr/logs/bdetr/scanrefer/1681798762/ckpt_epoch_135_best.pth;
+# resume_mode_path=/data/hdd01/xusc/exp/butd_detr/logs/bdetr/scanrefer/1681833237/ckpt_epoch_200_best.pth;
+
+
 
 
 
@@ -50,9 +55,12 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --lr_decay_epochs $decay_epoch \
     --upload-wandb \
     --use-tkps --joint_det \
-    --checkpoint_path $resume_mode_path \
-    --lr_decay_intermediate \
     2>&1 | tee -a logs/pretrain_cls.log
+
+    
+
+# --checkpoint_path $resume_mode_path \
+#     --lr_decay_intermediate \
 
 
 
