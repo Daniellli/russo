@@ -536,9 +536,8 @@ class BaseTrainTester:
                 )
                 
                 if dist.get_rank() == 0:
-                    if args.upload_wandb:
-                        self.wandb_log(performance)
-                        
+                    
+                    self.wandb_log(performance)
                     with open(save_dir, 'a+')as f :
                         f.write( f"epoch:{epoch},"+','.join(["%s:%.4f"%(k,v) for k,v in performance.items()])+"\n")
                         
