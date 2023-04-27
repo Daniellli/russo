@@ -11,38 +11,22 @@ import csv
 from collections import defaultdict
 import h5py
 import json
-import multiprocessing as mp
 import os
-import random
-from six.moves import cPickle
-
 
 import numpy as np
 import torch
-from torch.utils.data import Dataset
-#!+=============
-from transformers import RobertaTokenizerFast
-#!+=============
 
-from src.joint_semi_supervise_dataset import JointSemiSupervisetDataset
-from IPython import embed
-import wandb
-
+from src.joint_labeled_dataset import JointLabeledDataset
 from data.model_util_scannet import ScannetDatasetConfig
-from data.scannet_utils import read_label_mapping
-from src.visual_data_handlers import Scan
-from .scannet_classes import REL_ALIASES, VIEW_DEP_RELS
 
 NUM_CLASSES = 485
 DC = ScannetDatasetConfig(NUM_CLASSES)
 DC18 = ScannetDatasetConfig(18)
 MAX_NUM_OBJ = 132
 
-import os.path as osp
-from loguru import logger 
 
 
-class JointUnlabeledDataset(JointSemiSupervisetDataset):
+class JointUnlabeledDataset(JointLabeledDataset):
     """Dataset utilities for ReferIt3D."""
 
     def __init__(self, dataset_dict={'sr3d': 1, 'scannet': 10},
@@ -55,12 +39,10 @@ class JointUnlabeledDataset(JointSemiSupervisetDataset):
                  labeled_ratio=None):
         """Initialize dataset (here for ReferIt3D utterances)."""
         
-        self.labeled_ratio = labeled_ratio
-        
-
         super().__init__(dataset_dict,test_dataset,split, overfit,
                         data_path,use_color, use_height, use_multiview,
-                        detect_intermediate,butd, butd_gt, butd_cls, augment_det)
+                        detect_intermediate,butd, butd_gt, butd_cls, 
+                        augment_det,labeled_ratio = labeled_ratio)
                 
 
 

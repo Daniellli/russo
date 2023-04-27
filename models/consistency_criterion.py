@@ -1,10 +1,10 @@
 '''
 Author: daniel
 Date: 2023-03-27 12:02:20
-LastEditTime: 2023-03-28 11:54:51
+LastEditTime: 2023-04-27 23:02:01
 LastEditors: daniel
 Description: 
-FilePath: /butd_detr/my_utils/consistency_criterion.py
+FilePath: /butd_detr/models/consistency_criterion.py
 have a nice day
 '''
 
@@ -18,16 +18,16 @@ sys.path.append("~/exp/butd_detr")
 import torch
 
 import os.path as osp
-from my_utils.pc_utils import *
+from utils.pc_utils import *
 import torch.nn.functional as F
 
 from data.model_util_scannet import ScannetDatasetConfig
 
 from IPython import embed
 
-from my_utils.utils import make_dirs,rot_x,rot_y,rot_z,points2box,box2points,focalLoss,nn_distance
+from utils.utils import rot_x,rot_y,rot_z,points2box,box2points
 
-from my_utils.pc_utils import * 
+from utils.pc_utils import * 
 from loguru import logger
 
 from models.losses import ConsistencyHungarianMatcher
@@ -36,18 +36,13 @@ import torch.distributed as dist
 
 from models.losses import generalized_box_iou3d,box_cxcyczwhd_to_xyzxyz
 
-DEBUG_FILT = "~/exp/butd_detr/logs/debug"
-
-    
-
-import wandb 
-
 def is_dist_avail_and_initialized():
     if not dist.is_available():
         return False
     if not dist.is_initialized():
         return False
     return True
+
 
 def _get_src_permutation_idx(indices):
     # permute predictions following indices
@@ -116,8 +111,19 @@ class ConsistencyCriterion:
 
             student_out=parse_endpoint(end_points,prefix)
             teacher_out=parse_endpoint(ema_end_points,prefix)
+            """
+                debug_ids = 1
+                write_bbox(teacher_out[f"pred_boxes"][debug_ids][teacher_out['pred_logits'][debug_ids][:,-1].max(-1)[1]].unsqueeze(0).detach().cpu().numpy(),'logs/debug/teacher_before_trans_pred_box%d.ply'%(debug_ids))
+            """
+            
+
             if augmentation is not None and len(augmentation.keys()) >0:
                 teacher_out['pred_boxes'] = transformation_box(teacher_out['pred_boxes'],augmentation)
+
+            """
+                write_bbox(teacher_out[f"pred_boxes"][debug_ids][teacher_out['pred_logits'][debug_ids][:,-1].max(-1)[1]].unsqueeze(0).detach().cpu().numpy(),'logs/debug/teacher_after_trans_pred_box%d.ply'%(debug_ids))
+            """
+            
 
             center_size_consistency_loss,giou_consistency_loss,soft_token_consistency = self.get_loss(student_out, teacher_out)
             # query_consistency_loss = (1 - F.cosine_similarity(student_out['proj_queries'], teacher_out['proj_queries'])).mean()

@@ -13,8 +13,7 @@ sys.path.append(BASE_DIR)
 sys.path.append(os.path.join(os.getcwd(), "lib"))
 sys.path.append(os.path.join(os.getcwd(), "lib", 'pointnet2'))
 import models.pointnet2.pointnet2_utils as  pointnet2_utils
-from my_utils.utils import make_dirs
-from my_utils.pc_utils import * 
+from utils.pc_utils import * 
 from os.path import split,exists, isdir,isfile,join
 class SamplingModule(nn.Module):
     """

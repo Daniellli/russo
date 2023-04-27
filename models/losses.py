@@ -19,10 +19,9 @@ import os.path as osp
 import numpy as np
 
 from IPython import embed
-from my_utils.pc_utils import * 
+from utils.pc_utils import * 
 from loguru import logger
-from my_utils.utils import nn_distance
-from my_utils.pc_utils import *
+from utils.pc_utils import *
 
 def is_dist_avail_and_initialized():
     if not dist.is_available():
@@ -1023,50 +1022,3 @@ def compute_labeled_hungarian_loss(end_points, num_decoder_layers,
 
 
 
-
-
-''' 
-description:  调用set_criterion 计算loss 并且返回hungariun 匹配结果  ,并存储匹配结果
-param {*} output: pred 
-param {*} target :  gt
-param {*} set_criterion: 计算loss 的网络
-param {*} scan_ids : 数据对应的场景名字用于生成存储结果文件名
-param {*} prefix : 数据对应的前缀用于生成存储结果文件名
-return {*}
-'''
-def compute_loss_and_save_match_res_(output, target,set_criterion,scan_ids,prefix):
-    with open ('vis_results/current_path.txt','r') as f :
-        debug_save_path = f.read().strip()
-    
-    losses, indices = set_criterion(output, target) #* indices : 
-
-    # permute predictions following indices
-    batch_idx = torch.cat([
-        torch.full_like(src, i) for i, (src, _) in enumerate(indices)
-    ])
-    src_idx = torch.cat([src for (src, _) in indices])
-    
-    pred_bb = output['pred_boxes'][batch_idx,src_idx]
-
-    # pred_bb = [output['pred_boxes'][idx ,key.item()]  for idx, (key,key_id)  in enumerate(indices)]
-    # gt_bbox = [x['boxes'][0] for x in target]
-
-    gt_bbox = torch.cat([
-        t['boxes'][i] for t, (_, i) in zip(target, indices)
-    ], dim=0)
-
-    batch_size = len(indices)
-
-    bbox_num_per_batch =int( gt_bbox.shape[0]/batch_size)
-
-    for idx in range(len(indices)):
-        np.savetxt(osp.join(debug_save_path, 
-                        '%s_gt_%sbox.txt'%(scan_ids[idx],prefix)),
-                        gt_bbox[idx*bbox_num_per_batch:(idx+1)*bbox_num_per_batch].detach().cpu().numpy(),
-                        fmt='%s',delimiter=' ')
-
-        np.savetxt(osp.join(debug_save_path,'%s_pred_%sbox.txt'%(scan_ids[idx],prefix)),
-                    pred_bb[idx*bbox_num_per_batch:(idx+1)*bbox_num_per_batch].detach().cpu().numpy(),
-                    fmt='%s')
-
-    return losses

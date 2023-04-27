@@ -1,7 +1,7 @@
 '''
 Author: daniel
 Date: 2023-03-22 16:49:49
-LastEditTime: 2023-04-26 21:02:37
+LastEditTime: 2023-04-27 20:56:44
 LastEditors: daniel
 Description: 
 FilePath: /butd_detr/train_dist_mod.py
@@ -19,9 +19,7 @@ have a nice day
 # ------------------------------------------------------------------------
 """Main script for language modulation."""
 
-from distutils.log import debug
 import os
-import shutil
 
 import numpy as np
 import torch
@@ -29,7 +27,6 @@ import torch.distributed as dist
 
 from main_utils import parse_option, BaseTrainTester
 from data.model_util_scannet import ScannetDatasetConfig
-from src.joint_det_dataset import Joint3DDataset,points2box
 from src.joint_labeled_dataset import JointLabeledDataset
 from src.grounding_evaluator import GroundingEvaluator, GroundingGTEvaluator
 # from models import BeaUTyDETR
@@ -37,28 +34,22 @@ from models import BeaUTyDETRTKPS
 from models import APCalculator, parse_predictions, parse_groundtruths,my_parse_predictions
 
 from src.joint_labeled_dataset import JointLabeledDataset
-from src.scanrefer_test_datasets import ScanReferTestDataset
-from IPython import embed
+
 import ipdb
 st = ipdb.set_trace
-import scipy.io as scio
+
 import sys 
 
-from utils.box_util import get_3d_box
-import json
-import wandb
-from loguru import logger 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(BASE_DIR)
 
-from my_utils.utils import make_dirs, save_for_vis,parse_option,save_txt,load_json,move_dir_file
+from utils.utils import make_dirs,load_json,move_dir_file,save_box
+from utils.pc_utils import write_ply
 import os.path as osp
 import time
 
+from os.path import join,split,isdir,isfile,exists
 
-from tqdm import tqdm
-
-from src.joint_det_dataset import box2points
 
 
 class TrainTester(BaseTrainTester):
@@ -67,10 +58,6 @@ class TrainTester(BaseTrainTester):
     def __init__(self, args):
         """Initialize."""
         super().__init__(args)
-
-        if args.eval and args.local_rank == 0 : #* for debug ? 
-            self.vis_save_path = osp.join("vis_results",time.strftime("%Y:%m:%d",time.gmtime(time.time()))+"_"+str(int(time.time())))
-            os.makedirs(self.vis_save_path)
 
             
         
@@ -116,6 +103,9 @@ class TrainTester(BaseTrainTester):
     @staticmethod
     def get_model(args):
         """Initialize the model."""
+
+        assert exists(args.pp_checkpoint)
+        
         num_input_channel = int(args.use_color) * 3
         if args.use_height:
             num_input_channel += 1
@@ -139,6 +129,8 @@ class TrainTester(BaseTrainTester):
         #     pointnet_ckpt=args.pp_checkpoint,  #* pretrained model
         #     self_attend=args.self_attend
         # )
+            
+        
 
         model = BeaUTyDETRTKPS(
             num_class=num_class,
@@ -253,6 +245,25 @@ class TrainTester(BaseTrainTester):
             model: a nn.Module that returns end_points (dict)
             criterion: a function that returns (loss, end_points)
         """
+
+        
+        '''
+        description: 
+        param {*} data
+        param {*} scene_name
+        param {*} save_root
+        param {*} has_color
+        param {*} flag
+        return {*}
+        '''
+        def save_for_vis(box,pc,save_path,scene_name,bidx,flag = "debug",idx=0,save = True):
+            #* for teacher or student 
+            if save :
+                write_ply(pc,os.path.join(save_path, '%s_%d_%s_gt_%s.ply'%(scene_name,idx,bidx,flag)))
+            
+            save_box(box,os.path.join(save_path,'%s_%d_%s_box_%s.txt'%(scene_name,idx,bidx,flag)) )
+
+
         if args.test_dataset == 'scannet':
             return self.evaluate_one_epoch_det(
                 epoch, test_loader, model,
@@ -308,7 +319,6 @@ class TrainTester(BaseTrainTester):
                 prefix='last_'
                 evaluator.evaluate(end_points, prefix)
 
-            #!==========================
             #todo parse results and save 
             prefix = 'last_'
             better_res = load_json('logs/debug/vis_refer_%d.json'%(end_points['target_id'].device.index))#* only for current batch 
@@ -344,163 +354,50 @@ class TrainTester(BaseTrainTester):
                         #* save for vis , get top k for  vis 
 
                         
-                        target_save_path = osp.join(self.vis_save_path,sample_id)
+                        target_save_path = osp.join(self.args.log_dir,sample_id)
                         make_dirs(target_save_path)           
 
                         old_attention_path = osp.join(attention_path,f"{end_points['scan_ids'][idx]}_{end_points['target_id'][idx].cpu().numpy()}_{end_points['ann_id'][idx]}")
                         move_dir_file(old_attention_path,target_save_path)
 
                         utterance_format="%s_%d_%s_utterance.txt"
+
+                        np.savetxt(osp.join(target_save_path,utterance_format%(end_points['scan_ids'][idx],end_points['target_id'][idx].cpu().numpy(),end_points['ann_id'][idx])),
+                                    end_points['utterances'][idx])
                         
-                        save_txt(end_points['utterances'][idx],osp.join(target_save_path,utterance_format%(end_points['scan_ids'][idx],end_points['target_id'][idx].cpu().numpy(),end_points['ann_id'][idx])))
                         #* save pc and box         
                         boxes = np.array([ box.tolist() for box in batch_res[max_idx][1]])[None]
 
-                        save_for_vis(boxes,batch_data['point_clouds'][idx],target_save_path,end_points['scan_ids'][idx],end_points['ann_id'][idx],flag='student',idx=end_points['target_id'][idx].cpu().numpy())
-                        save_for_vis(batch_data['all_bboxes'][idx][batch_data['all_bbox_label_mask'][idx]].cpu().numpy(),batch_data['point_clouds'][idx],
-                                    target_save_path,end_points['scan_ids'][idx],end_points['ann_id'][idx],flag='student2',idx=end_points['target_id'][idx].cpu().numpy(),save=False)
-                        save_for_vis((torch.cat([batch_data['center_label'],batch_data['size_gts']],axis=-1)[idx][batch_data['box_label_mask'][idx].bool()]).cpu().numpy()
-                                        ,batch_data['point_clouds'][idx],target_save_path,end_points['scan_ids'][idx],end_points['ann_id'][idx],flag='teacher',idx=end_points['target_id'][idx].cpu().numpy(),save=False)
+                        save_for_vis(boxes,
+                                    batch_data['point_clouds'][idx],target_save_path,
+                                    end_points['scan_ids'][idx],
+                                    end_points['ann_id'][idx],
+                                    flag='student',
+                                    idx=end_points['target_id'][idx].cpu().numpy())
+                        
+                        save_for_vis(batch_data['all_bboxes'][idx][batch_data['all_bbox_label_mask'][idx]].cpu().numpy(),
+                                    batch_data['point_clouds'][idx],
+                                    target_save_path,end_points['scan_ids'][idx],end_points['ann_id'][idx],
+                                    flag='student2',
+                                    idx=end_points['target_id'][idx].cpu().numpy(),
+                                    save=False)
+                        
+                        save_for_vis((torch.cat([batch_data['center_label'],
+                                            batch_data['size_gts']],axis=-1)[idx][batch_data['box_label_mask'][idx].bool()]).cpu().numpy(),
+                                        batch_data['point_clouds'][idx],
+                                        target_save_path,end_points['scan_ids'][idx],
+                                        end_points['ann_id'][idx],
+                                        flag='teacher',
+                                        idx=end_points['target_id'][idx].cpu().numpy(),
+                                        save=False)
 
                     
-                    
-
-                #!==========================
+                
                 
         # save_txt('\n'.join(record_res),'logs/debug/final_list.txt')
         evaluator.synchronize_between_processes()
       
-     
-
-
-
-
-
     
-    '''
-    description:  评估并且存储评估结果用于上传ScanRefer server for evaluation   ,
-    for_vis: 是否存储可视化需要的数据 
-    return {*}
-    '''
-    @torch.no_grad()
-    def inference_for_scanrefer_benchmark(self, epoch, test_loader,
-                           model, criterion, set_criterion, args,for_vis = False,debug=False):
-        """
-        Eval grounding after a single epoch.
-
-        Some of the args:
-            model: a nn.Module that returns end_points (dict)
-            criterion: a function that returns (loss, end_points)
-        """
-        if args.test_dataset == 'scannet':
-            return self.evaluate_one_epoch_det(
-                epoch, test_loader, model,
-                criterion, set_criterion, args
-            )
-        stat_dict = {}
-        model.eval()  # set model to eval mode (for bn and dp)
-
-        # Main eval branch
-
-        pred_bboxes = []
-        CONFIG_DICT = {
-            'remove_empty_box': False, 'use_3d_nms': True,
-            'nms_iou': 0.25, 'use_old_type_nms': False, 'cls_nms': True,
-            'per_class_proposal': True, 'conf_thresh': 0.0,
-            'dataset_config': ScannetDatasetConfig(18),
-            'hungarian_loss': True
-        }
-
-        for batch_idx, batch_data in enumerate(test_loader):#* the length of batch data == 26 , 
-            #todo 是否会选择带有debug 参数的_main_eval_branch
-            #!+=======
-            debug = False
-            #!+=======
-            if debug:
-                #* 是否保存 attention 
-                #* 不保存 直接设成false , 保存需要再model 里面先设置一下debug 保存attention 
-                end_points = self._inference_only(
-                    batch_idx, batch_data, test_loader, model, stat_dict,
-                    criterion, set_criterion, args,debug=False
-                )
-            else :
-                stat_dict, end_points = self._main_eval_branch(
-                    batch_idx, batch_data, test_loader, model, stat_dict,
-                    criterion, set_criterion, args
-                )
-
-            #!==== generate result for upload evaluation server , scanrefer ===============================
-            prefix = 'last_'
-            #* return format :  pred_cls, pred_box and conf (0-1)
-            #* box 是8个定点
-
-            batch_pred_map_cls = my_parse_predictions(
-                end_points, CONFIG_DICT, prefix)
-
-                        
-            for idx,batch_res in  enumerate(batch_pred_map_cls):
-                #* 1. 获取target id 
-                #* 2. 根据target id 获取这个target 对应的 score 最大的target  
-                #* 3. 保存对应的 box等信息
-                batch_res=  np.array(batch_res)
-                
-                target_id = batch_data['target_cid'].cpu().numpy().tolist()[idx]
-
-                batch_res = batch_res[batch_res[:,0]==target_id]
-                # batch_data['target_id'].cpu().numpy().tolist()
-                # batch_data['ann_id']
-                # batch_data['unique_multiple'].cpu().numpy().tolist()
-
-                
-                max_idx = np.argmax(np.array([x[2] for x in batch_res])) #* 只取confidence 最大的, 不管是什么哪个target  , 这个对应的是target id , 也就是第几个目标
-
-                boxes =np.squeeze(box2points(batch_res[max_idx][1][None]))
-                
-
-                pred_data = {
-                    "scene_id": end_points['scan_ids'][idx],
-                    "object_id": batch_data['target_id'].cpu().numpy().astype(np.str0).tolist()[idx],
-                    "ann_id": batch_data['ann_id'][idx],
-                    "bbox": boxes.tolist(),
-                    "unique_multiple":  batch_data['unique_multiple'].cpu().numpy().tolist()[idx],
-                    "others": 1 if batch_data['target_cid'][idx] == 17 else 0
-                }
-                pred_bboxes.append(pred_data)
-                
-                
-                if for_vis:
-                    #* save for vis , get top k for  vis 
-                    target_save_path = osp.join(self.vis_save_path,end_points['scan_ids'][idx]+"_%d_%d"%(idx,batch_idx))
-                    make_dirs(target_save_path)                
-                    utterance_format="%s_%d_%d_utterance.txt"
-                    save_txt(end_points['utterances'][idx],osp.join(target_save_path,utterance_format%(end_points['scan_ids'][idx],idx,batch_idx)))
-                    topk = 5
-                    max_indexes = np.argsort(score)[-topk:]
-                    # score[max_indexes][::-1]#* 倒序的 转 正序的
-                    # obj_id=batch_res[max_indexes][:,0] #?
-                    boxes =batch_res[max_indexes][:,1]
-                    boxes = np.array([ box.tolist() for box in boxes])
-
-                    save_for_vis(boxes,batch_data['point_clouds'][idx],target_save_path,end_points['scan_ids'][idx],batch_idx,flag='student',idx=idx)
-                    save_for_vis(batch_data['all_bboxes'][idx][batch_data['all_bbox_label_mask'][idx]].cpu().numpy(),batch_data['point_clouds'][idx],
-                                target_save_path,end_points['scan_ids'][idx],batch_idx,flag='student2',idx=idx,save=False)
-                    save_for_vis((torch.cat([batch_data['center_label'],batch_data['size_gts']],axis=-1)[idx][batch_data['box_label_mask'][idx].bool()]).cpu().numpy()
-                                    ,batch_data['point_clouds'][idx],target_save_path,end_points['scan_ids'][idx],batch_idx,flag='teacher',idx=idx,save=False)
-
-
-            #!=================================================================================
-        
-        #* dump for upload evaluation server ========================================
-        self.log("dumping...")
-        pred_path = os.path.join(args.log_dir, "pred.json")
-        with open(pred_path, "w") as f:
-            json.dump(pred_bboxes, f, indent=4)
-            
-        self.log("done!")
-        #*===========================================================================
-
-
-
     @torch.no_grad()
     def evaluate_one_epoch_det(self, epoch, test_loader,
                                model, criterion, set_criterion, args):

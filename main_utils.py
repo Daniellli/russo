@@ -13,7 +13,6 @@
 import argparse
 import json
 import os
-from posixpath import dirname
 import random
 import time
 
@@ -25,34 +24,15 @@ from torch.utils.data.distributed import DistributedSampler
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel
 import wandb
-
-# from models import HungarianMatcher, SetCriterion, compute_hungarian_loss
 from models import HungarianMatcher, SetCriterion, compute_labeled_hungarian_loss
 from utils import get_scheduler, setup_logger
-
-
-
-from my_utils.vis_utils import *
-from my_utils.pc_utils import *
-
+from utils.pc_utils import *
 from loguru import logger
-
-
-
-
 import os.path as osp
+from os.path import isdir,isfile,exists,join,exists,split
+from utils.utils import save_res,load_checkpoint,save_checkpoint
 
-from IPython import embed
-from models.ap_helper import my_parse_predictions
-from data.model_util_scannet import ScannetDatasetConfig
-
-#*=====================================
-from signal import signal, SIGPIPE, SIG_DFL, SIG_IGN
-signal(SIGPIPE, SIG_IGN)
-from my_utils.utils import make_dirs, save_res,parse_option,detach_module,load_checkpoint,save_checkpoint
-
-#*=====================================
-        
+import torch.nn.functional as F
 def parse_option():
 
     """Parse cmd arguments."""
@@ -93,7 +73,6 @@ def parse_option():
     parser.add_argument('--use_multiview', action='store_true')
     
     parser.add_argument('--butd', action='store_true')
-    
     parser.add_argument('--butd_gt', action='store_true')
     parser.add_argument('--butd_cls', action='store_true')
     parser.add_argument('--augment_det', action='store_true')
@@ -101,7 +80,7 @@ def parse_option():
 
     #* Training
     parser.add_argument('--start_epoch', type=int, default=1)
-    parser.add_argument('--max_epoch', type=int, default=400)
+    parser.add_argument('--max_epoch', type=int, default=1000)
     parser.add_argument('--optimizer', type=str, default='adamW')
     parser.add_argument('--weight_decay', type=float, default=0.0005)
     parser.add_argument("--lr", default=1e-4, type=float)
@@ -138,29 +117,35 @@ def parse_option():
     parser.add_argument("--debug", action='store_true',
                         help="try to overfit few samples")
     parser.add_argument('--eval', action='store_true')
-    parser.add_argument('--eval-scanrefer', default=False, action='store_true',help=' generate the pred.json for the ')
     parser.add_argument('--eval_train', action='store_true')
-    parser.add_argument('--pp_checkpoint', default=None)
+    parser.add_argument('--pp_checkpoint', default="datasets/gf_detector_l6o256.pth")
     parser.add_argument('--reduce_lr', action='store_true')
 
     #* mine args 
     parser.add_argument('--gpu-ids', default='7', type=str)
-    parser.add_argument('--vis-save-path', default=None, type=str)
     parser.add_argument('--wandb',action='store_true', help="upload to wandb or not ?")
-    parser.add_argument('--labeled_ratio', default=None, type=float,help=' labeled datasets ratio ')
     parser.add_argument('--use-tkps',action='store_true', help="use-tkps")
     parser.add_argument('--ref_use_obj_mask',action='store_true', help="ref_use_obj_mask")
     parser.add_argument('--lr_decay_intermediate',action='store_true')
 
+
+    #* semi supervise
+    parser.add_argument('--semi_batch_size', type=str, default="2,8",help='Batch Size during training')
+    
+    parser.add_argument('--box_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
+    parser.add_argument('--box_giou_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
+    parser.add_argument('--soft_token_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
+    parser.add_argument('--object_query_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
+    parser.add_argument('--text_token_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
+    parser.add_argument('--rampup_length', type=float, default=None, help='rampup_length')
+    parser.add_argument('--labeled_ratio', default=None, type=float,help=' labeled datasets ratio ')
+    parser.add_argument('--ema-decay', default=None, type=float,help=' EMA decay parameter ')
+    parser.add_argument('--ema-decay-after-rampup', default=None, type=float,help=' EMA decay parameter ')
+    parser.add_argument('--ema-full-supervise', action='store_true',help='ema-full-supervise ')
+
+
     args, _ = parser.parse_known_args()
     args.eval = args.eval or args.eval_train
-
-
-    args.use_color = True
-    args.use_soft_token_loss=True
-    args.use_contrastive_align=True
-    args.self_attend=True
-
 
     if args.labeled_ratio is not None :
         print(f"origin decay epoch : {args.lr_decay_epochs},opt.labeled_ratio : {args.labeled_ratio}")
@@ -214,30 +199,37 @@ class BaseTrainTester:
             
 
     def init_wandb(self):
-        if self.args.checkpoint_path is not None:
+        config_path = join(self.args.log_dir,'wandb_resume_info.json')
+
+        if self.args.checkpoint_path is not None and exists(config_path):
             #todo resume wandb :
-            with open(join(self.args.log_dir,'wandb_resume_info.json'), 'r') as f :
+            with open(config_path, 'r') as f :
                 last_run_info  = json.load(f)
             run  = wandb.init(project='BUTD_DETR',id=last_run_info['id'], resume="must")
             self.log(f"wandb has been resume ")
         else:
             run = wandb.init(project='BUTD_DETR')
             run.name = split(self.args.log_dir)[-1]
-            with open(join(self.args.log_dir,'wandb_resume_info.json'),'w') as f :
+            with open(config_path,'w') as f :
                 json.dump({
                     "id":run.id,
                     "name":run.name,
                 },f)
-            
             for k, v in self.args.__dict__.items():
                 setattr(wandb.config,k,v)
             setattr(wandb.config,"save_root",self.args.log_dir)
             self.log(f"wandb init process has done")
         self.use_wandb = True
+
+
     
+    def update_wandb_config(self,config_name,config_value):
+
+        if hasattr(self,'use_wandb') and self.use_wandb:
+            setattr(wandb.config,config_name,config_value)
+
     def log(self,message):
-        if dist.get_rank() == 0 or self.args.local_rank == -1:
-            # print((message))
+        if dist.get_rank() == 0:
             self.logger.info(message)
 
         
@@ -249,9 +241,6 @@ class BaseTrainTester:
     def get_dataset(self):
         """Initialize datasets."""
         raise NotImplementedError
-        # train_dataset = None
-        # test_dataset = None
-        # return train_dataset, test_dataset
 
 
     def seed_worker(self,worker_id):
@@ -413,14 +402,10 @@ class BaseTrainTester:
 
 
 
-                
 
+            
     def main(self, args):
-
         torch.cuda.set_device(args.local_rank)
-        self.log(f"args.local_rank == {args.local_rank}")
-        
-        
         """Run main training/testing pipeline."""
         # Get loaders
 
@@ -440,7 +425,6 @@ class BaseTrainTester:
 
         train_loader = self.get_dataloader(train_dataset,args.batch_size,args.num_workers,shuffle=True)
 
-
         test_dataset = self.get_dataset(args.data_root,dataset_dict,args.test_dataset,
                         'val' if not args.eval_train else 'train',
                          args.use_color,args.use_height,args.detect_intermediate,
@@ -451,10 +435,8 @@ class BaseTrainTester:
         test_loader = self.get_dataloader(test_dataset,args.batch_size,args.num_workers,shuffle=False)
         
 
-        n_data = len(train_loader.dataset)
-        self.log(f"length of training dataset: {n_data}")
-        n_data = len(test_loader.dataset)
-        self.log(f"length of testing dataset: {n_data}")
+        self.log(f"length of testing dataset: {len(test_loader.dataset)} \t \
+                training dataset:{len(train_loader.dataset)}")
 
         # Get model
         model = self.get_model(args)
@@ -493,17 +475,16 @@ class BaseTrainTester:
 
             #* update lr decay milestones
             #* load model 之后 schedule 也变了 , 变成上次训练的,这次的就不见了, 重新加载
+            
             if args.lr_decay_intermediate:
                 
                 self.log(f"current step :{scheduler._step_count},last epoch {scheduler.last_epoch} , warm up epoch :{args.warmup_epoch},args.lr_decay_epochs :{args.lr_decay_epochs},len(train_loader):{len(train_loader)}")
-                
-                
-                # tmp = {scheduler._step_count+len(train_loader):1 } #* 一个epoch 后decay learning rate 
-                # tmp.update({ k:v for  idx, (k,v) in enumerate(scheduler.milestones.items()) if idx != 0})
-                
-                scheduler.milestones ={len(train_loader)*( l-args.warmup_epoch - args.start_epoch )+scheduler.last_epoch : 1 for l in args.lr_decay_epochs}
-                
 
+                scheduler.milestones ={len(train_loader)*( l-args.warmup_epoch - args.start_epoch )+scheduler.last_epoch : 1 for l in args.lr_decay_epochs}
+                #* update wandb config 
+                self.update_wandb_config('lr_decay_epochs',args.lr_decay_epochs)
+                self.log(f"after update, scheduler.milestones : {scheduler.milestones}")
+                
             #* eval student model 
             if args.eval:
                 performance = self.evaluate_one_epoch(
@@ -514,18 +495,17 @@ class BaseTrainTester:
                 if performance is not None :
                     self.log(','.join(['student_%s:%.04f'%(k,round(v,4)) for k,v in performance.items()]))
                     is_best,snew_performance = save_res(save_dir,args.start_epoch-1,performance,best_performce)
-
                     if is_best:
                         best_performce = snew_performance
+                exit(0)
+                    
                 
-                
-             
         model = DistributedDataParallel(
             model, device_ids=[args.local_rank],
             broadcast_buffers=True  # , find_unused_parameters=True
         )
 
-        self.log(scheduler.milestones)
+        
         last_best_epoch_path = None
         for epoch in range(args.start_epoch, args.max_epoch + 1):
             train_loader.sampler.set_epoch(epoch)
@@ -545,7 +525,8 @@ class BaseTrainTester:
                     optimizer.param_groups[1]['lr']
                 )
             )
-            # save model
+            
+
             if epoch % args.val_freq == 0:
             
                 print("Test evaluation.......")
@@ -558,7 +539,6 @@ class BaseTrainTester:
                     if args.upload_wandb:
                         self.wandb_log(performance)
                         
-                        
                     with open(save_dir, 'a+')as f :
                         f.write( f"epoch:{epoch},"+','.join(["%s:%.4f"%(k,v) for k,v in performance.items()])+"\n")
                         
@@ -568,17 +548,13 @@ class BaseTrainTester:
                         spath = save_checkpoint(args, epoch, model, optimizer, scheduler ,is_best=True)
                         self.wandb_log({'Metrics/best_acc':best_performce})
                         
-
                         if last_best_epoch_path is not None:
                             os.remove(last_best_epoch_path)
                         last_best_epoch_path = spath
-    
 
 
-        # Training is over, evaluate
+        #* Training is over, evaluate, and save the last epoch model 
         save_checkpoint(args, 'last', model, optimizer, scheduler, True)
-
-
         saved_path = os.path.join(args.log_dir, 'ckpt_epoch_last.pth')
         self.log("Saved in {}".format(saved_path))
         self.evaluate_one_epoch(
@@ -648,6 +624,16 @@ class BaseTrainTester:
             # Move to GPU
             batch_data = self._to_gpu(batch_data)
             inputs = self._get_inputs(batch_data)
+            """
+            # todo vis 
+                debug_ids= 0 
+                write_ply_rgb(inputs['point_clouds'][debug_ids,:,:3].cpu().numpy(),((F.normalize(inputs['point_clouds'][debug_ids,:,3:])+1)/2* 256).cpu().numpy(),'logs/debug/scene.ply')
+                write_bbox(inputs['det_boxes'][debug_ids][inputs['det_bbox_label_mask'][debug_ids]].cpu().numpy(),'logs/debug/box.ply')
+            """
+            
+
+
+
 
             # Forward pass
             end_points = model(inputs)
@@ -659,6 +645,30 @@ class BaseTrainTester:
             loss, end_points = self._compute_loss(
                 end_points, criterion, set_criterion, args
             )
+
+            """
+            debug 
+
+            debug_ids= 0 
+            write_ply_rgb(inputs['point_clouds'][debug_ids,:,:3].cpu().numpy(),((F.normalize(inputs['point_clouds'][debug_ids,:,3:])+1)/2* 256).cpu().numpy(),'logs/debug/scene%d.ply'%(debug_ids))
+            write_bbox(inputs['det_boxes'][debug_ids][inputs['det_bbox_label_mask'][debug_ids]].cpu().numpy(),'logs/debug/box%d.ply'%(debug_ids))
+
+
+            #* gt
+            write_bbox(torch.cat([end_points['center_label'],end_points['size_gts']],axis=-1)[debug_ids][[end_points['box_label_mask'][debug_ids]==1]].cpu().numpy(),'logs/debug/gt_box%d.ply'%(debug_ids))
+            end_points['utterances'][debug_ids]
+
+
+            #* prediction
+            prefix = 'last_'
+            write_bbox(torch.cat([end_points[f"{prefix}center"],end_points[f"{prefix}pred_size"]],axis=-1)[debug_ids][end_points[f"{prefix}sem_cls_scores"][debug_ids][:,-1].max(-1)[1]].detach().unsqueeze(0).cpu().numpy(),'logs/debug/pred_box%d.ply'%(debug_ids))
+            write_bbox(torch.cat([end_points[f"{prefix}center"],end_points[f"{prefix}pred_size"]],axis=-1)[debug_ids].detach().cpu().numpy(),'logs/debug/all_pred_box%d.ply'%(debug_ids))
+            
+            """
+
+            
+
+
 
 
             optimizer.zero_grad()
@@ -677,22 +687,17 @@ class BaseTrainTester:
 
             if (batch_idx + 1) % args.print_freq == 0:
                 # Terminal logs
+                tmp = { f'Loss/{key}':stat_dict[key] / args.print_freq  for key in sorted(stat_dict.keys()) if 'loss' in key and 'proposal_' not in key and 'last_' not in key and 'head_' not in key }
+                
                 self.log(
-                    f'Train: [{epoch}][{batch_idx + 1}/{len(train_loader)}]  '
-                )
-                self.log(''.join([
-                    f'{key} {stat_dict[key] / args.print_freq:.4f} \t'
-                    for key in sorted(stat_dict.keys())
-                    if 'loss' in key and 'proposal_' not in key
-                    and 'last_' not in key and 'head_' not in key
+                    f'Train: [{epoch}][{batch_idx + 1}/{len(train_loader)}]  '+ \
+                    ''.join([
+                    f'{k} {v / args.print_freq:.4f} \t'
+                    for k,v in tmp.items()
                 ]))
 
-                
-                if args.upload_wandb and args.local_rank==0:
-                    
-                    tmp = { f'Loss/{key}':stat_dict[key] / args.print_freq  for key in sorted(stat_dict.keys()) if 'loss' in key and 'proposal_' not in key and 'last_' not in key and 'head_' not in key }
-                    tmp.update({"Misc/lr": scheduler.get_last_lr()[0],'Misc/grad_norm':stat_dict['grad_norm'],'epoch':epoch})
-                    self.wandb_log(tmp)
+                tmp.update({"Misc/lr": scheduler.get_last_lr()[0],'Misc/grad_norm':stat_dict['grad_norm'],'epoch':epoch})
+                self.wandb_log(tmp)
 
                 for key in sorted(stat_dict.keys()):
                     stat_dict[key] = 0

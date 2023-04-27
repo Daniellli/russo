@@ -16,8 +16,9 @@ import os
 import numpy as np
 import torch
 import torch.distributed as dist
+from main_utils import parse_option, BaseTrainTester
 from train_dist_mod import TrainTester
-from src.joint_semi_supervise_dataset import JointSemiSupervisetDataset
+import torch.nn.functional as F
 
 from src.joint_labeled_dataset import JointLabeledDataset
 from src.joint_unlabeled_dataset import JointUnlabeledDataset
@@ -25,9 +26,8 @@ from src.joint_unlabeled_dataset import JointUnlabeledDataset
 import ipdb
 st = ipdb.set_trace
 import sys 
+from utils.pc_utils import *
 
-import wandb
-from loguru import logger 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(BASE_DIR)
 
@@ -36,18 +36,11 @@ import os.path as osp
 import time
 from torch.nn.parallel import DistributedDataParallel
 from main_utils import save_checkpoint,load_checkpoint,get_scheduler
+from utils.utils import save_res,make_dirs
 
-from torch.utils.data.distributed import DistributedSampler
-from torch.utils.data import DataLoader
-import random 
-from my_utils.consistant_loss import get_consistency_loss
-from my_utils.utils import parse_semi_supervise_option,save_res,make_dirs,remove_file
+from os.path import join,exists,split,isdir,isfile
 
-from IPython import embed
-
-
-
-from my_utils.consistency_criterion import ConsistencyCriterion
+from models.consistency_criterion import ConsistencyCriterion
 
 
 class SemiSuperviseTrainTester(TrainTester):
@@ -129,10 +122,9 @@ class SemiSuperviseTrainTester(TrainTester):
     '''
     def get_unlabeled_dataset(self,data_root,train_dataset_dict,test_datasets,split,use_color,use_height,
                     detect_intermediate,use_multiview,butd,butd_gt,butd_cls,
-                    augment_det=False,debug=False,labeled_ratio=None,unlabel_dataset_root=None):
+                    augment_det=False,debug=False,labeled_ratio=None):
 
         self.log(f"unlabeled datasets,ratio {labeled_ratio} , has been loaded ")
-
         
         return JointUnlabeledDataset(
             dataset_dict=train_dataset_dict,
@@ -218,10 +210,9 @@ class SemiSuperviseTrainTester(TrainTester):
             "epoch":epoch
         })
         
-        
         unlabeled_loader_iter=iter(unlabeled_loader)
-        # get_current_consistency_weight
-
+        
+        
         consistency_criterion = ConsistencyCriterion(box_consistency_weight=box_consistency_weight,
                             giou_consistency_weight = box_giou_consistency_weight,
                             soft_token_consistency_weight=soft_token_consistency_weight,
@@ -241,7 +232,6 @@ class SemiSuperviseTrainTester(TrainTester):
 
                     
 
-        
         for batch_idx, batch_data in enumerate(labeled_loader):
 
 
@@ -268,19 +258,8 @@ class SemiSuperviseTrainTester(TrainTester):
             teacher_input=self._get_teacher_inputs(batch_data)
             
             
-            #* check input
-            DEBUG=False 
-            if  DEBUG and args.local_rank == 0 :
-                for scene in batch_data['scan_ids']:
-                    make_dirs(osp.join(self.vis_save_path,scene))
-
-                self.check_input(inputs,batch_data['scan_ids'],'student')
-                self.check_input(teacher_input,batch_data['scan_ids'],'teacher')
-                self.check_target(batch_data,batch_data['scan_ids'])
-
-                if batch_idx == 5:
-                    break
-
+        
+         
             # Forward pass
             end_points = model(inputs)
             with torch.no_grad():
@@ -290,7 +269,34 @@ class SemiSuperviseTrainTester(TrainTester):
             for key in batch_data:
                 assert (key not in end_points)
                 end_points[key] = batch_data[key]
-                # teacher_end_points[key] = batch_data[key]
+
+            """
+            #* check input
+
+                debug_ids=1
+                #* studnet 
+                write_ply_rgb(inputs['point_clouds'][debug_ids,:,:3].cpu().numpy(),((F.normalize(inputs['point_clouds'][debug_ids,:,3:])+1)/2* 256).cpu().numpy(),'logs/debug/scene%d.ply'%(debug_ids))
+                write_bbox(inputs['det_boxes'][debug_ids][inputs['det_bbox_label_mask'][debug_ids]].cpu().numpy(),'logs/debug/box%d.ply'%(debug_ids))
+
+
+                write_bbox(torch.cat([end_points['center_label'],end_points['size_gts']],axis=-1)[debug_ids][[end_points['box_label_mask'][debug_ids]==1]].cpu().numpy(),'logs/debug/gt_box%d.ply'%(debug_ids))
+                end_points['utterances'][debug_ids]
+
+                prefix = 'last_'
+                write_bbox(torch.cat([end_points[f"{prefix}center"],end_points[f"{prefix}pred_size"]],axis=-1)[debug_ids][end_points[f"{prefix}sem_cls_scores"][debug_ids][:,-1].max(-1)[1]].detach().unsqueeze(0).cpu().numpy(),'logs/debug/pred_box%d.ply'%(debug_ids))
+                write_bbox(torch.cat([end_points[f"{prefix}center"],end_points[f"{prefix}pred_size"]],axis=-1)[debug_ids].detach().cpu().numpy(),'logs/debug/all_pred_box%d.ply'%(debug_ids))
+
+
+                #* teacher 
+                write_ply_rgb(teacher_input['point_clouds'][debug_ids,:,:3].cpu().numpy(),((F.normalize(teacher_input['point_clouds'][debug_ids,:,3:])+1)/2* 256).cpu().numpy(),'logs/debug/teacher_scene%d.ply'%(debug_ids))
+                write_bbox(teacher_input['det_boxes'][debug_ids][teacher_input['det_bbox_label_mask'][debug_ids]].cpu().numpy(),'logs/debug/teacher_box%d.ply'%(debug_ids))
+
+                write_bbox(torch.cat([teacher_end_points[f"{prefix}center"],teacher_end_points[f"{prefix}pred_size"]],axis=-1)[debug_ids][teacher_end_points[f"{prefix}sem_cls_scores"][debug_ids][:,-1].max(-1)[1]].detach().unsqueeze(0).cpu().numpy(),'logs/debug/teacher_pred_box%d.ply'%(debug_ids))
+                write_bbox(torch.cat([teacher_end_points[f"{prefix}center"],teacher_end_points[f"{prefix}pred_size"]],axis=-1)[debug_ids].detach().cpu().numpy(),'logs/debug/teacher_all_pred_box%d.ply'%(debug_ids))
+
+            """
+
+            
 
             #* add index for knowing  what is labeled which is unlabeled 
             loss, end_points = self._compute_loss(
@@ -306,11 +312,6 @@ class SemiSuperviseTrainTester(TrainTester):
             
             optimizer.zero_grad()
             loss.backward()
-
-
-
-
-
 
 
             """
@@ -398,12 +399,10 @@ class SemiSuperviseTrainTester(TrainTester):
                 np.quantile(supervised_loss_grad_list, 0.25): 3.599652245611651e-06
                 np.quantile(supervised_loss_grad_list, 0.5) : 3.329723404021934e-05
                 np.quantile(supervised_loss_grad_list, 0.75): 0.00023653818061575294
+
+
             """
 
-
-            
-            
-            #* max grad  == 20.026945, 
             if args.clip_norm > 0:
                 grad_total_norm = torch.nn.utils.clip_grad_norm_(
                     model.parameters(), args.clip_norm
@@ -423,18 +422,13 @@ class SemiSuperviseTrainTester(TrainTester):
             if ran_epoch>args.rampup_length:
                 alpha=args.ema_decay_after_rampup
                 
-
-
             self.update_ema_variables(model,ema_model,alpha,global_step)
             #*===================================================
 
             # Accumulate statistics and print out
+            stat_dict = self._accumulate_stats(stat_dict, end_points)
+
             if (batch_idx + 1) % args.print_freq == 0 and args.local_rank==0:
-                stat_dict = self._accumulate_stats(stat_dict, end_points)
-
-                self.log(f"ran_epoch:{ran_epoch},alpha:{alpha} \n Train: [{epoch}][{batch_idx + 1}/{total_iteration}]")
-                
-
                 tmp =  { "Loss/%s"%(key) : round(stat_dict[key] / args.print_freq,10) for key in sorted(stat_dict.keys()) \
                     if 'loss' in key and 'proposal_' not in key and 'last_' not in key and 'head_' not in key and 'consistency' not in key}
 
@@ -446,151 +440,16 @@ class SemiSuperviseTrainTester(TrainTester):
                             "Misc/grad_norm":stat_dict['grad_norm'],
                             "Misc/Epoch":epoch})
 
-                self.log('\t'.join([k+': '+"%.10f"%(v) for k,v in tmp.items()]))
+                self.log(f"ran_epoch:{ran_epoch},alpha:{alpha} \n Train: [{epoch}][{batch_idx + 1}/{total_iteration}]" + \
+                        '\t'.join([k+': '+"%.10f"%(v) for k,v in tmp.items()]))
                 self.wandb_log(tmp)
-
-                for key in sorted(stat_dict.keys()):
-                    stat_dict[key] = 0
-
-
-
-    def full_supervise_train_one_epoch(self, epoch, labeled_loader,
-                        model,ema_model,
-                        criterion, set_criterion,
-                        optimizer, scheduler, args):
-        """
-        Run a single epoch.
-
-        Some of the args:
-            model: a nn.Module that returns end_points (dict)
-            criterion: a function that returns (loss, end_points)
-        """
-        stat_dict = {}  # collect statistics
-        model.train()  # set model to training mode
-
-        # Loop over batches
-
-        total_iteration=len(labeled_loader)
-    
-        self.log(f"total_iteration == {total_iteration}")
-
-        center_consistency_weight = self.get_current_consistency_weight(args.center_consistency_weight ,epoch,args)
-        size_consistency_weight = self.get_current_consistency_weight(args.size_consistency_weight ,epoch,args)
-        token_consistency_weight = self.get_current_consistency_weight(args.token_consistency_weight ,epoch,args)
-
-        query_consistency_weight = self.get_current_consistency_weight(args.query_consistency_weight ,epoch,args)
-        text_consistency_weight = self.get_current_consistency_weight(args.text_consistency_weight ,epoch,args)
-
-
-        self.log(f"center_consistency_weight  : {center_consistency_weight}")
-        self.log(f"size_consistency_weight  : {size_consistency_weight}")
-        self.log(f"token_consistency_weight  : {token_consistency_weight}")
-        self.log(f"query_consistency_weight  : {query_consistency_weight}")
-        self.log(f"text_consistency_weight  : {text_consistency_weight}")
-
-        
-        for batch_idx, batch_data in enumerate(labeled_loader):
-            # Move to GPU
-            batch_data = self._to_gpu(batch_data)
-
-            inputs = self._get_inputs(batch_data)
-            teacher_input=self._get_teacher_inputs(batch_data)
-            
-            
-            # Forward pass
-            end_points = model(inputs)
-            with torch.no_grad():
-                teacher_end_points = ema_model(teacher_input)   
-
-            # Compute loss and gradients, update parameters.
-            for key in batch_data:
-                assert (key not in end_points)
-                end_points[key] = batch_data[key]
-                # teacher_end_points[key] = batch_data[key]
-
-            #* add index for knowing  what is labeled which is unlabeled 
-            loss, end_points = self._compute_loss(
-                end_points, criterion, set_criterion, args
-            )
-
-            end_points = get_consistency_loss(end_points, teacher_end_points,batch_data['augmentations'])
-            consistent_loss =center_consistency_loss=soft_token_consistency_loss=size_consistency_loss=query_consistency_loss=text_consistency_loss=None
-
-            center_consistency_loss = end_points['center_consistency_loss'] * center_consistency_weight
-            soft_token_consistency_loss = end_points['soft_token_consistency_loss']* token_consistency_weight
-            size_consistency_loss = end_points['size_consistency_loss'] * size_consistency_weight
-            query_consistency_loss = end_points['query_consistency_loss'] * query_consistency_weight
-            text_consistency_loss = end_points['text_consistency_loss'] * text_consistency_weight
-
-            consistent_loss = soft_token_consistency_loss +center_consistency_loss+size_consistency_loss+query_consistency_loss+text_consistency_loss
-
-
-            #* total loss
-            if consistent_loss is not None:
-                total_loss = loss+consistent_loss
-            else:
-                total_loss = loss
-
-            optimizer.zero_grad()
-            total_loss.backward()
-            
-            if args.clip_norm > 0:
-                grad_total_norm = torch.nn.utils.clip_grad_norm_(
-                    model.parameters(), args.clip_norm
-                )
-                stat_dict['grad_norm'] = grad_total_norm
-
-            optimizer.step()
-            scheduler.step()
-
-            #*===================================================
-            #* update  teacher model 
-            #* epoch start from 1 by default , so have to minus one 
-            global_step = (batch_idx+1) + (epoch -args.start_epoch) *total_iteration
-            alpha = args.ema_decay
-            self.update_ema_variables(model,ema_model,alpha,global_step)
-            #*===================================================
-
-            # Accumulate statistics and print out
-            stat_dict = self._accumulate_stats(stat_dict, end_points)
-
-            if (batch_idx + 1) % args.print_freq == 0:
-                # Terminal logs
-                self.log(
-                    f'Train: [{epoch}][{batch_idx + 1}/{total_iteration}]  '
-                )
-                self.log(''.join([
-                    f'{key} {stat_dict[key] / args.print_freq:.4f} \t'
-                    for key in sorted(stat_dict.keys())
-                    if 'loss' in key and 'proposal_' not in key
-                    and 'last_' not in key and 'head_' not in key
-                ]))
-
-
-                if args.upload_wandb and args.local_rank==0:
-                    tmp = { f'{key}':stat_dict[key] / args.print_freq  for key in sorted(stat_dict.keys()) if 'loss' in key and 'proposal_' not in key and 'last_' not in key and 'head_' not in key }
-                    tmp.update({"student_supervised_loss":loss.clone().detach().item(),
-                                "center_consistency_loss":center_consistency_loss.clone().detach().item() if center_consistency_loss is not None else None,
-                                "soft_token_consistency_loss":soft_token_consistency_loss.clone().detach().item() if soft_token_consistency_loss is not None else None,
-                                "size_consistency_loss":size_consistency_loss.clone().detach().item() if size_consistency_loss is not None else None,
-                                "query_consistency_loss":query_consistency_loss.clone().detach().item() if query_consistency_loss is not None else None,
-                                "text_consistency_loss":text_consistency_loss.clone().detach().item() if text_consistency_loss is not None else None,
-                                "consistent_loss":consistent_loss.clone().detach().item() if consistent_loss is not None else None ,
-                                "total_loss":total_loss.clone().detach().item(),
-                                "lr": scheduler.get_last_lr()[0]
-                            })
-                    wandb.log(tmp)
-
                 for key in sorted(stat_dict.keys()):
                     stat_dict[key] = 0
 
 
     def main(self, args):
-        #!======================= 避免数据跑到其他卡上
         torch.cuda.set_device(args.local_rank)
-        self.log(f"args.local_rank == {args.local_rank}")
-        #!=======================
-
+        
         """Run main training/testing pipeline."""
         # Get loaders
         dataset_dict = {}  # dict to use multiple datasets
@@ -618,7 +477,7 @@ class SemiSuperviseTrainTester(TrainTester):
                         args.use_color,args.use_height,args.detect_intermediate,
                         args.use_multiview,args.butd,args.butd_gt,
                         args.butd_cls,args.augment_det,args.debug,
-                        labeled_ratio=args.labeled_ratio,unlabel_dataset_root=args.unlabel_dataset_root)
+                        labeled_ratio=args.labeled_ratio)
                 
         
         test_dataset = self.get_dataset(args.data_root,dataset_dict,args.test_dataset,
@@ -630,7 +489,7 @@ class SemiSuperviseTrainTester(TrainTester):
 
 
 
-        batch_size_list = np.array(args.batch_size.split(',')).astype(np.int64)
+        batch_size_list = np.array(args.semi_batch_size.split(',')).astype(np.int64)
         labeled_loader = self.get_dataloader(labeled_dataset,int(batch_size_list[0]),args.num_workers,shuffle = True)
         unlabeled_loader = self.get_dataloader(unlabeled_datasets,int(batch_size_list[1]),args.num_workers,shuffle = True)
         test_loader = self.get_dataloader(test_dataset,int(batch_size_list.sum().astype(np.int64)),args.num_workers,shuffle = False)
@@ -677,20 +536,20 @@ class SemiSuperviseTrainTester(TrainTester):
 
         #* 1.Check for a checkpoint
         #* 2.eval and save res to a txt file 
+            
+        
         if args.checkpoint_path:
             assert os.path.isfile(args.checkpoint_path)
+
             load_checkpoint(args, model, optimizer, scheduler)
             load_checkpoint(args, ema_model, optimizer, scheduler)
 
             #* update lr decay milestones
             if args.lr_decay_intermediate:    
-                # tmp = {scheduler._step_count+len(labeled_loader):1 } #* 一个epoch 后decay learning rate 
-                # tmp.update({ k:v for  idx, (k,v) in enumerate(scheduler.milestones.items()) if idx != 0})
-                # scheduler.milestones = tmp
                 self.log(f"scheduler._step_count :{scheduler._step_count},args.start_epoch:{args.start_epoch},args.warmup_epoch:{args.warmup_epoch}")
-                decay_epoch = [( l-args.warmup_epoch - args.start_epoch ) for l in args.lr_decay_epochs]
-
+                
                 scheduler.milestones ={len(labeled_loader)*( l-args.warmup_epoch - args.start_epoch )+scheduler.last_epoch : 1 for l in args.lr_decay_epochs}
+                self.update_wandb_config('lr_decay_epochs',args.lr_decay_epochs)
                 self.log(scheduler.milestones )
 
             #* eval student model 
@@ -699,25 +558,11 @@ class SemiSuperviseTrainTester(TrainTester):
                     args.start_epoch, test_loader,
                     model, criterion, set_criterion, args
                 )
-                
                 if performance is not None :
                     self.log(','.join(['student_%s:%.04f'%(k,round(v,4)) for k,v in performance.items()]))
                     is_best,snew_performance = save_res(save_dir,args.start_epoch-1,performance,best_performce)
-
                     if is_best:
                         best_performce = snew_performance
-
-                #* eval teacher model 
-                ema_performance = self.evaluate_one_epoch(
-                    args.start_epoch, test_loader,
-                    ema_model, criterion, set_criterion, args
-                )
-
-                if ema_performance is not None :
-                    self.log(','.join(['teacher_%s:%.04f'%(k,round(v,4)) for k,v in ema_performance.items()]))
-                    is_best,tnew_performance = save_res(ema_save_dir,args.start_epoch-1,ema_performance,ema_best_performce)
-                    if is_best:
-                        ema_best_performce= tnew_performance
                 exit(0)
 
         model = DistributedDataParallel(
@@ -731,7 +576,6 @@ class SemiSuperviseTrainTester(TrainTester):
             
             labeled_loader.sampler.set_epoch(epoch)
             unlabeled_loader.sampler.set_epoch(epoch)
-
 
             tic = time.time()
             
@@ -767,7 +611,9 @@ class SemiSuperviseTrainTester(TrainTester):
                         best_performce =  snew_performance
                         spath = save_checkpoint(args, epoch, model, optimizer, scheduler ,is_best=True,prefix='student_')
 
-                        remove_file(last_student_best_path)
+                        if exists(last_student_best_path):
+                            os.remove(last_student_best_path)
+
                         last_student_best_path = spath
 
                 
@@ -783,249 +629,25 @@ class SemiSuperviseTrainTester(TrainTester):
                         ema_best_performce =  tnew_performance
                         spath= save_checkpoint(args, epoch, ema_model, optimizer, scheduler ,is_best=True,prefix='teacher_')
                 
-                        remove_file(last_teacher_best_path)
+                        if exists(last_student_best_path):
+                            os.remove(last_teacher_best_path)
                         last_teacher_best_path = spath
                         
                 
-                
                 #todo 把save as txt 分离出来? 
-                if dist.get_rank() == 0 and args.upload_wandb:
-                    #* model (student model )
-                    if performance is not None :
-                        wandb.log({'student_%s'%(k):round(v,4) for k,v in performance.items()})
-                        if is_best:
-                            wandb.log({'%s'%('student_best_'+k):round(v,4) for k,v in performance.items()})
-
-                    if ema_performance is not None :
-                        wandb.log({'teacher_%s'%(k):round(v,4) for k,v in ema_performance.items()})
-                        if ema_is_best:
-                            wandb.log({'%s'%('teacher_best_'+k):round(v,4) for k,v in ema_performance.items()})
-
-
-        # Training is over, evaluate
-        save_checkpoint(args, 'last', model, optimizer, scheduler, True)
-        saved_path = os.path.join(args.log_dir, 'ckpt_epoch_last.pth')
-        self.log("Saved in {}".format(saved_path))
-        self.evaluate_one_epoch(
-            args.max_epoch, test_loader,
-            model, criterion, set_criterion, args
-        )
-        return saved_path
-
-    
-    '''
-    description:  全部使用有标签数据过EMA architecture
-    param {*} self
-    param {*} args
-    return {*}
-    '''
-    def full_supervise_main(self, args):
-        #!======================= 避免数据跑到其他卡上
-        torch.cuda.set_device(args.local_rank)
-        self.log(f"args.local_rank == {args.local_rank}")
-        #!=======================
-
-        """Run main training/testing pipeline."""
-        # Get loaders
-        dataset_dict = {}  # dict to use multiple datasets
-        for dset in args.dataset:
-            dataset_dict[dset] = 1
-
-        if args.joint_det:
-            dataset_dict['scannet'] = 10
-
-
-
-        print('Loading datasets:', sorted(list(dataset_dict.keys())))
-        labeled_dataset = self.get_dataset(args.data_root,dataset_dict,args.test_dataset,
-                        'train' if not args.debug else 'val', 
-                        args.use_color,args.use_height,args.detect_intermediate,
-                        args.use_multiview,args.butd,args.butd_gt,
-                        args.butd_cls,args.augment_det,args.debug,
-                        labeled_ratio=None)#* using all  training datasets  as labeled datasets 
-
-
-        
-        test_dataset = self.get_dataset(args.data_root,dataset_dict,args.test_dataset,
-                        'val' if not args.eval_train else 'train',
-                         args.use_color,args.use_height,args.detect_intermediate,
-                         args.use_multiview,args.butd,args.butd_gt,
-                         args.butd_cls,debug = args.debug)
-
-
-
-
-        batch_size_list = np.array(args.batch_size.split(',')).astype(np.int64)
-
-
-        labeled_loader = self.get_dataloader(labeled_dataset,int(batch_size_list.sum()),args.num_workers,shuffle = True)
-        test_loader = self.get_dataloader(test_dataset,int(batch_size_list.sum().astype(np.int64)),args.num_workers,shuffle = False)
-
-
-        self.log(f"length of  labeled dataset: {len(labeled_loader.dataset)} \t length of testing dataset: {len(test_loader.dataset)}")
-
-        
-        # Get model
-        model = self.get_model(args)
-        ema_model = self.get_model(args)
-        
-        for param in ema_model.parameters():
-            param.detach_()
-
-        # Get criterion
-        criterion, set_criterion = self.get_criterion(args)
-
-        # Get optimizer
-        optimizer = self.get_optimizer(args, model)
-
-
-        # Get scheduler
-        scheduler = get_scheduler(optimizer, len(labeled_loader), args)#* 第二个参数是一个epoch需要iteration 多少次 
-
-        # Move model to devices
-        if torch.cuda.is_available():
-            model = model.cuda(args.local_rank)
-            ema_model = ema_model.cuda(args.local_rank)
-
-       
-
-        
-        #* file and variable for saving the eval res 
-        best_performce = 0
-        save_dir = osp.join(args.log_dir,'performance.txt')
-
-        ema_best_performce = 0
-        ema_save_dir = osp.join(args.log_dir,'ema_performance.txt')
-
-        if osp.exists(save_dir):
-            os.remove(save_dir)
-
-        #* 1.Check for a checkpoint
-        #* 2.eval and save res to a txt file 
-        if args.checkpoint_path:
-            assert os.path.isfile(args.checkpoint_path)
-            load_checkpoint(args, model, optimizer, scheduler)
-            load_checkpoint(args, ema_model, optimizer, scheduler)
-
-            #* update lr decay milestones
-            if args.lr_decay_intermediate:    
-                self.log(f"scheduler._step_count :{scheduler._step_count},args.start_epoch:{args.start_epoch},args.warmup_epoch:{args.warmup_epoch}")
-                decay_epoch = [( l-args.warmup_epoch - args.start_epoch ) for l in args.lr_decay_epochs]
-
-                scheduler.milestones ={len(labeled_loader)*( l-args.warmup_epoch - args.start_epoch )+scheduler.last_epoch : 1 for l in args.lr_decay_epochs}
-                self.log(scheduler.milestones )
-
-            #* eval student model 
-            if args.eval:
-                performance = self.evaluate_one_epoch(
-                    args.start_epoch, test_loader,
-                    model, criterion, set_criterion, args
-                )
-                
+                #* model (student model )
                 if performance is not None :
-                    self.log(','.join(['student_%s:%.04f'%(k,round(v,4)) for k,v in performance.items()]))
-                    is_best,snew_performance = save_res(save_dir,args.start_epoch-1,performance,best_performce)
-
+                    self.wandb_log({'student_%s'%(k):round(v,4) for k,v in performance.items()})
                     if is_best:
-                        best_performce = snew_performance
-
-                #* eval teacher model 
-                ema_performance = self.evaluate_one_epoch(
-                    args.start_epoch, test_loader,
-                    ema_model, criterion, set_criterion, args
-                )
+                        self.wandb_log({'%s'%('student_best_'+k):round(v,4) for k,v in performance.items()})
 
                 if ema_performance is not None :
-                    self.log(','.join(['teacher_%s:%.04f'%(k,round(v,4)) for k,v in ema_performance.items()]))
-                    is_best,tnew_performance = save_res(ema_save_dir,args.start_epoch-1,ema_performance,ema_best_performce)
-                    if is_best:
-                        ema_best_performce= tnew_performance
-                exit(0)
-
-
-        model = DistributedDataParallel(
-            model, device_ids=[args.local_rank],
-            broadcast_buffers=True  # , find_unused_parameters=True
-        )
-
-                    
-        #* Training loop
-        last_student_best_path = last_teacher_best_path = None
-        for epoch in range(args.start_epoch, args.max_epoch + 1):
-            
-            labeled_loader.sampler.set_epoch(epoch)
-
-
-            tic = time.time()
-            
-
-            self.full_supervise_train_one_epoch(
-                epoch, labeled_loader,model,ema_model,
-                criterion, set_criterion,
-                optimizer, scheduler, args
-            )
-
-            self.log(
-                'epoch {}, total time {:.2f}, '
-                'lr_base {:.5f}, lr_pointnet {:.5f}'.format(
-                    epoch, (time.time() - tic),
-                    optimizer.param_groups[0]['lr'],
-                    optimizer.param_groups[1]['lr']
-                )
-            )
-
-            # save model
-            if epoch % args.val_freq == 0:
-
-                print("Test evaluation.......")
-                performance = self.evaluate_one_epoch(
-                    epoch, test_loader,
-                    model, criterion, set_criterion, args
-                )
-                
-                if performance is not None :
-                    self.log(','.join(['student_%s:%.04f'%(k,round(v,4)) for k,v in performance.items()]))
-                    is_best,snew_performance = save_res(save_dir,epoch,performance,best_performce)
-                    if is_best:
-                        best_performce =  snew_performance
-                        spath = save_checkpoint(args, epoch, model, optimizer, scheduler ,is_best=True,prefix='student_')
-
-                        remove_file(last_student_best_path)
-                        last_student_best_path = spath
-
-                
-                ema_performance = self.evaluate_one_epoch(
-                    epoch, test_loader,
-                    ema_model, criterion, set_criterion, args
-                )
-
-                if ema_performance is not None :
-                    self.log(','.join(['teacher_%s:%.04f'%(k,round(v,4)) for k,v in ema_performance.items()]))
-                    ema_is_best,tnew_performance = save_res(ema_save_dir,epoch,ema_performance,ema_best_performce)
+                    self.wandb_log({'teacher_%s'%(k):round(v,4) for k,v in ema_performance.items()})
                     if ema_is_best:
-                        ema_best_performce =  tnew_performance
-                        spath= save_checkpoint(args, epoch, ema_model, optimizer, scheduler ,is_best=True,prefix='teacher_')     
-                        
-                        remove_file(last_teacher_best_path)
-                        last_teacher_best_path = spath
-
-                
-                
-                #todo 把save as txt 分离出来? 
-                if dist.get_rank() == 0 and args.upload_wandb:
-                    #* model (student model )
-                    if performance is not None :
-                        wandb.log({'student_%s'%(k):round(v,4) for k,v in performance.items()})
-                        if is_best:
-                            wandb.log({'%s'%('student_best_'+k):round(v,4) for k,v in performance.items()})
-
-                    if ema_performance is not None :
-                        wandb.log({'teacher_%s'%(k):round(v,4) for k,v in ema_performance.items()})
-                        if ema_is_best:
-                            wandb.log({'%s'%('teacher_best_'+k):round(v,4) for k,v in ema_performance.items()})
+                        self.wandb_log({'%s'%('teacher_best_'+k):round(v,4) for k,v in ema_performance.items()})
 
 
-        # Training is over, evaluate
+        #* Training is over, evaluate
         save_checkpoint(args, 'last', model, optimizer, scheduler, True)
         saved_path = os.path.join(args.log_dir, 'ckpt_epoch_last.pth')
         self.log("Saved in {}".format(saved_path))
@@ -1034,14 +656,11 @@ class SemiSuperviseTrainTester(TrainTester):
             model, criterion, set_criterion, args
         )
         return saved_path
-
-
-
 
     
 if __name__ == '__main__':
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
-    opt = parse_semi_supervise_option()
+    opt = parse_option()
 
     
     # logger.info(f"gpu ids == {opt.gpu_ids}")
@@ -1055,9 +674,6 @@ if __name__ == '__main__':
 
     train_tester = SemiSuperviseTrainTester(opt)
 
-    if opt.ema_full_supervise:
-        ckpt_path = train_tester.full_supervise_main(opt)
-    else:
-        ckpt_path = train_tester.main(opt)
+    ckpt_path = train_tester.main(opt)
     
     
