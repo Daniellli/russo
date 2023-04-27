@@ -57,9 +57,6 @@ class SemiSuperviseTrainTester(TrainTester):
         """Initialize."""
         super().__init__(args)
             
-            
-        
-
     ''' 
     description:  就是 不是直接用args.consistency_weight  , 而是用这个公式不断靠近这个consistency_weight,E.g.0.1,0.2....10
     param {*} self
@@ -85,8 +82,6 @@ class SemiSuperviseTrainTester(TrainTester):
         return weight * sigmoid_rampup(epoch,args)
 
 
-
-            
       
     '''
     description: 获取一个数据集

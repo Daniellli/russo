@@ -2,7 +2,7 @@
 ###
  # @Author: daniel
  # @Date: 2023-03-28 23:07:11
- # @LastEditTime: 2023-03-28 23:11:01
+ # @LastEditTime: 2023-04-26 21:01:00
  # @LastEditors: daniel
  # @Description: 
  # @FilePath: /butd_detr/scripts/pretrain_det_scanrefer.sh
@@ -20,8 +20,9 @@ test_data=scanrefer
 DATA_ROOT=datasets/
 
 #* GPU id you need to run this shell 
-gpu_ids="0,1,2,3,4,5,6";
-gpu_num=7;
+# gpu_ids="0,1,2,3";
+gpu_ids="4,5,6,7";
+gpu_num=4;
 
 #* batch size 
 b_size=12;
@@ -31,7 +32,7 @@ port=29530
 labeled_ratio=0.2;
 topk=8;
 
-decay_epoch="65";
+decay_epoch="120 140";
 epoch=1000;
 
 
@@ -50,10 +51,10 @@ TORCH_DISTRIBUTED_DEBUG=INFO CUDA_VISIBLE_DEVICES=$gpu_ids python -m torch.distr
     --labeled_ratio $labeled_ratio \
     --max_epoch $epoch \
     --lr_decay_epochs $decay_epoch \
-    --upload-wandb \
+    --wandb \
+    --use-tkps \
     2>&1 | tee -a logs/pretrain_cls.log
 
-# --use-tkps
 
 
 # --lr-scheduler '

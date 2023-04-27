@@ -31,266 +31,137 @@ import multiprocessing as mp
 from IPython import embed
 
 
-def parse_semi_supervise_option():
-    """Parse cmd arguments."""
-    parser = argparse.ArgumentParser()
+# def parse_semi_supervise_option():
+#     """Parse cmd arguments."""
+#     parser = argparse.ArgumentParser()
 
-    # Model
-    parser.add_argument('--num_target', type=int, default=256,
-                        help='Proposal number')
-    parser.add_argument('--sampling', default='kps', type=str,
-                        help='Query points sampling method (kps, fps)')
+#     # Model
+#     parser.add_argument('--num_target', type=int, default=256,
+#                         help='Proposal number')
+#     parser.add_argument('--sampling', default='kps', type=str,
+#                         help='Query points sampling method (kps, fps)')
 
-    # Transformer
-    parser.add_argument('--num_encoder_layers', default=3, type=int)
-    parser.add_argument('--num_decoder_layers', default=6, type=int)
-    parser.add_argument('--self_position_embedding', default='loc_learned',
-                        type=str, help='(none, xyz_learned, loc_learned)')
-    parser.add_argument('--self_attend', action='store_true')
+#     # Transformer
+#     parser.add_argument('--num_encoder_layers', default=3, type=int)
+#     parser.add_argument('--num_decoder_layers', default=6, type=int)
+#     parser.add_argument('--self_position_embedding', default='loc_learned',
+#                         type=str, help='(none, xyz_learned, loc_learned)')
+#     parser.add_argument('--self_attend', action='store_true')
 
-    # Loss
-    parser.add_argument('--query_points_obj_topk', default=8, type=int)
-    parser.add_argument('--use_contrastive_align', action='store_true')
-    parser.add_argument('--use_soft_token_loss', action='store_true')
-    parser.add_argument('--detect_intermediate', action='store_true')
-    parser.add_argument('--joint_det', action='store_true')
+#     # Loss
+#     parser.add_argument('--query_points_obj_topk', default=8, type=int)
+#     parser.add_argument('--use_contrastive_align', action='store_true')
+#     parser.add_argument('--use_soft_token_loss', action='store_true')
+#     parser.add_argument('--detect_intermediate', action='store_true')
+#     parser.add_argument('--joint_det', action='store_true')
 
 
 
-    # Data
-    parser.add_argument('--batch_size', type=str, default="2,8",
-                        help='Batch Size during training')
-    parser.add_argument('--dataset', type=str, default=['sr3d'],
-                        nargs='+', help='list of datasets to train on')
+#     # Data
+#     parser.add_argument('--batch_size', type=str, default="2,8",
+#                         help='Batch Size during training')
+#     parser.add_argument('--dataset', type=str, default=['sr3d'],
+#                         nargs='+', help='list of datasets to train on')
     
 
-    parser.add_argument('--test_dataset', default='sr3d')
-    #!+=======
-    parser.add_argument('--unlabel-dataset-root', default=None)
-    #!+=======
-    parser.add_argument('--data_root', default='datasets/')
-    parser.add_argument('--use_height', action='store_true',
-                        help='Use height signal in input.')
-    parser.add_argument('--use_color', action='store_true',
-                        help='Use RGB color in input.')
-    parser.add_argument('--use_multiview', action='store_true')
-    parser.add_argument('--butd', action='store_true')
-    parser.add_argument('--butd_gt', action='store_true')
-    parser.add_argument('--butd_cls', action='store_true')
-    parser.add_argument('--augment_det', action='store_true')
-    parser.add_argument('--num_workers', type=int, default=4)
+#     parser.add_argument('--test_dataset', default='sr3d')
+#     #!+=======
+#     parser.add_argument('--unlabel-dataset-root', default=None)
+#     #!+=======
+#     parser.add_argument('--data_root', default='datasets/')
+#     parser.add_argument('--use_height', action='store_true',
+#                         help='Use height signal in input.')
+#     parser.add_argument('--use_color', action='store_true',
+#                         help='Use RGB color in input.')
+#     parser.add_argument('--use_multiview', action='store_true')
+#     parser.add_argument('--butd', action='store_true')
+#     parser.add_argument('--butd_gt', action='store_true')
+#     parser.add_argument('--butd_cls', action='store_true')
+#     parser.add_argument('--augment_det', action='store_true')
+#     parser.add_argument('--num_workers', type=int, default=4)
 
-    # Training
-    parser.add_argument('--start_epoch', type=int, default=1)
-    parser.add_argument('--max_epoch', type=int, default=400)
-    parser.add_argument('--optimizer', type=str, default='adamW')
-    parser.add_argument('--weight_decay', type=float, default=0.0005)
-    parser.add_argument("--lr", default=1e-4, type=float)
-    parser.add_argument("--lr_backbone", default=1e-3, type=float)
-    parser.add_argument("--text_encoder_lr", default=1e-5, type=float)
-    parser.add_argument('--lr-scheduler', type=str, default='step',
-                        choices=["step", "cosine"])
-    parser.add_argument('--lr_decay_epochs', type=int, default=[280, 340],
-                        nargs='+', help='when to decay lr, can be a list')
-    parser.add_argument('--lr_decay_rate', type=float, default=0.1,
-                        help='for step scheduler. decay rate for lr')
-    parser.add_argument('--clip_norm', default=0.1, type=float,
-                        help='gradient clipping max norm')
-    parser.add_argument('--bn_momentum', type=float, default=0.1)
-    parser.add_argument('--syncbn', action='store_true')
-    parser.add_argument('--warmup-epoch', type=int, default=-1)
-    parser.add_argument('--warmup-multiplier', type=int, default=100)
+#     # Training
+#     parser.add_argument('--start_epoch', type=int, default=1)
+#     parser.add_argument('--max_epoch', type=int, default=400)
+#     parser.add_argument('--optimizer', type=str, default='adamW')
+#     parser.add_argument('--weight_decay', type=float, default=0.0005)
+#     parser.add_argument("--lr", default=1e-4, type=float)
+#     parser.add_argument("--lr_backbone", default=1e-3, type=float)
+#     parser.add_argument("--text_encoder_lr", default=1e-5, type=float)
+#     parser.add_argument('--lr-scheduler', type=str, default='step',
+#                         choices=["step", "cosine"])
+#     parser.add_argument('--lr_decay_epochs', type=int, default=[280, 340],
+#                         nargs='+', help='when to decay lr, can be a list')
+#     parser.add_argument('--lr_decay_rate', type=float, default=0.1,
+#                         help='for step scheduler. decay rate for lr')
+#     parser.add_argument('--clip_norm', default=0.1, type=float,
+#                         help='gradient clipping max norm')
+#     parser.add_argument('--bn_momentum', type=float, default=0.1)
+#     parser.add_argument('--syncbn', action='store_true')
+#     parser.add_argument('--warmup-epoch', type=int, default=-1)
+#     parser.add_argument('--warmup-multiplier', type=int, default=100)
 
-    # io
-    parser.add_argument('--checkpoint_path', default=None,
-                        help='Model checkpoint path')
-    parser.add_argument('--log_dir', default='logs/bdetr',
-                        help='Dump dir to save model checkpoint')
-    parser.add_argument('--print_freq', type=int, default=10)  # batch-wise
-    parser.add_argument('--save_freq', type=int, default=1)  # epoch-wise
-    parser.add_argument('--val_freq', type=int, default=1)  # epoch-wise
+#     # io
+#     parser.add_argument('--checkpoint_path', default=None,
+#                         help='Model checkpoint path')
+#     parser.add_argument('--log_dir', default='logs/bdetr',
+#                         help='Dump dir to save model checkpoint')
+#     parser.add_argument('--print_freq', type=int, default=10)  # batch-wise
+#     parser.add_argument('--save_freq', type=int, default=1)  # epoch-wise
+#     parser.add_argument('--val_freq', type=int, default=1)  # epoch-wise
 
-    # others
-    parser.add_argument("--local_rank", type=int,default=-1,
-                        help='local rank for DistributedDataParallel')
-    parser.add_argument('--ap_iou_thresholds', type=float, default=[0.25, 0.5],
-                        nargs='+', help='A list of AP IoU thresholds')
-    parser.add_argument("--rng_seed", type=int, default=0, help='manual seed')
-    parser.add_argument("--debug", action='store_true',
-                        help="try to overfit few samples")
-    parser.add_argument('--eval', default=False, action='store_true')
-    parser.add_argument('--eval_train', action='store_true')
-    parser.add_argument('--pp_checkpoint', default=None)
-    parser.add_argument('--reduce_lr', action='store_true')
+#     # others
+#     parser.add_argument("--local_rank", type=int,default=-1,
+#                         help='local rank for DistributedDataParallel')
+#     parser.add_argument('--ap_iou_thresholds', type=float, default=[0.25, 0.5],
+#                         nargs='+', help='A list of AP IoU thresholds')
+#     parser.add_argument("--rng_seed", type=int, default=0, help='manual seed')
+#     parser.add_argument("--debug", action='store_true',
+#                         help="try to overfit few samples")
+#     parser.add_argument('--eval', default=False, action='store_true')
+#     parser.add_argument('--eval_train', action='store_true')
+#     parser.add_argument('--pp_checkpoint', default=None)
+#     parser.add_argument('--reduce_lr', action='store_true')
 
-    #* mine args 
-    #* semi supervise 
-    parser.add_argument('--box_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
-    parser.add_argument('--box_giou_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
-    parser.add_argument('--soft_token_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
-    parser.add_argument('--object_query_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
-    parser.add_argument('--text_token_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
-    parser.add_argument('--rampup_length', type=float, default=None, help='rampup_length')
-    parser.add_argument('--labeled_ratio', default=None, type=float,help=' labeled datasets ratio ')
+#     #* mine args 
+#     #* semi supervise 
+#     parser.add_argument('--box_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
+#     parser.add_argument('--box_giou_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
+#     parser.add_argument('--soft_token_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
+#     parser.add_argument('--object_query_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
+#     parser.add_argument('--text_token_consistency_weight', type=float, default=1.0, metavar='WEIGHT', help='use consistency loss with given weight (default: None)')
+#     parser.add_argument('--rampup_length', type=float, default=None, help='rampup_length')
+#     parser.add_argument('--labeled_ratio', default=None, type=float,help=' labeled datasets ratio ')
     
-    #* others 
-    parser.add_argument('--gpu-ids', default='7', type=str)
-    parser.add_argument('--vis-save-path', default=None, type=str)
-    parser.add_argument('--upload-wandb',action='store_true', help="upload to wandb or not ?")
-    parser.add_argument('--save-input-output',action='store_true', help="save-input-output")
-    parser.add_argument('--use-tkps',action='store_true', help="use-tkps")
-    parser.add_argument('--lr_decay_intermediate',action='store_true')
+#     #* others 
+#     parser.add_argument('--gpu-ids', default='7', type=str)
+#     parser.add_argument('--vis-save-path', default=None, type=str)
+#     parser.add_argument('--upload-wandb',action='store_true', help="upload to wandb or not ?")
+#     parser.add_argument('--save-input-output',action='store_true', help="save-input-output")
+#     parser.add_argument('--use-tkps',action='store_true', help="use-tkps")
+#     parser.add_argument('--lr_decay_intermediate',action='store_true')
 
 
-    parser.add_argument('--ema-decay', default=None, type=float,help=' EMA decay parameter ')
-    parser.add_argument('--ema-decay-after-rampup', default=None, type=float,help=' EMA decay parameter ')
-    parser.add_argument('--ema-full-supervise', action='store_true',help='ema-full-supervise ')
+#     parser.add_argument('--ema-decay', default=None, type=float,help=' EMA decay parameter ')
+#     parser.add_argument('--ema-decay-after-rampup', default=None, type=float,help=' EMA decay parameter ')
+#     parser.add_argument('--ema-full-supervise', action='store_true',help='ema-full-supervise ')
 
+
+#     args, _ = parser.parse_known_args()
+#     args.eval = args.eval or args.eval_train
+
+
+#     args.use_color = True
+#     args.use_soft_token_loss=True
+#     args.use_contrastive_align=True
+#     args.self_attend=True
     
+#     if args.labeled_ratio is not None :
+#         print(f"origin decay epoch : {args.lr_decay_epochs},opt.labeled_ratio : {args.labeled_ratio}")
+#         args.lr_decay_epochs  = (np.array(args.lr_decay_epochs) //  args.labeled_ratio).astype(np.int64).tolist()
+#         print(f"after calibration, decay epoch : {args.lr_decay_epochs}")
 
-
-    args, _ = parser.parse_known_args()
-    args.eval = args.eval or args.eval_train
-
-
-
-    args.use_color = True
-    args.use_soft_token_loss=True
-    args.use_contrastive_align=True
-    args.self_attend=True
-    
-    # --use_color
-    # --use_soft_token_loss
-    # --use_contrastive_align
-    # --self_attend
-    # --use-tkps
-
-    if args.labeled_ratio is not None :
-        print(f"origin decay epoch : {args.lr_decay_epochs},opt.labeled_ratio : {args.labeled_ratio}")
-        args.lr_decay_epochs  = (np.array(args.lr_decay_epochs) //  args.labeled_ratio).astype(np.int64).tolist()
-        print(f"after calibration, decay epoch : {args.lr_decay_epochs}")
-
-    return args
-
-
-
-def parse_option():
-
-    """Parse cmd arguments."""
-    parser = argparse.ArgumentParser()
-    # Model
-    parser.add_argument('--num_target', type=int, default=256,
-                        help='Proposal number')
-    parser.add_argument('--sampling', default='kps', type=str,
-                        help='Query points sampling method (kps, fps)')
-
-    # Transformer
-    parser.add_argument('--num_encoder_layers', default=3, type=int)
-    parser.add_argument('--num_decoder_layers', default=6, type=int)
-    parser.add_argument('--self_position_embedding', default='loc_learned',
-                        type=str, help='(none, xyz_learned, loc_learned)')
-    parser.add_argument('--self_attend', action='store_true')
-
-    # Loss
-    parser.add_argument('--query_points_obj_topk', default=8, type=int)
-    parser.add_argument('--use_contrastive_align', action='store_true')
-    parser.add_argument('--use_soft_token_loss', action='store_true')
-    parser.add_argument('--detect_intermediate', action='store_true')
-    parser.add_argument('--joint_det', action='store_true')
-
-    # Data
-    parser.add_argument('--batch_size', type=int, default=8,
-                        help='Batch Size during training')
-    
-    parser.add_argument('--dataset', type=str, default=['sr3d'],
-                        nargs='+', help='list of datasets to train on')
-    
-    parser.add_argument('--test_dataset', default='sr3d')
-    parser.add_argument('--data_root', default='datasets/')
-    parser.add_argument('--use_height', action='store_true',
-                        help='Use height signal in input.')
-    parser.add_argument('--use_color', action='store_true',
-                        help='Use RGB color in input.')
-    parser.add_argument('--use_multiview', action='store_true')
-    
-    parser.add_argument('--butd', action='store_true')
-    
-    parser.add_argument('--butd_gt', action='store_true')
-    parser.add_argument('--butd_cls', action='store_true')
-    parser.add_argument('--augment_det', action='store_true')
-    parser.add_argument('--num_workers', type=int, default=4)
-
-    # Training
-    parser.add_argument('--start_epoch', type=int, default=1)
-    parser.add_argument('--max_epoch', type=int, default=400)
-    parser.add_argument('--optimizer', type=str, default='adamW')
-    parser.add_argument('--weight_decay', type=float, default=0.0005)
-    parser.add_argument("--lr", default=1e-4, type=float)
-    parser.add_argument("--lr_backbone", default=1e-3, type=float)
-    parser.add_argument("--text_encoder_lr", default=1e-5, type=float)
-    parser.add_argument('--lr-scheduler', type=str, default='step',
-                        choices=["step", "cosine"])
-    parser.add_argument('--lr_decay_epochs', type=int, default=[280, 340],
-                        nargs='+', help='when to decay lr, can be a list')
-    parser.add_argument('--lr_decay_rate', type=float, default=0.1,
-                        help='for step scheduler. decay rate for lr')
-    parser.add_argument('--clip_norm', default=0.1, type=float,
-                        help='gradient clipping max norm')
-    parser.add_argument('--bn_momentum', type=float, default=0.1)
-    parser.add_argument('--syncbn', action='store_true')
-    parser.add_argument('--warmup-epoch', type=int, default=-1)
-    parser.add_argument('--warmup-multiplier', type=int, default=100)
-
-    # io
-    parser.add_argument('--checkpoint_path', default=None,
-                        help='Model checkpoint path')
-    parser.add_argument('--log_dir', default='logs/bdetr',
-                        help='Dump dir to save model checkpoint')
-    parser.add_argument('--print_freq', type=int, default=10)  # batch-wise
-    parser.add_argument('--save_freq', type=int, default=1)  # epoch-wise
-    parser.add_argument('--val_freq', type=int, default=1)  # epoch-wise
-
-    # others
-    parser.add_argument("--local_rank", type=int,default=-1,
-                        help='local rank for DistributedDataParallel')
-    parser.add_argument('--ap_iou_thresholds', type=float, default=[0.25, 0.5],
-                        nargs='+', help='A list of AP IoU thresholds')
-    parser.add_argument("--rng_seed", type=int, default=0, help='manual seed')
-    parser.add_argument("--debug", action='store_true',
-                        help="try to overfit few samples")
-    parser.add_argument('--eval', action='store_true')
-    parser.add_argument('--eval-scanrefer', default=False, action='store_true',help=' generate the pred.json for the ')
-    parser.add_argument('--eval_train', action='store_true')
-    parser.add_argument('--pp_checkpoint', default=None)
-    parser.add_argument('--reduce_lr', action='store_true')
-
-    #* mine args 
-    parser.add_argument('--gpu-ids', default='7', type=str)
-    parser.add_argument('--vis-save-path', default=None, type=str)
-    parser.add_argument('--upload-wandb',action='store_true', help="upload to wandb or not ?")
-    parser.add_argument('--labeled_ratio', default=None, type=float,help=' labeled datasets ratio ')
-    parser.add_argument('--use-tkps',action='store_true', help="use-tkps")
-    parser.add_argument('--ref_use_obj_mask',action='store_true', help="ref_use_obj_mask")
-    parser.add_argument('--lr_decay_intermediate',action='store_true')
-
-    args, _ = parser.parse_known_args()
-    args.eval = args.eval or args.eval_train
-
-
-    args.use_color = True
-    args.use_soft_token_loss=True
-    args.use_contrastive_align=True
-    args.self_attend=True
-
-
-    if args.labeled_ratio is not None :
-        print(f"origin decay epoch : {args.lr_decay_epochs},opt.labeled_ratio : {args.labeled_ratio}")
-        args.lr_decay_epochs  = (np.array(args.lr_decay_epochs) //  args.labeled_ratio).astype(np.int64).tolist()
-        print(f"after calibration, decay epoch : {args.lr_decay_epochs}")
-
-
-
-    return args
+#     return args
 
 
 

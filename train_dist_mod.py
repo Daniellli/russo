@@ -1,7 +1,7 @@
 '''
 Author: daniel
 Date: 2023-03-22 16:49:49
-LastEditTime: 2023-03-28 15:29:40
+LastEditTime: 2023-04-26 21:02:37
 LastEditors: daniel
 Description: 
 FilePath: /butd_detr/train_dist_mod.py
@@ -111,32 +111,6 @@ class TrainTester(BaseTrainTester):
             augment_det=augment_det ,
             labeled_ratio=labeled_ratio
         )
-
-
-    def get_scanrefer_dataset(self,data_root,train_dataset_dict,test_datasets,split,use_color,use_height,
-                    detect_intermediate,use_multiview,butd,butd_gt,butd_cls,augment_det=False,
-                    debug=False,labeled_ratio=None):
-
-
-        self.log(f"labeled ratio :{labeled_ratio}")
-
-        
-        return ScanReferTestDataset(
-            dataset_dict=train_dataset_dict,
-            test_dataset=test_datasets,
-            split=split,
-            use_color=use_color, use_height=use_height,
-            overfit=debug,
-            data_path=data_root,
-            detect_intermediate=detect_intermediate,
-            use_multiview=use_multiview,
-            butd=butd, 
-            butd_gt=butd_gt,
-            butd_cls=butd_cls,
-            augment_det=augment_det ,
-            labeled_ratio=labeled_ratio
-        )
-
         
 
     @staticmethod

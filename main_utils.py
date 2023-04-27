@@ -52,8 +52,123 @@ signal(SIGPIPE, SIG_IGN)
 from my_utils.utils import make_dirs, save_res,parse_option,detach_module,load_checkpoint,save_checkpoint
 
 #*=====================================
-
         
+def parse_option():
+
+    """Parse cmd arguments."""
+    parser = argparse.ArgumentParser()
+    #* Model
+    parser.add_argument('--num_target', type=int, default=256,
+                        help='Proposal number')
+    parser.add_argument('--sampling', default='kps', type=str,
+                        help='Query points sampling method (kps, fps)')
+
+    #* Transformer
+    parser.add_argument('--num_encoder_layers', default=3, type=int)
+    parser.add_argument('--num_decoder_layers', default=6, type=int)
+    parser.add_argument('--self_position_embedding', default='loc_learned',
+                        type=str, help='(none, xyz_learned, loc_learned)')
+    parser.add_argument('--self_attend', action='store_true')
+
+    #* Loss
+    parser.add_argument('--query_points_obj_topk', default=8, type=int)
+    parser.add_argument('--use_contrastive_align', action='store_true')
+    parser.add_argument('--use_soft_token_loss', action='store_true')
+    parser.add_argument('--detect_intermediate', action='store_true')
+    parser.add_argument('--joint_det', action='store_true')
+
+    #* Data
+    parser.add_argument('--batch_size', type=int, default=8,
+                        help='Batch Size during training')
+    
+    parser.add_argument('--dataset', type=str, default=['sr3d'],
+                        nargs='+', help='list of datasets to train on')
+    
+    parser.add_argument('--test_dataset', default='sr3d')
+    parser.add_argument('--data_root', default='datasets/')
+    parser.add_argument('--use_height', action='store_true',
+                        help='Use height signal in input.')
+    parser.add_argument('--use_color', action='store_true',
+                        help='Use RGB color in input.')
+    parser.add_argument('--use_multiview', action='store_true')
+    
+    parser.add_argument('--butd', action='store_true')
+    
+    parser.add_argument('--butd_gt', action='store_true')
+    parser.add_argument('--butd_cls', action='store_true')
+    parser.add_argument('--augment_det', action='store_true')
+    parser.add_argument('--num_workers', type=int, default=4)
+
+    #* Training
+    parser.add_argument('--start_epoch', type=int, default=1)
+    parser.add_argument('--max_epoch', type=int, default=400)
+    parser.add_argument('--optimizer', type=str, default='adamW')
+    parser.add_argument('--weight_decay', type=float, default=0.0005)
+    parser.add_argument("--lr", default=1e-4, type=float)
+    parser.add_argument("--lr_backbone", default=1e-3, type=float)
+    parser.add_argument("--text_encoder_lr", default=1e-5, type=float)
+    parser.add_argument('--lr-scheduler', type=str, default='step',
+                        choices=["step", "cosine"])
+    parser.add_argument('--lr_decay_epochs', type=int, default=[280, 340],
+                        nargs='+', help='when to decay lr, can be a list')
+    parser.add_argument('--lr_decay_rate', type=float, default=0.1,
+                        help='for step scheduler. decay rate for lr')
+    parser.add_argument('--clip_norm', default=0.1, type=float,
+                        help='gradient clipping max norm')
+    parser.add_argument('--bn_momentum', type=float, default=0.1)
+    parser.add_argument('--syncbn', action='store_true')
+    parser.add_argument('--warmup-epoch', type=int, default=-1)
+    parser.add_argument('--warmup-multiplier', type=int, default=100)
+
+    # io
+    parser.add_argument('--checkpoint_path', default=None,
+                        help='Model checkpoint path')
+    parser.add_argument('--log_dir', default='logs/bdetr',
+                        help='Dump dir to save model checkpoint')
+    parser.add_argument('--print_freq', type=int, default=10)  # batch-wise
+    parser.add_argument('--save_freq', type=int, default=1)  # epoch-wise
+    parser.add_argument('--val_freq', type=int, default=1)  # epoch-wise
+
+    # others
+    parser.add_argument("--local_rank", type=int,default=-1,
+                        help='local rank for DistributedDataParallel')
+    parser.add_argument('--ap_iou_thresholds', type=float, default=[0.25, 0.5],
+                        nargs='+', help='A list of AP IoU thresholds')
+    parser.add_argument("--rng_seed", type=int, default=0, help='manual seed')
+    parser.add_argument("--debug", action='store_true',
+                        help="try to overfit few samples")
+    parser.add_argument('--eval', action='store_true')
+    parser.add_argument('--eval-scanrefer', default=False, action='store_true',help=' generate the pred.json for the ')
+    parser.add_argument('--eval_train', action='store_true')
+    parser.add_argument('--pp_checkpoint', default=None)
+    parser.add_argument('--reduce_lr', action='store_true')
+
+    #* mine args 
+    parser.add_argument('--gpu-ids', default='7', type=str)
+    parser.add_argument('--vis-save-path', default=None, type=str)
+    parser.add_argument('--wandb',action='store_true', help="upload to wandb or not ?")
+    parser.add_argument('--labeled_ratio', default=None, type=float,help=' labeled datasets ratio ')
+    parser.add_argument('--use-tkps',action='store_true', help="use-tkps")
+    parser.add_argument('--ref_use_obj_mask',action='store_true', help="ref_use_obj_mask")
+    parser.add_argument('--lr_decay_intermediate',action='store_true')
+
+    args, _ = parser.parse_known_args()
+    args.eval = args.eval or args.eval_train
+
+
+    args.use_color = True
+    args.use_soft_token_loss=True
+    args.use_contrastive_align=True
+    args.self_attend=True
+
+
+    if args.labeled_ratio is not None :
+        print(f"origin decay epoch : {args.lr_decay_epochs},opt.labeled_ratio : {args.labeled_ratio}")
+        args.lr_decay_epochs  = (np.array(args.lr_decay_epochs) //  args.labeled_ratio).astype(np.int64).tolist()
+        print(f"after calibration, decay epoch : {args.lr_decay_epochs}")
+
+    return args
+
 
 
 class BaseTrainTester:
@@ -63,18 +178,20 @@ class BaseTrainTester:
 
         self.args = args
 
-        self.init_wandb()
-
-
         """Initialize."""
-        name = args.log_dir.split('/')[-1]
-        # Create log dir
-        args.log_dir = os.path.join(
-            args.log_dir,
-            ','.join(args.dataset),
-            f'{int(time.time())}'
-        )
-        os.makedirs(args.log_dir, exist_ok=True)
+        if args.checkpoint_path is not None:
+            # name = 'resume'
+            name = args.checkpoint_path.split('/')[-4]
+            args.log_dir = '/'.join(args.checkpoint_path.split('/')[:-1])
+        else:
+            name = args.log_dir.split('/')[-1]
+            args.log_dir = os.path.join(
+                args.log_dir,
+                ','.join(args.dataset),
+                time.strftime("%Y-%m-%d-%H:%M",time.gmtime(time.time()))
+            )
+            os.makedirs(args.log_dir, exist_ok=True)
+
 
         # Create logger
         self.logger = setup_logger(
@@ -92,30 +209,41 @@ class BaseTrainTester:
                 json.dump(vars(args), f, indent=2)
             self.log("Full config saved to {}".format(path))
             self.log(str(vars(args)))
+            if args.wandb:
+                self.init_wandb()
             
 
-
     def init_wandb(self):
-        if self.args.upload_wandb and self.args.local_rank == 0:
-            run=wandb.init(project="BUTD_DETR")
-            # run.name = "test_"+run.name
+        if self.args.checkpoint_path is not None:
+            #todo resume wandb :
+            with open(join(self.args.log_dir,'wandb_resume_info.json'), 'r') as f :
+                last_run_info  = json.load(f)
+            run  = wandb.init(project='BUTD_DETR',id=last_run_info['id'], resume="must")
+            self.log(f"wandb has been resume ")
+        else:
+            run = wandb.init(project='BUTD_DETR')
+            run.name = split(self.args.log_dir)[-1]
+            with open(join(self.args.log_dir,'wandb_resume_info.json'),'w') as f :
+                json.dump({
+                    "id":run.id,
+                    "name":run.name,
+                },f)
+            
             for k, v in self.args.__dict__.items():
                 setattr(wandb.config,k,v)
-            self.use_wandb = True
+            setattr(wandb.config,"save_root",self.args.log_dir)
+            self.log(f"wandb init process has done")
+        self.use_wandb = True
     
     def log(self,message):
-
-        if self.args.local_rank == 0 or self.args.local_rank == -1:
+        if dist.get_rank() == 0 or self.args.local_rank == -1:
             # print((message))
             self.logger.info(message)
 
         
     def wandb_log(self,message):
-        if (self.args.local_rank == 0 or self.args.local_rank == -1 ) and hasattr(self,'use_wandb') and self.use_wandb:
+        if dist.get_rank() == 0 and hasattr(self,'use_wandb') and self.use_wandb:
             wandb.log(message)
-
-            
-
 
 
     def get_dataset(self):
@@ -215,8 +343,13 @@ class BaseTrainTester:
         return optimizer
 
 
+    '''
+    description: ???
+    param {*} self
+    param {*} args
+    return {*}
+    '''
     def evaluation(self,args):
-
         assert os.path.isfile(args.checkpoint_path)
         if args.checkpoint_path is None :
             logger.error("not checkpoint found ")
@@ -227,18 +360,11 @@ class BaseTrainTester:
         torch.cuda.set_device(args.local_rank)
         
         """Run main training/testing pipeline."""
-        if args.eval_scanrefer:
-            test_dataset = self.get_scanrefer_dataset(args.data_root,{},args.test_dataset,
-                            'test',
-                            args.use_color,args.use_height,args.detect_intermediate,
-                            args.use_multiview,args.butd,args.butd_gt,
-                            args.butd_cls,debug = args.debug,labeled_ratio=args.labeled_ratio)
-        else :
-             test_dataset = self.get_dataset(args.data_root,{},args.test_dataset,
-                            'val' if not args.eval_train else 'train',
-                            args.use_color,args.use_height,args.detect_intermediate,
-                            args.use_multiview,args.butd,args.butd_gt,
-                            args.butd_cls,debug = args.debug,labeled_ratio=args.labeled_ratio)
+        test_dataset = self.get_dataset(args.data_root,{},args.test_dataset,
+                    'val' if not args.eval_train else 'train',
+                    args.use_color,args.use_height,args.detect_intermediate,
+                    args.use_multiview,args.butd,args.butd_gt,
+                    args.butd_cls,debug = args.debug,labeled_ratio=args.labeled_ratio)
 
 
 
@@ -275,27 +401,11 @@ class BaseTrainTester:
             os.remove(save_dir)
 
 
-
-
-
         #* eval student model 
-        #!=========
-        DEBUG = False
-        if DEBUG:
-            performance = self.inference_for_scanrefer_benchmark(
-                args.start_epoch, test_loader,
-                model, criterion, set_criterion, args,for_vis=True,debug=DEBUG
-            )
-        else:
-
-            #     performance = self.evaluate_one_epoch_and_save_qualitative_res(
-            #     args.start_epoch, test_loader,
-            #     model, criterion, set_criterion, args
-            # )
-            performance = self.evaluate_one_epoch(
-                args.start_epoch, test_loader,
-                model, criterion, set_criterion, args
-            )
+        performance = self.evaluate_one_epoch(
+            args.start_epoch, test_loader,
+            model, criterion, set_criterion, args
+        )
 
         if performance is not None :
             self.log(','.join(['student_%s:%.04f'%(k,round(v,4)) for k,v in performance.items()]))
@@ -666,87 +776,8 @@ class BaseTrainTester:
 
 
 
-    '''
-    description:  with debug 
-    return {*}
-    '''
-    def _inference_only(self, batch_idx, batch_data, test_loader, model,
-                        stat_dict,criterion, set_criterion, args,debug):
-        # Move to GPU
-        batch_data = self._to_gpu(batch_data)
-        inputs = self._get_inputs(batch_data)
-        if "train" not in inputs:
-            inputs.update({"train": False})
-        else:
-            inputs["train"] = False
-
-        # Forward pass
-        #todo 如何把debug 信息传给 model 里面的 DKS? 
-        end_points = model(inputs)#* the length of end_points  == 60, last item ==  last_sem_cls_scores
-
-        # Compute loss
-        for key in batch_data: 
-            assert (key not in end_points)
-            end_points[key] = batch_data[key]#*  the length of end_points == 86, last item ==  target_cid 
-
-            
-        return end_points
-
     
-    ''' 
-    description: 检查输入 
-    param {*} self
-    param {*} inputs
-    return {*}
-    '''
-    def check_input(self,inputs,scan_ids,FLAG='student'):
-        #* 132 == MAX_NUM_OBJ ,the max number of object  in that scenes 
-        # inputs['point_clouds']#*  [2, 50000, 6]
-        # inputs['text'] #* length = 2 
-        # inputs['det_boxes']#* [2, 132, 6]
-        # inputs['det_bbox_label_mask']#* [2,132]   , 对应是目标还是padding 
-        # inputs['det_class_ids']#* [2,132] , 对应类别信息
-
-        B,N,_=inputs['point_clouds'].shape
-        for i in range(B):
-
-            write_pc_as_ply(
-                        inputs['point_clouds'][i].clone().detach().cpu().numpy(),
-                        os.path.join(self.vis_save_path,scan_ids[i], '%s_gt_%s.ply'%(scan_ids[i],FLAG))
-                    )
-
-
-            #* open3d  format bounding box 
-            np.savetxt(os.path.join(self.vis_save_path, scan_ids[i],'%s_box_%s.txt'%(scan_ids[i],FLAG)),
-            inputs['det_boxes'][i][inputs['det_bbox_label_mask'][i]].clone().detach().cpu().numpy(),
-            fmt='%s')
             
-            #* write utterances
-            with open(os.path.join(self.vis_save_path, scan_ids[i],'%s_utterances_%s.txt'%(scan_ids[i],FLAG)), 'w') as f :
-                f.write(inputs['text'][i])
-
-
-     
-    '''
-    description:  检查target box
-    param {*} self
-    param {*} batch_data
-    param {*} conrresponding_pc
-    param {*} scan_ids
-    return {*}
-    '''
-    def check_target(self,batch_data,scan_ids):
-        flag = 'target'
-        mask = batch_data['box_label_mask']
-        gt_box = torch.cat([batch_data['center_label'],batch_data['size_gts']],dim=2)
-        for i in range(len(mask)):
-            #* open3d  format bounding box 
-            np.savetxt(os.path.join(self.vis_save_path, scan_ids[i],'%s_box_%s.txt'%(scan_ids[i],flag)),
-                        gt_box[i][mask[i].bool()].clone().detach().cpu().numpy(),fmt='%s')
-
-
-                
-                
 
     @torch.no_grad()
     def evaluate_one_epoch(self, epoch, test_loader,
