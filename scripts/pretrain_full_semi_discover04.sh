@@ -2,7 +2,7 @@
 ###
  # @Author: daniel
  # @Date: 2023-03-28 23:07:11
- # @LastEditTime: 2023-04-27 23:51:33
+ # @LastEditTime: 2023-04-28 00:15:53
  # @LastEditors: daniel
  # @Description: 
  # @FilePath: /russo/scripts/pretrain_full_semi_discover04.sh
