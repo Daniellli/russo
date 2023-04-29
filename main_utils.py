@@ -482,7 +482,7 @@ class BaseTrainTester:
 
                 scheduler.milestones ={len(train_loader)*( l-args.warmup_epoch - args.start_epoch )+scheduler.last_epoch : 1 for l in args.lr_decay_epochs}
                 #* update wandb config 
-                self.update_wandb_config('lr_decay_epochs',args.lr_decay_epochs)
+                # self.update_wandb_config('lr_decay_epochs',args.lr_decay_epochs)
                 self.log(f"after update, scheduler.milestones : {scheduler.milestones}")
                 
             #* eval student model 
